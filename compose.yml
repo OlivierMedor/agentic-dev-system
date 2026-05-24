@@ -1,0 +1,7 @@
+services:
+  agentic:
+    build: .
+    working_dir: /app
+    volumes:
+      - ./:/app
+      - ../sandbox-product:/sandbox-product
