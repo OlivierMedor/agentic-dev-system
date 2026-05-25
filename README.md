@@ -28,3 +28,13 @@ docker compose run --rm agentic agentic init --project /sandbox-product
 ```
 
 This initializes the separate sandbox project mounted at `/sandbox-product`. The tool repo stays separate from the project being prepared.
+
+## Create a review bundle
+
+Run this from the repo root to collect review files for a story:
+
+```powershell
+docker compose run --rm agentic agentic review-bundle --project /app --story story_002_review_bundle_command
+```
+
+The command writes Git status, recent commits, unstaged changes, staged changes, test output, lint output, a file tree, and a short handoff into the story's `review_bundle/` folder. It also records untracked file lists and safe text snapshots for untracked files so reviewers can see newly created files before they are staged.

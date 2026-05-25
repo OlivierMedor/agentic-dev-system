@@ -11,6 +11,9 @@ def test_init_project_creates_expected_structure(tmp_path: Path) -> None:
     assert (tmp_path / ".agentic" / "project.yaml").exists()
     assert (tmp_path / ".agentic" / "rules.yaml").exists()
     assert (tmp_path / ".agentic" / "quality_gates.yaml").exists()
+    assert f"project_name: {tmp_path.name}" in (tmp_path / ".agentic" / "project.yaml").read_text(
+        encoding="utf-8",
+    )
 
     assert (tmp_path / "blueprints" / "blueprint.md").exists()
 

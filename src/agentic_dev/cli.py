@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from agentic_dev.review_bundle import create_review_bundle
 from agentic_dev.scaffolding import init_project
 
 
@@ -25,6 +26,22 @@ def main() -> None:
         help="Target project folder. Defaults to the current directory.",
     )
 
+    review_bundle_parser = subparsers.add_parser(
+        "review-bundle",
+        help="Create a review bundle for a story.",
+    )
+    review_bundle_parser.add_argument(
+        "--project",
+        type=Path,
+        required=True,
+        help="Target project folder.",
+    )
+    review_bundle_parser.add_argument(
+        "--story",
+        required=True,
+        help="Story folder name under the project's stories folder.",
+    )
+
     args = parser.parse_args()
 
     if args.command == "init":
@@ -38,3 +55,13 @@ def main() -> None:
                 print(f"  - {path}")
         else:
             print("\nNo new files created. Project already appears initialized.")
+
+    if args.command == "review-bundle":
+        result = create_review_bundle(args.project, args.story)
+
+        print(f"Review bundle created at: {result.review_bundle_path}")
+        print(f"pytest passed: {result.pytest_passed}")
+        print(f"ruff passed: {result.ruff_passed}")
+        print("\nGenerated:")
+        for path in result.generated_files:
+            print(f"  - {path}")

@@ -26,6 +26,7 @@ def write_if_missing(path: Path, content: str) -> None:
 def init_project(project_path: Path) -> list[Path]:
     """Prepare a project folder for the agentic development workflow."""
     project_path = project_path.resolve()
+    project_name = project_path.name
     created_paths: list[Path] = []
 
     directories = [
@@ -58,7 +59,7 @@ def init_project(project_path: Path) -> list[Path]:
             created_paths.append(directory)
 
     files = {
-        project_path / ".agentic" / "project.yaml": """project_name: sandbox-product
+        project_path / ".agentic" / "project.yaml": f"""project_name: {project_name}
 project_type: unknown
 description: Project prepared for agentic development.
 """,

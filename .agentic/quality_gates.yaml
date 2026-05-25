@@ -1,0 +1,5 @@
+quality_gates:
+  - tests_required
+  - docs_required
+  - review_bundle_required
+  - local_review_required
