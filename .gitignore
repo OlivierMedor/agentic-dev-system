@@ -16,6 +16,8 @@ __pycache__/
 
 # Review packets / generated local artifacts
 .review_packets/
+review_to_chatgpt/
+agentic_story*_review.zip
 
 # OS
 .DS_Store

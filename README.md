@@ -1,10 +1,10 @@
 # Agentic Development System
 
-This is a reusable tool for preparing software projects for an agentic development workflow.
+This repo contains a small reusable CLI for preparing a project to use an agentic development workflow.
 
-## Current goal
+## What it does
 
-The first version creates the standard project structure:
+The current command initializes a target project with a standard structure:
 
 - `.agentic/`
 - `blueprints/`
@@ -13,13 +13,18 @@ The first version creates the standard project structure:
 - `tests/`
 - `docs/`
 
+It also creates the first setup story, basic project rules, quality gates, and starter instructions for the agent roles used by the workflow.
+
 ## Why this exists
 
-The system is designed so that a project can start from a blueprint, create story workspaces, assign agents, collect reports, and prepare review bundles for human/cloud review.
+The goal is to make agent-assisted development repeatable. A project can start from a blueprint, organize work into stories, collect agent reports, and prepare review bundles for human or cloud review.
 
 ## Try it on a sandbox project
 
-From this repo:
+Run this from the repo root:
 
 ```powershell
 docker compose run --rm agentic agentic init --project /sandbox-product
+```
+
+This initializes the separate sandbox project mounted at `/sandbox-product`. The tool repo stays separate from the project being prepared.
