@@ -1,0 +1,5 @@
+rules:
+  - Developer agent must not write tests.
+  - Test agent must write tests independently.
+  - Human approval is required before merge.
+  - Do not commit secrets, API keys, private keys, or .env files.

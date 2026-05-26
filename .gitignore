@@ -18,6 +18,8 @@ __pycache__/
 .review_packets/
 review_to_chatgpt/
 agentic_story*_review.zip
+stories/**/review_bundle/*
+!stories/**/review_bundle/.gitkeep
 
 # OS
 .DS_Store
