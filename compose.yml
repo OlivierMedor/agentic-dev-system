@@ -1,5 +1,5 @@
 services:
-  agentic:
+  dev:
     build: .
     working_dir: /app
     volumes:

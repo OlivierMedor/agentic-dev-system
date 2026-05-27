@@ -1,0 +1,12 @@
+﻿unit_tests:
+  required: true
+  frequency: every_commit
+
+integration_tests:
+  required: false
+  frequency: later
+
+manual_checks:
+  - Run generate-stories using default blueprint path.
+  - Confirm generated story folders contain required files.
+  - Confirm existing story files are not overwritten.

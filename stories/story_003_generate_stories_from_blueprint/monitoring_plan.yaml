@@ -1,0 +1,10 @@
+﻿logs_required: true
+
+watch_for:
+  - missing_blueprint_file
+  - invalid_blueprint_yaml
+  - missing_stories_list
+  - duplicate_story_slug
+  - attempted_overwrite
+
+failure_action: create_maintenance_queue_item
