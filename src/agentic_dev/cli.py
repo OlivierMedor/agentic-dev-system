@@ -5,6 +5,7 @@ from pathlib import Path
 
 from agentic_dev.review_bundle import create_review_bundle
 from agentic_dev.scaffolding import init_project
+from agentic_dev.story_generator import generate_stories
 
 
 def main() -> None:
@@ -33,8 +34,8 @@ def main() -> None:
     review_bundle_parser.add_argument(
         "--project",
         type=Path,
-        required=True,
-        help="Target project folder.",
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
     )
     review_bundle_parser.add_argument(
         "--story",
@@ -42,26 +43,57 @@ def main() -> None:
         help="Story folder name under the project's stories folder.",
     )
 
+    generate_stories_parser = subparsers.add_parser(
+        "generate-stories",
+        help="Generate story workspaces from a blueprint.",
+    )
+    generate_stories_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    generate_stories_parser.add_argument(
+        "--blueprint",
+        type=Path,
+        help="Blueprint YAML file. Defaults to blueprints/blueprint.yaml inside the project.",
+    )
+
     args = parser.parse_args()
 
-    if args.command == "init":
-        created_paths = init_project(args.project)
+    try:
+        if args.command == "init":
+            created_paths = init_project(args.project)
 
-        print(f"Initialized agentic project at: {args.project.resolve()}")
+            print(f"Initialized agentic project at: {args.project.resolve()}")
 
-        if created_paths:
-            print("\nCreated:")
-            for path in created_paths:
+            if created_paths:
+                print("\nCreated:")
+                for path in created_paths:
+                    print(f"  - {path}")
+            else:
+                print("\nNo new files created. Project already appears initialized.")
+
+        if args.command == "review-bundle":
+            result = create_review_bundle(args.project, args.story)
+
+            print(f"Review bundle created at: {result.review_bundle_path}")
+            print(f"pytest passed: {result.pytest_passed}")
+            print(f"ruff passed: {result.ruff_passed}")
+            print("\nGenerated:")
+            for path in result.generated_files:
                 print(f"  - {path}")
-        else:
-            print("\nNo new files created. Project already appears initialized.")
 
-    if args.command == "review-bundle":
-        result = create_review_bundle(args.project, args.story)
+        if args.command == "generate-stories":
+            created_paths = generate_stories(args.project, args.blueprint)
 
-        print(f"Review bundle created at: {result.review_bundle_path}")
-        print(f"pytest passed: {result.pytest_passed}")
-        print(f"ruff passed: {result.ruff_passed}")
-        print("\nGenerated:")
-        for path in result.generated_files:
-            print(f"  - {path}")
+            print(f"Generated story workspaces in: {args.project.resolve() / 'stories'}")
+
+            if created_paths:
+                print("\nCreated:")
+                for path in created_paths:
+                    print(f"  - {path}")
+            else:
+                print("\nNo new files created. Story workspaces already exist.")
+    except (FileNotFoundError, ValueError) as error:
+        parser.exit(status=1, message=f"Error: {error}\n")

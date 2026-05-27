@@ -1,0 +1,4 @@
+logs_required: true
+watch_for:
+- missing_agent_instruction
+- invalid_story_folder

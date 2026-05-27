@@ -1,0 +1,5 @@
+logs_required: true
+watch_for:
+- missing_review_bundle
+- failing_test_output
+- missing_required_report

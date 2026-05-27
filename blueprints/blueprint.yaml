@@ -1,0 +1,67 @@
+﻿project:
+  name: agentic-dev-system
+  type: agentic_development_tool
+  description: Reusable agentic development workflow system.
+
+story_sizing_rule: >
+  User stories should be narrow enough to have clear acceptance criteria and a focused code change,
+  but large enough to justify the full agent workflow: Research, Planner, Developer, Test, Docs,
+  Security/Quality, and Reviewer. If only one agent has meaningful work, the story is probably
+  too small. If the story touches many unrelated features or modules, it is probably too large.
+
+stories:
+  - id: STORY-004
+    slug: story_004_agent_assignment
+    title: Add automatic agent assignment
+    goal: Create a command that assigns the correct core agents to a story workspace.
+    why: Agent assignment should be consistent and based on the story instructions and project rules.
+    acceptance_criteria:
+      - Add an agent assignment command.
+      - Create an agent_plan.yaml file inside the story folder.
+      - Include all core agents by default.
+      - Add specialist agents later based on story content.
+    not_in_scope:
+      - No LangGraph execution yet.
+      - No model-based agent selection yet.
+    definition_of_done:
+      - pytest passes.
+      - ruff passes.
+      - agent_plan.yaml is created for the target story.
+    test_plan:
+      unit_tests: true
+      integration_tests: false
+      frequency: every_commit
+    monitoring_plan:
+      logs_required: true
+      watch_for:
+        - missing_agent_instruction
+        - invalid_story_folder
+
+  - id: STORY-005
+    slug: story_005_quality_gate
+    title: Add quality gate command
+    goal: Create a command that checks whether a story is ready for human/cloud review.
+    why: The system needs a clear pass/fail gate before code is reviewed or merged.
+    acceptance_criteria:
+      - Add a quality gate command.
+      - Check pytest result.
+      - Check ruff result.
+      - Check that a review bundle exists.
+      - Check that required story reports exist.
+    not_in_scope:
+      - No deployment validation yet.
+      - No production release bundle yet.
+    definition_of_done:
+      - pytest passes.
+      - ruff passes.
+      - quality gate produces READY_FOR_REVIEW or REQUEST_CHANGES.
+    test_plan:
+      unit_tests: true
+      integration_tests: false
+      frequency: every_commit
+    monitoring_plan:
+      logs_required: true
+      watch_for:
+        - missing_review_bundle
+        - failing_test_output
+        - missing_required_report
