@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from agentic_dev.agent_assignment import assign_agents
 from agentic_dev.review_bundle import create_review_bundle
 from agentic_dev.scaffolding import init_project
 from agentic_dev.story_generator import generate_stories
@@ -59,6 +60,27 @@ def main() -> None:
         help="Blueprint YAML file. Defaults to blueprints/blueprint.yaml inside the project.",
     )
 
+    assign_agents_parser = subparsers.add_parser(
+        "assign-agents",
+        help="Assign the core agent team to a story.",
+    )
+    assign_agents_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    assign_agents_parser.add_argument(
+        "--story",
+        required=True,
+        help="Story folder name under the project's stories folder.",
+    )
+    assign_agents_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Regenerate agent_plan.yaml if it already exists.",
+    )
+
     args = parser.parse_args()
 
     try:
@@ -95,5 +117,10 @@ def main() -> None:
                     print(f"  - {path}")
             else:
                 print("\nNo new files created. Story workspaces already exist.")
+
+        if args.command == "assign-agents":
+            agent_plan_path = assign_agents(args.project, args.story, args.force)
+
+            print(f"Agent plan created at: {agent_plan_path}")
     except (FileNotFoundError, ValueError) as error:
         parser.exit(status=1, message=f"Error: {error}\n")
