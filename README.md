@@ -43,6 +43,18 @@ docker compose run --rm dev agentic generate-stories
 
 Use `--project` to target another project folder or `--blueprint` to use a different blueprint file.
 
+## Assign agents to a story
+
+Run this from the repo root to create an execution map for a story:
+
+```powershell
+docker compose run --rm dev agentic assign-agents --story story_004_agent_assignment
+```
+
+The command writes `stories/<story>/agent_plan.yaml`. That file is the story's execution map: it lists the core agent team, their execution order, each agent's instruction file, and each expected report output.
+
+Use `--force` when you intentionally want to regenerate an existing `agent_plan.yaml`.
+
 ## Create a review bundle
 
 Run this from the repo root to collect review files for a story:

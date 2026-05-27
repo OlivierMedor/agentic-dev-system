@@ -1,4 +1,9 @@
-logs_required: true
+﻿logs_required: true
+
 watch_for:
-- missing_agent_instruction
-- invalid_story_folder
+  - missing_story_folder
+  - missing_instruction_file
+  - attempted_agent_plan_overwrite
+  - invalid_agent_plan_output
+
+failure_action: create_maintenance_queue_item
