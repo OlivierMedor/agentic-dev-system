@@ -1,0 +1,7 @@
+logs_required: true
+watch_for:
+- missing_story_folder
+- failed_agent_assignment
+- failed_prompt_generation
+- missing_prompt_pack
+- invalid_status_update

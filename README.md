@@ -67,6 +67,23 @@ The command reads the story file, agent plan, test plan, monitoring plan, projec
 
 Use `--force` when you intentionally want to overwrite existing prompt files.
 
+## Prepare a story
+
+Run this from the repo root to prepare a story for agent execution:
+
+```powershell
+docker compose run --rm dev agentic prepare-story --story story_007_prepare_story_command
+```
+
+The command validates that `stories/<story>/` exists, creates `agent_plan.yaml` when missing,
+generates prompt files in `stories/<story>/prompt_pack/`, writes `story_runbook.md`, writes
+`reports/prepare_story_report.md`, and updates `status.yaml` to `prepared` with
+`ready_for_review: false`.
+
+Use `--force` when you intentionally want to refresh an existing `agent_plan.yaml` and overwrite
+existing prompt files. The command does not execute agents, run cloud models, create a review
+bundle, or run the quality gate.
+
 ## Create a review bundle
 
 Run this from the repo root to collect review files for a story:
