@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 from agentic_dev.agent_assignment import assign_agents
+from agentic_dev.quality_gate import run_quality_gate
 from agentic_dev.review_bundle import create_review_bundle
 from agentic_dev.scaffolding import init_project
 from agentic_dev.story_generator import generate_stories
@@ -39,6 +40,22 @@ def main() -> None:
         help="Target project folder. Defaults to the current directory.",
     )
     review_bundle_parser.add_argument(
+        "--story",
+        required=True,
+        help="Story folder name under the project's stories folder.",
+    )
+
+    quality_gate_parser = subparsers.add_parser(
+        "quality-gate",
+        help="Check whether a story is ready for human or cloud review.",
+    )
+    quality_gate_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    quality_gate_parser.add_argument(
         "--story",
         required=True,
         help="Story folder name under the project's stories folder.",
@@ -105,6 +122,15 @@ def main() -> None:
             print("\nGenerated:")
             for path in result.generated_files:
                 print(f"  - {path}")
+
+        if args.command == "quality-gate":
+            result = run_quality_gate(args.project, args.story)
+
+            print(f"Quality gate status: {result.status}")
+            print(f"Ready for review: {result.ready_for_review}")
+            print(f"Result written to: {result.result_path}")
+            print(f"Report written to: {result.report_path}")
+            print(f"Next action: {result.next_action}")
 
         if args.command == "generate-stories":
             created_paths = generate_stories(args.project, args.blueprint)

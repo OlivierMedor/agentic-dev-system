@@ -1,5 +1,12 @@
-logs_required: true
+﻿logs_required: true
+
 watch_for:
-- missing_review_bundle
-- failing_test_output
-- missing_required_report
+  - missing_story_file
+  - missing_agent_plan
+  - missing_required_report
+  - missing_review_bundle
+  - failing_pytest_output
+  - failing_ruff_output
+  - local_review_not_ready
+
+failure_action: create_maintenance_queue_item

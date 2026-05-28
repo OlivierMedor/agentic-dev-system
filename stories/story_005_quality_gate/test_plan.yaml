@@ -1,3 +1,14 @@
-unit_tests: true
-integration_tests: false
-frequency: every_commit
+﻿unit_tests:
+  required: true
+  frequency: every_commit
+
+integration_tests:
+  required: false
+  frequency: later
+
+manual_checks:
+  - Run quality-gate for story_005_quality_gate.
+  - Confirm quality_gate_result.yaml is created.
+  - Confirm quality_gate_report.md is created.
+  - Confirm failed checks are explained clearly.
+  - Confirm passing checks produce READY_FOR_REVIEW.

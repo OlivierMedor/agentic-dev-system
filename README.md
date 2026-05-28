@@ -65,6 +65,16 @@ docker compose run --rm dev agentic review-bundle --story story_003_generate_sto
 
 The command writes Git status, recent commits, unstaged changes, staged changes, test output, lint output, a file tree, and a short handoff into the story's `review_bundle/` folder. It also records untracked file lists and safe text snapshots for untracked files so reviewers can see newly created files before they are staged.
 
+## Run a quality gate
+
+Run this from the repo root to decide whether a story is ready for human or cloud review:
+
+```powershell
+docker compose run --rm dev agentic quality-gate --story story_005_quality_gate
+```
+
+The command checks that required story files, agent reports, review bundle files, passing pytest output, passing Ruff output, and local reviewer approval are present. It writes `stories/<story>/reports/quality_gate_result.yaml` and `stories/<story>/reports/quality_gate_report.md` with either `READY_FOR_REVIEW` or `REQUEST_CHANGES`.
+
 ## Local checks
 
 ```powershell
