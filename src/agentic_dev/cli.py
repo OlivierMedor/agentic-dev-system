@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 from agentic_dev.agent_assignment import assign_agents
+from agentic_dev.finalize_story import finalize_story
 from agentic_dev.prepare_story import prepare_story
 from agentic_dev.prompt_pack import generate_prompt_pack
 from agentic_dev.quality_gate import run_quality_gate
@@ -142,6 +143,27 @@ def main() -> None:
         help="Refresh existing agent plan and prompt files.",
     )
 
+    finalize_story_parser = subparsers.add_parser(
+        "finalize-story",
+        help="Finalize a story by creating evidence, running the quality gate, and updating status.",
+    )
+    finalize_story_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    finalize_story_parser.add_argument(
+        "--story",
+        required=True,
+        help="Story folder name under the project's stories folder.",
+    )
+    finalize_story_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Refresh generated finalize evidence.",
+    )
+
     args = parser.parse_args()
 
     try:
@@ -220,5 +242,17 @@ def main() -> None:
             print(f"Runbook: {result.runbook_path}")
             print(f"Report: {result.report_path}")
             print(f"Status: {result.status_path}")
+
+        if args.command == "finalize-story":
+            result = finalize_story(args.project, args.story, args.force)
+
+            print(f"Story finalized: {result.story}")
+            print(f"Status: {result.status}")
+            print(f"Ready for review: {result.ready_for_review}")
+            print(f"Review bundle: {result.review_bundle_path}")
+            print(f"Quality gate result: {result.quality_gate_result_path}")
+            print(f"Finalize result: {result.finalize_result_path}")
+            print(f"Finalize report: {result.finalize_report_path}")
+            print(f"Next action: {result.next_action}")
     except (FileNotFoundError, ValueError) as error:
         parser.exit(status=1, message=f"Error: {error}\n")
