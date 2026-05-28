@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 from agentic_dev.agent_assignment import assign_agents
+from agentic_dev.prepare_story import prepare_story
 from agentic_dev.prompt_pack import generate_prompt_pack
 from agentic_dev.quality_gate import run_quality_gate
 from agentic_dev.review_bundle import create_review_bundle
@@ -120,6 +121,27 @@ def main() -> None:
         help="Overwrite existing prompt files.",
     )
 
+    prepare_story_parser = subparsers.add_parser(
+        "prepare-story",
+        help="Prepare a story workspace for agent execution.",
+    )
+    prepare_story_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    prepare_story_parser.add_argument(
+        "--story",
+        required=True,
+        help="Story folder name under the project's stories folder.",
+    )
+    prepare_story_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Refresh existing agent plan and prompt files.",
+    )
+
     args = parser.parse_args()
 
     try:
@@ -188,5 +210,15 @@ def main() -> None:
                 for path in result.skipped_files:
                     print(f"  - {path}")
                 print("\nUse --force to overwrite existing prompt files.")
+
+        if args.command == "prepare-story":
+            result = prepare_story(args.project, args.story, args.force)
+
+            print(f"Story prepared: {result.story}")
+            print(f"Agent plan: {result.agent_plan_path}")
+            print(f"Prompt pack: {result.prompt_pack_path}")
+            print(f"Runbook: {result.runbook_path}")
+            print(f"Report: {result.report_path}")
+            print(f"Status: {result.status_path}")
     except (FileNotFoundError, ValueError) as error:
         parser.exit(status=1, message=f"Error: {error}\n")
