@@ -104,6 +104,25 @@ docker compose run --rm dev agentic quality-gate --story story_005_quality_gate
 
 The command checks that required story files, agent reports, review bundle files, passing pytest output, passing Ruff output, and local reviewer approval are present. It writes `stories/<story>/reports/quality_gate_result.yaml` and `stories/<story>/reports/quality_gate_report.md` with either `READY_FOR_REVIEW` or `REQUEST_CHANGES`.
 
+## Finalize a story
+
+Run this from the repo root after agent work and local review are complete:
+
+```powershell
+docker compose run --rm dev agentic finalize-story --story story_008_finalize_story_command
+```
+
+The command validates that `stories/<story>/` exists, creates or refreshes the review bundle,
+runs the quality gate, regenerates the review bundle so final evidence is captured, writes
+`stories/<story>/reports/finalize_story_result.yaml`, writes
+`stories/<story>/reports/finalize_story_report.md`, and updates `status.yaml`.
+
+If the quality gate returns `READY_FOR_REVIEW`, `status.yaml` is updated to
+`status: ready_for_review` with `ready_for_review: true`. If the quality gate returns
+`REQUEST_CHANGES`, `status.yaml` is updated to `status: request_changes` with
+`ready_for_review: false`. The command does not commit, push, merge, deploy, or call cloud
+models.
+
 ## Local checks
 
 ```powershell
