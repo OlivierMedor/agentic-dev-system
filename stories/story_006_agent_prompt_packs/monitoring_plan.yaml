@@ -1,0 +1,6 @@
+logs_required: true
+watch_for:
+- missing_agent_plan
+- missing_story_file
+- missing_prompt_pack
+- invalid_prompt_output
