@@ -55,6 +55,18 @@ The command writes `stories/<story>/agent_plan.yaml`. That file is the story's e
 
 Use `--force` when you intentionally want to regenerate an existing `agent_plan.yaml`.
 
+## Generate prompt packs
+
+Run this from the repo root to create Codex-ready prompts for each assigned agent in a story:
+
+```powershell
+docker compose run --rm dev agentic generate-prompts --story story_006_agent_prompt_packs
+```
+
+The command reads the story file, agent plan, test plan, monitoring plan, project rules, and quality gates. It writes one prompt per assigned agent into `stories/<story>/prompt_pack/`.
+
+Use `--force` when you intentionally want to overwrite existing prompt files.
+
 ## Create a review bundle
 
 Run this from the repo root to collect review files for a story:

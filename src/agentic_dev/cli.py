@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 from agentic_dev.agent_assignment import assign_agents
+from agentic_dev.prompt_pack import generate_prompt_pack
 from agentic_dev.quality_gate import run_quality_gate
 from agentic_dev.review_bundle import create_review_bundle
 from agentic_dev.scaffolding import init_project
@@ -98,6 +99,27 @@ def main() -> None:
         help="Regenerate agent_plan.yaml if it already exists.",
     )
 
+    generate_prompts_parser = subparsers.add_parser(
+        "generate-prompts",
+        help="Generate Codex-ready prompt files for a story's assigned agents.",
+    )
+    generate_prompts_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    generate_prompts_parser.add_argument(
+        "--story",
+        required=True,
+        help="Story folder name under the project's stories folder.",
+    )
+    generate_prompts_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing prompt files.",
+    )
+
     args = parser.parse_args()
 
     try:
@@ -148,5 +170,23 @@ def main() -> None:
             agent_plan_path = assign_agents(args.project, args.story, args.force)
 
             print(f"Agent plan created at: {agent_plan_path}")
+
+        if args.command == "generate-prompts":
+            result = generate_prompt_pack(args.project, args.story, args.force)
+
+            print(f"Prompt pack created at: {result.prompt_pack_path}")
+
+            if result.created_files:
+                print("\nCreated or updated:")
+                for path in result.created_files:
+                    print(f"  - {path}")
+            else:
+                print("\nNo prompt files created or updated.")
+
+            if result.skipped_files:
+                print("\nSkipped existing files:")
+                for path in result.skipped_files:
+                    print(f"  - {path}")
+                print("\nUse --force to overwrite existing prompt files.")
     except (FileNotFoundError, ValueError) as error:
         parser.exit(status=1, message=f"Error: {error}\n")
