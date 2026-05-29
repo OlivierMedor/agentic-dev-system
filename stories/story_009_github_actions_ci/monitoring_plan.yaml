@@ -1,0 +1,7 @@
+logs_required: true
+watch_for:
+- github_actions_failure
+- docker_build_failure
+- pytest_failure
+- ruff_failure
+- missing_generated_story_files

@@ -190,3 +190,45 @@ stories:
         - quality_gate_failure
         - invalid_status_update
         - missing_finalize_report
+
+  - id: STORY-009
+    slug: story_009_github_actions_ci
+    title: Add GitHub Actions CI workflow
+    goal: Create a GitHub Actions workflow that automatically builds the Docker environment and runs quality checks on pushes and pull requests.
+    why: The system should not rely only on local checks. Every PR should prove that the project builds and passes tests in a clean GitHub runner before merge.
+    acceptance_criteria:
+      - Add .github/workflows/ci.yml.
+      - CI runs on pull requests targeting main.
+      - CI runs on pushes to main and story branches.
+      - CI builds the Docker Compose environment.
+      - CI runs pytest inside the dev container.
+      - CI runs Ruff inside the dev container.
+      - CI runs agentic generate-stories as an idempotency/sanity check.
+      - CI fails if generated stories are missing from the committed repo.
+      - Add tests that verify the workflow file contains the required CI commands.
+      - Update README with CI usage notes.
+      - Add docs/ci_cd.md explaining what the CI workflow checks.
+    not_in_scope:
+      - No deployment.
+      - No remote dev validation environment.
+      - No GitHub branch protection automation.
+      - No cloud model review integration.
+      - No secrets or environment-specific credentials.
+    definition_of_done:
+      - pytest passes locally.
+      - ruff passes locally.
+      - .github/workflows/ci.yml exists.
+      - tests verify the CI workflow content.
+      - GitHub Actions runs successfully on the PR.
+    test_plan:
+      unit_tests: true
+      integration_tests: false
+      frequency: every_commit
+    monitoring_plan:
+      logs_required: true
+      watch_for:
+        - github_actions_failure
+        - docker_build_failure
+        - pytest_failure
+        - ruff_failure
+        - missing_generated_story_files
