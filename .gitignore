@@ -20,6 +20,8 @@ review_to_chatgpt/
 agentic_story*_review.zip
 stories/**/review_bundle/*
 !stories/**/review_bundle/.gitkeep
+stories/**/cloud_review_packet/*
+!stories/**/cloud_review_packet/.gitkeep
 
 # OS
 .DS_Store

@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 from agentic_dev.agent_assignment import assign_agents
+from agentic_dev.cloud_review_packet import create_cloud_review_packet
 from agentic_dev.finalize_story import finalize_story
 from agentic_dev.prepare_story import prepare_story
 from agentic_dev.prompt_pack import generate_prompt_pack
@@ -164,6 +165,27 @@ def main() -> None:
         help="Refresh generated finalize evidence.",
     )
 
+    cloud_review_packet_parser = subparsers.add_parser(
+        "cloud-review-packet",
+        help="Create a cloud-model-ready review packet for a story.",
+    )
+    cloud_review_packet_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    cloud_review_packet_parser.add_argument(
+        "--story",
+        required=True,
+        help="Story folder name under the project's stories folder.",
+    )
+    cloud_review_packet_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing cloud review packet files.",
+    )
+
     args = parser.parse_args()
 
     try:
@@ -254,5 +276,19 @@ def main() -> None:
             print(f"Finalize result: {result.finalize_result_path}")
             print(f"Finalize report: {result.finalize_report_path}")
             print(f"Next action: {result.next_action}")
+
+        if args.command == "cloud-review-packet":
+            result = create_cloud_review_packet(args.project, args.story, args.force)
+
+            print(f"Cloud review packet created for: {result.story}")
+            print(f"Packet path: {result.packet_path}")
+            print("\nGenerated:")
+            for path in result.generated_files:
+                print(f"  - {path}")
+
+            if result.missing_optional_files:
+                print("\nMissing optional evidence:")
+                for relative_path in result.missing_optional_files:
+                    print(f"  - {relative_path}")
     except (FileNotFoundError, ValueError) as error:
         parser.exit(status=1, message=f"Error: {error}\n")

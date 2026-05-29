@@ -1,0 +1,7 @@
+logs_required: true
+watch_for:
+- missing_story_folder
+- missing_quality_gate_result
+- missing_review_bundle
+- missing_cloud_review_packet
+- invalid_cloud_review_prompt

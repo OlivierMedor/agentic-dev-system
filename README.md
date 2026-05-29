@@ -123,6 +123,24 @@ If the quality gate returns `READY_FOR_REVIEW`, `status.yaml` is updated to
 `ready_for_review: false`. The command does not commit, push, merge, deploy, or call cloud
 models.
 
+## Create a cloud review packet
+
+Run this from the repo root to prepare a cloud-model-ready packet for a completed story:
+
+```powershell
+docker compose run --rm dev agentic cloud-review-packet --story story_010_cloud_review_packet
+```
+
+The command validates that `stories/<story>/` and `story.md` exist, then writes
+`cloud_review_prompt.md`, `cloud_review_context.md`, `cloud_review_checklist.md`, and
+`cloud_review_result_template.md` into `stories/<story>/cloud_review_packet/`. The context
+includes story content plus available quality gate, finalize, review bundle, Git status, diff stat,
+and untracked-file evidence. Missing optional evidence is listed in the context instead of causing
+failure.
+
+Use `--force` when you intentionally want to overwrite existing cloud review packet files. The
+command does not call cloud models, commit, push, merge, or deploy.
+
 ## Local checks
 
 ```powershell
