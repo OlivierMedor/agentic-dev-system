@@ -129,3 +129,9 @@ models.
 docker compose run --rm dev pytest
 docker compose run --rm dev ruff check .
 ```
+
+## Continuous integration
+
+GitHub Actions runs the `CI` workflow on pull requests targeting `main`, pushes to `main`, and pushes to `story/**` branches. The workflow builds the Docker Compose environment, runs pytest and Ruff inside the `dev` container, runs `agentic generate-stories`, and fails if generated story files are missing or stale.
+
+See `docs/ci_cd.md` for the full CI behavior and failure-handling notes.
