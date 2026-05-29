@@ -4,31 +4,19 @@ Status: READY_FOR_REVIEW
 
 ## Files changed
 
-- `.github/workflows/ci.yml`
-- `.gitignore`
-- `README.md`
+- `Dockerfile`
 - `docs/ci_cd.md`
-- `src/agentic_dev/artifact_policy.py`
-- `src/agentic_dev/cli.py`
-- `tests/test_artifact_policy.py`
-- `tests/test_ci_workflow.py`
-- `stories/story_011_artifact_policy_guard/status.yaml`
 - `stories/story_011_artifact_policy_guard/reports/local_review_report.md`
-- `stories/story_011_artifact_policy_guard/reports/quality_gate_result.yaml`
-- `stories/story_011_artifact_policy_guard/reports/quality_gate_report.md`
-- `stories/story_011_artifact_policy_guard/reports/finalize_story_result.yaml`
-- `stories/story_011_artifact_policy_guard/reports/finalize_story_report.md`
-- `stories/story_011_artifact_policy_guard/review_bundle/*`
 
 ## What I did
 
-- Reviewed the Story 011 implementation for the artifact-policy command, CLI wiring, CI workflow, ignore rules, docs, and tests.
-- Verified the command defaults `--project` to the current working directory in the CLI.
-- Confirmed the policy blocks tracked review bundle files, cloud review packet files, `review_to_chatgpt/`, zip files, and `.env` or `.env.*` files while allowing `.gitkeep` in generated artifact folders and `.env.example`.
-- Confirmed CI runs `agentic artifact-policy`.
+- Added `git config --system --add safe.directory /app` to the Docker image immediately after Git installation so Git running inside the dev container trusts only the mounted repository path used in CI.
+- Updated `docs/ci_cd.md` with a short note explaining that GitHub Actions runs Git inside Docker, mounts the repository at `/app`, and relies on the image-level `/app` safe-directory entry to satisfy Git ownership checks.
+- Checked for existing Dockerfile or CI workflow content tests and found no test updates were required for this focused fix.
 
 ## Validation performed
 
+- `docker compose build` -> passed
 - `docker compose run --rm dev pytest` -> passed (`72 passed`)
 - `docker compose run --rm dev ruff check .` -> passed
 - `docker compose run --rm dev agentic artifact-policy` -> passed
@@ -38,8 +26,8 @@ Status: READY_FOR_REVIEW
 
 ## Assumptions
 
-- Story 011 review is limited to the files listed above plus the generated story workspace records required for local review.
-- The modified `blueprints/blueprint.yaml` in the working tree is unrelated to Story 011 and is not part of this approval decision.
+- The current fix is intentionally limited to the container trust configuration and the matching CI documentation note.
+- The modified `blueprints/blueprint.yaml` in the working tree remains unrelated to this Story 011 follow-up and is not part of this approval decision.
 
 ## Warnings or uncertainty
 

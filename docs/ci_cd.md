@@ -29,6 +29,8 @@ The `quality` job runs on `ubuntu-latest` and performs these checks:
 
 Docker keeps CI aligned with the local development environment. The GitHub runner builds the same Compose service and runs checks inside the `dev` container, reducing differences between local machines and CI.
 
+GitHub Actions also runs Git inside that Docker container while the checked-out repository is mounted at `/app`. Because Git can reject mounted repositories when the container user does not own the files, the Docker image marks `/app` as a safe directory so Git commands used in CI continue to work without trusting every repository on the system.
+
 ## Why generated stories are checked
 
 Story workspaces are generated from the blueprint. CI runs `agentic generate-stories` as an idempotency and sanity check so pull requests cannot pass while generated story files are missing or stale. If generation changes the working tree, the workflow prints the changed paths and exits with a failure.
