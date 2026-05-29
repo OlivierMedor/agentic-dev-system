@@ -141,15 +141,29 @@ failure.
 Use `--force` when you intentionally want to overwrite existing cloud review packet files. The
 command does not call cloud models, commit, push, merge, or deploy.
 
+## Check generated artifact policy
+
+Run this from the repo root to verify generated review artifacts and environment files are not
+tracked by Git:
+
+```powershell
+docker compose run --rm dev agentic artifact-policy
+```
+
+The command uses `git ls-files` and fails if tracked files include generated review bundle files,
+generated cloud review packet files, `review_to_chatgpt/`, zip files, `.env`, or `.env.*` files.
+It allows `.gitkeep` inside generated artifact folders and `.env.example`.
+
 ## Local checks
 
 ```powershell
 docker compose run --rm dev pytest
 docker compose run --rm dev ruff check .
+docker compose run --rm dev agentic artifact-policy
 ```
 
 ## Continuous integration
 
-GitHub Actions runs the `CI` workflow on pull requests targeting `main`, pushes to `main`, and pushes to `story/**` branches. The workflow builds the Docker Compose environment, runs pytest and Ruff inside the `dev` container, runs `agentic generate-stories`, and fails if generated story files are missing or stale.
+GitHub Actions runs the `CI` workflow on pull requests targeting `main`, pushes to `main`, and pushes to `story/**` branches. The workflow builds the Docker Compose environment, runs pytest and Ruff inside the `dev` container, runs `agentic generate-stories`, fails if generated story files are missing or stale, and runs `agentic artifact-policy`.
 
 See `docs/ci_cd.md` for the full CI behavior and failure-handling notes.

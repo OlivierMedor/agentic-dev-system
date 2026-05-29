@@ -17,6 +17,7 @@ __pycache__/
 # Review packets / generated local artifacts
 .review_packets/
 review_to_chatgpt/
+*.zip
 agentic_story*_review.zip
 stories/**/review_bundle/*
 !stories/**/review_bundle/.gitkeep

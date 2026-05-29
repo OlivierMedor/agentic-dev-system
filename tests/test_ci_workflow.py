@@ -29,6 +29,7 @@ def test_ci_workflow_runs_required_quality_commands() -> None:
     assert "docker compose run --rm dev pytest" in workflow
     assert "docker compose run --rm dev ruff check ." in workflow
     assert "docker compose run --rm dev agentic generate-stories" in workflow
+    assert "docker compose run --rm dev agentic artifact-policy" in workflow
 
 
 def test_ci_workflow_fails_when_generate_stories_changes_working_tree() -> None:
