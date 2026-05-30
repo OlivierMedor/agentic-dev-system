@@ -14,6 +14,7 @@ The CLI can initialize a target project, generate story workspaces from a bluepr
 - `docs/`
 
 It also creates the first setup story, basic project rules, quality gates, and starter instructions for the agent roles used by the workflow.
+Agent runtime queues live under `.agentic/`, including the support queue used when agents are blocked and need structured cloud-model review.
 
 ## Story sizing
 
@@ -141,6 +142,48 @@ failure.
 Use `--force` when you intentionally want to overwrite existing cloud review packet files. The
 command does not call cloud models, commit, push, merge, or deploy.
 
+## Use the support queue
+
+Run this from the repo root when an agent is blocked and needs a structured answer:
+
+```powershell
+docker compose run --rm dev agentic support-ticket create --story story_012_agent_support_queue --agent developer_agent --blocker-type requirements --question "Should the ticket answer command move or copy the file?"
+```
+
+The command writes a YAML ticket into `.agentic/support_queue/pending/` and, when the matching
+story folder exists, updates `stories/<story>/status.yaml` to `status: blocked` with
+`ready_for_review: false` and `blocked_by: <ticket_id>`.
+
+List the queue at any time:
+
+```powershell
+docker compose run --rm dev agentic support-ticket list
+```
+
+Create a cloud-model-ready support packet without calling any APIs:
+
+```powershell
+docker compose run --rm dev agentic support-ticket cloud-packet --ticket SUPPORT-20260530-120000
+```
+
+The packet is written next to the ticket as Markdown and instructs the cloud model to return one
+of `ANSWER`, `NEEDS_HUMAN`, or `REQUEST_MORE_CONTEXT` while using only the ticket context.
+
+Record a response from a file and move the ticket into `.agentic/support_queue/answered/`:
+
+```powershell
+docker compose run --rm dev agentic support-ticket answer --ticket SUPPORT-20260530-120000 --answer-file docs/support_answer.md
+```
+
+Close a ticket when no further queue work is needed:
+
+```powershell
+docker compose run --rm dev agentic support-ticket close --ticket SUPPORT-20260530-120000
+```
+
+The support queue creates runtime YAML and Markdown files only. It does not call cloud APIs,
+notify humans, resume agents automatically, or trigger Codex execution.
+
 ## Check generated artifact policy
 
 Run this from the repo root to verify generated review artifacts and environment files are not
@@ -151,8 +194,9 @@ docker compose run --rm dev agentic artifact-policy
 ```
 
 The command uses `git ls-files` and fails if tracked files include generated review bundle files,
-generated cloud review packet files, `review_to_chatgpt/`, zip files, `.env`, or `.env.*` files.
-It allows `.gitkeep` inside generated artifact folders and `.env.example`.
+generated cloud review packet files, support queue runtime YAML or Markdown files,
+`review_to_chatgpt/`, zip files, `.env`, or `.env.*` files. It allows `.gitkeep` inside generated
+artifact folders and `.env.example`.
 
 ## Local checks
 

@@ -15,6 +15,7 @@ def test_allowed_project_paths_do_not_violate_artifact_policy() -> None:
         "stories/story_011_artifact_policy_guard/story_runbook.md",
         "stories/story_011_artifact_policy_guard/review_bundle/.gitkeep",
         "stories/story_011_artifact_policy_guard/cloud_review_packet/.gitkeep",
+        ".agentic/support_queue/pending/.gitkeep",
         ".env.example",
     ]
 
@@ -38,6 +39,15 @@ def test_generated_cloud_review_packet_files_are_blocked() -> None:
     ]
 
     assert violation_paths(blocked_paths) == blocked_paths
+
+
+def test_support_queue_runtime_files_are_blocked_except_gitkeep() -> None:
+    blocked_paths = [
+        ".agentic/support_queue/pending/SUPPORT-001.yaml",
+        ".agentic/support_queue/pending/SUPPORT-001_cloud_packet.md",
+    ]
+
+    assert violation_paths([*blocked_paths, ".agentic/support_queue/pending/.gitkeep"]) == blocked_paths
 
 
 def test_review_to_chatgpt_artifacts_are_blocked() -> None:

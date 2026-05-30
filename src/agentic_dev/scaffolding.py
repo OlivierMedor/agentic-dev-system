@@ -40,6 +40,10 @@ def init_project(project_path: Path) -> list[Path]:
         project_path / ".agentic" / "feature_queue" / "pending",
         project_path / ".agentic" / "feature_queue" / "approved",
         project_path / ".agentic" / "feature_queue" / "rejected",
+        project_path / ".agentic" / "support_queue" / "pending",
+        project_path / ".agentic" / "support_queue" / "answered",
+        project_path / ".agentic" / "support_queue" / "escalated_to_human",
+        project_path / ".agentic" / "support_queue" / "closed",
         project_path / "blueprints",
         project_path / "stories",
         project_path / "stories" / "story_001_project_setup",
@@ -139,6 +143,10 @@ This project was initialized with the reusable agentic development system.
 - `tests/` stores actual tests.
 - `docs/` stores permanent project documentation.
 """,
+        project_path / ".agentic" / "support_queue" / "pending" / ".gitkeep": "",
+        project_path / ".agentic" / "support_queue" / "answered" / ".gitkeep": "",
+        project_path / ".agentic" / "support_queue" / "escalated_to_human" / ".gitkeep": "",
+        project_path / ".agentic" / "support_queue" / "closed" / ".gitkeep": "",
     }
 
     for file_path, content in files.items():
