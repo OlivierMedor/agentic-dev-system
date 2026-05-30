@@ -13,6 +13,14 @@ from agentic_dev.quality_gate import run_quality_gate
 from agentic_dev.review_bundle import create_review_bundle
 from agentic_dev.scaffolding import init_project
 from agentic_dev.story_generator import generate_stories
+from agentic_dev.support_queue import (
+    answer_support_ticket,
+    close_support_ticket,
+    create_support_ticket,
+    create_support_ticket_cloud_packet,
+    format_support_ticket_list,
+    list_support_tickets,
+)
 
 
 def main() -> None:
@@ -198,6 +206,117 @@ def main() -> None:
         help="Target project folder. Defaults to the current directory.",
     )
 
+    support_ticket_parser = subparsers.add_parser(
+        "support-ticket",
+        help="Create and manage structured support tickets for blocked agents.",
+    )
+    support_ticket_subparsers = support_ticket_parser.add_subparsers(
+        dest="support_ticket_command",
+        required=True,
+    )
+
+    support_ticket_create_parser = support_ticket_subparsers.add_parser(
+        "create",
+        help="Create a support ticket for cloud-model review.",
+    )
+    support_ticket_create_parser.add_argument("--story", required=True, help="Story folder name.")
+    support_ticket_create_parser.add_argument("--agent", required=True, help="Blocked agent name.")
+    support_ticket_create_parser.add_argument(
+        "--blocker-type",
+        required=True,
+        help="Short category for the blocker.",
+    )
+    support_ticket_create_parser.add_argument(
+        "--question",
+        required=True,
+        help="Structured question for the cloud model or human reviewer.",
+    )
+    support_ticket_create_parser.add_argument(
+        "--details",
+        help="Optional extra context for the ticket.",
+    )
+    support_ticket_create_parser.add_argument(
+        "--severity",
+        default="medium",
+        help="Ticket severity. Defaults to medium.",
+    )
+    support_ticket_create_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
+    support_ticket_list_parser = support_ticket_subparsers.add_parser(
+        "list",
+        help="List pending, answered, escalated, and closed support tickets.",
+    )
+    support_ticket_list_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
+    support_ticket_cloud_packet_parser = support_ticket_subparsers.add_parser(
+        "cloud-packet",
+        help="Create a cloud-model-ready packet for a support ticket.",
+    )
+    support_ticket_cloud_packet_parser.add_argument(
+        "--ticket",
+        required=True,
+        help="Support ticket ID, for example SUPPORT-20260530-120000.",
+    )
+    support_ticket_cloud_packet_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
+    support_ticket_answer_parser = support_ticket_subparsers.add_parser(
+        "answer",
+        help="Record an answer for a support ticket and move it to answered.",
+    )
+    support_ticket_answer_parser.add_argument(
+        "--ticket",
+        required=True,
+        help="Support ticket ID.",
+    )
+    support_ticket_answer_parser.add_argument(
+        "--answer-file",
+        type=Path,
+        required=True,
+        help="Path to a file containing the answer text.",
+    )
+    support_ticket_answer_parser.add_argument(
+        "--answered-by",
+        default="cloud_model",
+        help="Responder name. Defaults to cloud_model.",
+    )
+    support_ticket_answer_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
+    support_ticket_close_parser = support_ticket_subparsers.add_parser(
+        "close",
+        help="Close a support ticket and move it to closed.",
+    )
+    support_ticket_close_parser.add_argument(
+        "--ticket",
+        required=True,
+        help="Support ticket ID.",
+    )
+    support_ticket_close_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
     args = parser.parse_args()
 
     try:
@@ -309,5 +428,49 @@ def main() -> None:
 
             if not result.passed:
                 parser.exit(status=1)
+
+        if args.command == "support-ticket":
+            if args.support_ticket_command == "create":
+                result = create_support_ticket(
+                    project_path=args.project,
+                    story=args.story,
+                    agent=args.agent,
+                    blocker_type=args.blocker_type,
+                    question=args.question,
+                    details=args.details,
+                    severity=args.severity,
+                )
+                print(f"Support ticket created: {result.ticket_id}")
+                print(f"Ticket path: {result.ticket_path}")
+                if result.story_status_path is not None:
+                    print(f"Story status updated: {result.story_status_path}")
+
+            if args.support_ticket_command == "list":
+                result = list_support_tickets(args.project)
+                print(format_support_ticket_list(result))
+
+            if args.support_ticket_command == "cloud-packet":
+                result = create_support_ticket_cloud_packet(args.project, args.ticket)
+                print(f"Cloud packet created for: {result.ticket_id}")
+                print(f"Ticket path: {result.ticket_path}")
+                print(f"Packet path: {result.packet_path}")
+
+            if args.support_ticket_command == "answer":
+                result = answer_support_ticket(
+                    project_path=args.project,
+                    ticket_id=args.ticket,
+                    answer_file=args.answer_file,
+                    answered_by=args.answered_by,
+                )
+                print(f"Support ticket answered: {result.ticket_id}")
+                print(f"Source path: {result.source_path}")
+                print(f"Answered path: {result.destination_path}")
+                print(f"Answered by: {result.answered_by}")
+
+            if args.support_ticket_command == "close":
+                result = close_support_ticket(args.project, args.ticket)
+                print(f"Support ticket closed: {result.ticket_id}")
+                print(f"Source path: {result.source_path}")
+                print(f"Closed path: {result.destination_path}")
     except (FileNotFoundError, ValueError) as error:
         parser.exit(status=1, message=f"Error: {error}\n")

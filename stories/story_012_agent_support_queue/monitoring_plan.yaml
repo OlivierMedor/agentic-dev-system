@@ -1,0 +1,7 @@
+logs_required: true
+watch_for:
+- support_ticket_creation_failure
+- missing_support_ticket
+- missing_cloud_packet
+- invalid_support_answer
+- support_ticket_artifact_committed
