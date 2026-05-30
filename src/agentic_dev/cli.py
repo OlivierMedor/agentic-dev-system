@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 from agentic_dev.agent_assignment import assign_agents
+from agentic_dev.artifact_policy import check_artifact_policy, format_artifact_policy_report
 from agentic_dev.cloud_review_packet import create_cloud_review_packet
 from agentic_dev.finalize_story import finalize_story
 from agentic_dev.prepare_story import prepare_story
@@ -186,6 +187,17 @@ def main() -> None:
         help="Overwrite existing cloud review packet files.",
     )
 
+    artifact_policy_parser = subparsers.add_parser(
+        "artifact-policy",
+        help="Fail when forbidden generated artifacts or environment files are tracked.",
+    )
+    artifact_policy_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
     args = parser.parse_args()
 
     try:
@@ -290,5 +302,12 @@ def main() -> None:
                 print("\nMissing optional evidence:")
                 for relative_path in result.missing_optional_files:
                     print(f"  - {relative_path}")
+
+        if args.command == "artifact-policy":
+            result = check_artifact_policy(args.project)
+            print(format_artifact_policy_report(result))
+
+            if not result.passed:
+                parser.exit(status=1)
     except (FileNotFoundError, ValueError) as error:
         parser.exit(status=1, message=f"Error: {error}\n")

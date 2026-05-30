@@ -1,0 +1,7 @@
+logs_required: true
+watch_for:
+- committed_review_bundle
+- committed_cloud_review_packet
+- committed_zip_file
+- committed_env_file
+- ci_artifact_policy_failure

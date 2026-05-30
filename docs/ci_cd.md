@@ -23,14 +23,24 @@ The `quality` job runs on `ubuntu-latest` and performs these checks:
 - Runs Ruff inside the dev container with `docker compose run --rm dev ruff check .`.
 - Runs `docker compose run --rm dev agentic generate-stories`.
 - Fails if `git status --short` reports generated story files or other working tree changes after story generation.
+- Runs `docker compose run --rm dev agentic artifact-policy`.
 
 ## Why Docker is used
 
 Docker keeps CI aligned with the local development environment. The GitHub runner builds the same Compose service and runs checks inside the `dev` container, reducing differences between local machines and CI.
 
+GitHub Actions also runs Git inside that Docker container while the checked-out repository is mounted at `/app`. Because Git can reject mounted repositories when the container user does not own the files, the Docker image marks `/app` as a safe directory so Git commands used in CI continue to work without trusting every repository on the system.
+
 ## Why generated stories are checked
 
 Story workspaces are generated from the blueprint. CI runs `agentic generate-stories` as an idempotency and sanity check so pull requests cannot pass while generated story files are missing or stale. If generation changes the working tree, the workflow prints the changed paths and exits with a failure.
+
+## Why generated artifacts are blocked
+
+Review bundles, cloud review packets, `review_to_chatgpt/`, zip files, and local environment files
+are generated or machine-specific artifacts. CI runs `agentic artifact-policy` so pull requests fail
+when any of those files are tracked by Git. The policy allows `.gitkeep` files inside generated
+artifact folders and `.env.example` as a safe template.
 
 ## When CI fails
 
@@ -41,7 +51,8 @@ docker compose build
 docker compose run --rm dev pytest
 docker compose run --rm dev ruff check .
 docker compose run --rm dev agentic generate-stories
+docker compose run --rm dev agentic artifact-policy
 git status --short
 ```
 
-Commit any intended generated story files or source changes before pushing again. Do not commit secrets, `.env` files, private keys, or environment-specific credentials.
+Commit any intended generated story files or source changes before pushing again. Remove generated review artifacts, zip files, and environment-specific files from Git tracking before pushing. Do not commit secrets, `.env` files, private keys, or environment-specific credentials.

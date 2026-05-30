@@ -39,3 +39,6 @@ jobs:
             echo "Generated files are missing or the working tree changed. Run generate-stories locally and commit the results."
             exit 1
           fi
+
+      - name: Check generated artifact policy
+        run: docker compose run --rm dev agentic artifact-policy

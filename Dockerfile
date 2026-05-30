@@ -8,6 +8,7 @@ ENV PIP_NO_CACHE_DIR=1
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git \
+    && git config --system --add safe.directory /app \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml README.md ./
