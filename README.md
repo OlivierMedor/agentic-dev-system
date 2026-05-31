@@ -166,6 +166,15 @@ quality gate requests changes if the test layer result is missing.
 
 See `docs/test_layers.md` for the schema and layer definitions.
 
+## Mock E2E testing
+
+Mock E2E tests exercise the full local workflow with temporary projects, fake data, and local
+doubles instead of live APIs, cloud models, browser tooling, deployed environments, or a real Git
+repository. Project-level mock E2E tests live in `tests/e2e/`; story `test_plan.yaml` files declare
+whether mock E2E coverage is required.
+
+See `docs/e2e_testing.md` for the test layer definitions and the recommended mock workflow pattern.
+
 ## Finalize a story
 
 Run this from the repo root after agent work and local review are complete:

@@ -1,0 +1,7 @@
+logs_required: true
+watch_for:
+- e2e_workflow_failure
+- missing_generated_story
+- failed_test_layer_validation
+- failed_finalize_story
+- unexpected_live_service_usage

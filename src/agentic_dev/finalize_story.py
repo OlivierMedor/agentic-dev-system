@@ -8,7 +8,7 @@ import yaml
 
 from agentic_dev.quality_gate import READY_FOR_REVIEW, REQUEST_CHANGES, QualityGateResult
 from agentic_dev.quality_gate import run_quality_gate
-from agentic_dev.review_bundle import ReviewBundleResult, create_review_bundle
+from agentic_dev.review_bundle import CommandRunner, ReviewBundleResult, create_review_bundle
 from agentic_dev.test_layers import TestLayerResult, run_test_layers, test_plan_uses_test_layer_schema
 
 
@@ -31,7 +31,12 @@ class FinalizeStoryResult:
     next_action: str
 
 
-def finalize_story(project_path: Path, story: str, force: bool = False) -> FinalizeStoryResult:
+def finalize_story(
+    project_path: Path,
+    story: str,
+    force: bool = False,
+    command_runner: CommandRunner | None = None,
+) -> FinalizeStoryResult:
     """Finalize a story for review without committing, pushing, or running cloud models."""
     project_path = project_path.resolve()
     story_path = project_path / "stories" / story
@@ -45,7 +50,7 @@ def finalize_story(project_path: Path, story: str, force: bool = False) -> Final
     reports_path = story_path / "reports"
     reports_path.mkdir(parents=True, exist_ok=True)
 
-    review_bundle_result = create_review_bundle(project_path, story)
+    review_bundle_result = create_review_bundle_with_runner(project_path, story, command_runner)
     test_layer_result = run_test_layers_if_applicable(project_path, story_path, story)
     quality_gate_result = run_quality_gate(project_path, story)
 
@@ -70,10 +75,21 @@ def finalize_story(project_path: Path, story: str, force: bool = False) -> Final
     write_finalize_result(result)
     write_finalize_report(result, quality_gate_result, review_bundle_result, force)
 
-    review_bundle_result = create_review_bundle(project_path, story)
+    review_bundle_result = create_review_bundle_with_runner(project_path, story, command_runner)
     write_finalize_report(result, quality_gate_result, review_bundle_result, force)
 
     return result
+
+
+def create_review_bundle_with_runner(
+    project_path: Path,
+    story: str,
+    command_runner: CommandRunner | None,
+) -> ReviewBundleResult:
+    if command_runner is None:
+        return create_review_bundle(project_path, story)
+
+    return create_review_bundle(project_path, story, command_runner=command_runner)
 
 
 def run_test_layers_if_applicable(
