@@ -15,6 +15,23 @@ The CLI can initialize a target project, generate story workspaces from a bluepr
 
 It also creates the first setup story, basic project rules, quality gates, and starter instructions for the agent roles used by the workflow.
 Agent runtime queues live under `.agentic/`, including the support queue used when agents are blocked and need structured cloud-model review.
+Projects can also define per-agent runtime behavior in `.agentic/agent_runtime.yaml`.
+
+## Runtime config
+
+The runtime config is a project-level YAML file at `.agentic/agent_runtime.yaml`.
+It defines:
+
+- which provider each agent should use
+- which model name is expected
+- which approval mode each agent should run under
+- which fallback provider to use when the preferred runtime is unavailable
+- which routine commands are allowed without repeated approval
+- which risky commands must always require human approval
+
+The default config includes all core agents, a `cloud_reviewer` with
+`provider: manual_cloud_model`, and support for the future
+`local_model_optional` provider type.
 
 ## Story sizing
 
@@ -67,6 +84,24 @@ docker compose run --rm dev agentic generate-prompts --story story_006_agent_pro
 The command reads the story file, agent plan, test plan, monitoring plan, project rules, and quality gates. It writes one prompt per assigned agent into `stories/<story>/prompt_pack/`.
 
 Use `--force` when you intentionally want to overwrite existing prompt files.
+When `.agentic/agent_runtime.yaml` is present, the generated prompt files also include the
+runtime config content and a short per-agent runtime expectation summary with provider, model,
+approval mode, and fallback provider.
+
+## Inspect runtime config
+
+Print the current project runtime config:
+
+```powershell
+docker compose run --rm dev agentic runtime-config show
+```
+
+Validate that the runtime config has the required agents, known provider types, known approval
+modes, and human-approval coverage for risky commands:
+
+```powershell
+docker compose run --rm dev agentic runtime-config validate
+```
 
 ## Prepare a story
 

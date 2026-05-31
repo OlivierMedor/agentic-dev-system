@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from agentic_dev.runtime_config import default_runtime_config_text
+
 
 CORE_AGENT_INSTRUCTIONS = {
     "research_agent.md": "Research the story scope, risks, best practices, and useful references.",
@@ -79,6 +81,7 @@ description: Project prepared for agentic development.
   - review_bundle_required
   - local_review_required
 """,
+        project_path / ".agentic" / "agent_runtime.yaml": default_runtime_config_text(),
         project_path / "blueprints" / "blueprint.md": """# Project Blueprint
 
 ## Vision
@@ -136,12 +139,17 @@ This project was initialized with the reusable agentic development system.
 
 ## Key folders
 
-- `.agentic/` stores project rules, quality gates, and queues.
+- `.agentic/` stores project rules, quality gates, runtime config, and queues.
 - `blueprints/` stores the high-level project blueprint.
 - `stories/` stores story workspaces.
 - `src/` stores product code.
 - `tests/` stores actual tests.
 - `docs/` stores permanent project documentation.
+
+## Runtime config
+
+Edit `.agentic/agent_runtime.yaml` to define which provider/model each agent should use,
+which approval mode is expected, and which commands require human approval.
 """,
         project_path / ".agentic" / "support_queue" / "pending" / ".gitkeep": "",
         project_path / ".agentic" / "support_queue" / "answered" / ".gitkeep": "",

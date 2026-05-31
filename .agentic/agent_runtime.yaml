@@ -1,0 +1,79 @@
+agents:
+  research_agent:
+    provider: codex
+    model: gpt-5.5
+    approval_mode: workspace_write_no_prompt
+    fallback_provider: manual_cloud_model
+
+  planner_agent:
+    provider: codex
+    model: gpt-5.5
+    approval_mode: workspace_write_no_prompt
+    fallback_provider: manual_cloud_model
+
+  developer_agent:
+    provider: codex
+    model: gpt-5.5
+    approval_mode: workspace_write_no_prompt
+    fallback_provider: manual_cloud_model
+
+  test_agent:
+    provider: codex
+    model: gpt-5.5
+    approval_mode: workspace_write_no_prompt
+    fallback_provider: manual_cloud_model
+
+  docs_agent:
+    provider: local_model_optional
+    model: qwen_coder_or_codex_fallback
+    approval_mode: workspace_write_no_prompt
+    fallback_provider: codex
+
+  security_quality_agent:
+    provider: codex
+    model: gpt-5.5
+    approval_mode: workspace_write_no_prompt
+    fallback_provider: manual_cloud_model
+
+  local_reviewer_agent:
+    provider: codex
+    model: gpt-5.5
+    approval_mode: workspace_write_no_prompt
+    fallback_provider: manual_cloud_model
+
+  cloud_reviewer:
+    provider: manual_cloud_model
+    model: main_cloud_model
+    approval_mode: manual_only
+    fallback_provider: human_owner
+
+command_policy:
+  allowed_without_approval:
+    - docker compose run --rm dev pytest
+    - docker compose run --rm dev ruff check .
+    - docker compose run --rm dev agentic generate-stories
+    - docker compose run --rm dev agentic prepare-story
+    - docker compose run --rm dev agentic review-bundle
+    - docker compose run --rm dev agentic quality-gate
+    - docker compose run --rm dev agentic finalize-story
+    - docker compose run --rm dev agentic artifact-policy
+
+  requires_human_approval:
+    - git push
+    - git merge
+    - git reset --hard
+    - git rebase
+    - deployment commands
+    - secret changes
+    - credential changes
+    - wallet/private-key actions
+    - destructive file deletion
+
+support_policy:
+  if_agent_blocked: create_support_ticket
+  preferred_responder: cloud_model
+  escalate_to_human_when:
+    - cloud_model_uncertain
+    - business_decision_required
+    - security_sensitive_decision
+    - real_money_or_deployment_risk
