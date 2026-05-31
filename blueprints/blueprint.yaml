@@ -422,3 +422,47 @@ stories:
         - missing_cloud_packet
         - invalid_support_answer
         - support_ticket_artifact_committed
+
+  - id: STORY-013
+    slug: story_013_dynamic_agent_runtime_config
+    title: Add dynamic agent runtime config
+    goal: Create a project-level runtime config that defines which provider/model each agent should use and what commands are allowed without repeated human approval.
+    why: The system should support different execution modes for different agents. Some agents may use Codex, some may use local models, and final review may use a manual cloud model. The project should also define safe command policies so agents do not ask for approval on routine checks but still require approval for risky actions.
+    acceptance_criteria:
+      - Add .agentic/agent_runtime.yaml to initialized projects.
+      - Add an agentic runtime-config validate command.
+      - Add an agentic runtime-config show command.
+      - Runtime config defines agent providers, models, approval modes, and fallback providers.
+      - Runtime config defines commands allowed without approval.
+      - Runtime config defines commands requiring human approval.
+      - Runtime config includes cloud_reviewer as manual_cloud_model.
+      - Runtime config includes local_model_optional as a supported future provider type.
+      - Prompt pack generation includes runtime config content when present.
+      - Tests verify runtime config creation, validation, and prompt-pack inclusion.
+      - README explains how runtime config works.
+    not_in_scope:
+      - No actual local model installation.
+      - No automatic Codex execution.
+      - No automatic cloud API calls.
+      - No LangGraph yet.
+      - No direct enforcement of command policies by Codex yet.
+      - No remote deployment.
+    definition_of_done:
+      - pytest passes.
+      - ruff passes.
+      - artifact-policy passes.
+      - runtime-config validate passes on the current repo.
+      - generate-prompts includes runtime config guidance.
+      - finalize-story marks this story ready for review.
+    test_plan:
+      unit_tests: true
+      integration_tests: false
+      frequency: every_commit
+    monitoring_plan:
+      logs_required: true
+      watch_for:
+        - missing_agent_runtime_config
+        - invalid_agent_provider
+        - invalid_approval_mode
+        - unsafe_command_policy
+        - missing_cloud_reviewer_config

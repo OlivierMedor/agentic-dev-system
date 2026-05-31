@@ -7,6 +7,8 @@ from typing import Any
 
 import yaml
 
+from agentic_dev.runtime_config import load_runtime_config, runtime_config_path
+
 
 PROMPT_FILENAMES = {
     "research_agent": "01_research_agent_prompt.md",
@@ -63,6 +65,8 @@ def generate_prompt_pack(project_path: Path, story: str, force: bool = False) ->
         "monitoring_plan": read_optional_text(story_path / "monitoring_plan.yaml"),
         "project_rules": read_optional_text(project_path / ".agentic" / "rules.yaml"),
         "quality_gates": read_optional_text(project_path / ".agentic" / "quality_gates.yaml"),
+        "runtime_config": read_runtime_config_text(project_path),
+        "runtime_agents": load_runtime_agents(project_path),
     }
 
     created_files: list[Path] = []
@@ -141,12 +145,13 @@ def prompt_filename(agent_id: str, index: int) -> str:
     return f"{index:02d}_{safe_agent_id}_prompt.md"
 
 
-def format_agent_prompt(story: str, agent: dict[str, Any], context: dict[str, str]) -> str:
+def format_agent_prompt(story: str, agent: dict[str, Any], context: dict[str, Any]) -> str:
     agent_id = text_value(agent, "id", "unknown_agent")
     display_name = text_value(agent, "display_name", agent_id.replace("_", " ").title())
     responsibility = text_value(agent, "responsibility", "Use the story and plans to do your role.")
     expected_output = text_value(agent, "expected_output", "Write a report in the story reports folder.")
     agent_rule = AGENT_SPECIFIC_RULES.get(agent_id, "Follow only the responsibilities assigned to you.")
+    runtime_expectation = format_runtime_expectation(agent_id, context["runtime_agents"])
 
     return f"""# {display_name} Prompt
 
@@ -196,6 +201,16 @@ You are the {display_name} for `{story}`.
 {context["monitoring_plan"].rstrip()}
 ```
 
+## Runtime Config
+
+```yaml
+{context["runtime_config"].rstrip()}
+```
+
+## Runtime Expectation
+
+{runtime_expectation}
+
 ## Agent-Specific Rule
 
 {agent_rule}
@@ -231,6 +246,51 @@ def read_optional_text(path: Path) -> str:
         return f"# Not found: {path.name}\n"
 
     return path.read_text(encoding="utf-8")
+
+
+def read_runtime_config_text(project_path: Path) -> str:
+    config_path = runtime_config_path(project_path)
+
+    if not config_path.exists():
+        return f"# Not found: {config_path.name}\n"
+
+    return read_required_text(config_path)
+
+
+def load_runtime_agents(project_path: Path) -> dict[str, Any]:
+    config_path = runtime_config_path(project_path)
+
+    if not config_path.exists():
+        return {}
+
+    _, runtime_config = load_runtime_config(project_path)
+    agents = runtime_config.get("agents")
+
+    if not isinstance(agents, dict):
+        raise ValueError(f"Runtime config agents section must be a mapping: {config_path}")
+
+    return agents
+
+
+def format_runtime_expectation(agent_id: str, runtime_agents: dict[str, Any]) -> str:
+    runtime_agent = runtime_agents.get(agent_id)
+
+    if not isinstance(runtime_agent, dict):
+        return "No runtime config entry found for this agent."
+
+    provider = text_value(runtime_agent, "provider", "not configured")
+    model = text_value(runtime_agent, "model", "not configured")
+    approval_mode = text_value(runtime_agent, "approval_mode", "not configured")
+    fallback_provider = text_value(runtime_agent, "fallback_provider", "not configured")
+
+    return "\n".join(
+        [
+            f"- Provider: `{provider}`",
+            f"- Model: `{model}`",
+            f"- Approval mode: `{approval_mode}`",
+            f"- Fallback provider: `{fallback_provider}`",
+        ]
+    )
 
 
 def text_value(mapping: dict[str, Any], key: str, default: str) -> str:

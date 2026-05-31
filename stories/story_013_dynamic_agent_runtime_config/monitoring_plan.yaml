@@ -1,0 +1,7 @@
+logs_required: true
+watch_for:
+- missing_agent_runtime_config
+- invalid_agent_provider
+- invalid_approval_mode
+- unsafe_command_policy
+- missing_cloud_reviewer_config

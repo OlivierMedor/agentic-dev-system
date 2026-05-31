@@ -11,6 +11,7 @@ from agentic_dev.prepare_story import prepare_story
 from agentic_dev.prompt_pack import generate_prompt_pack
 from agentic_dev.quality_gate import run_quality_gate
 from agentic_dev.review_bundle import create_review_bundle
+from agentic_dev.runtime_config import show_runtime_config, validate_runtime_config
 from agentic_dev.scaffolding import init_project
 from agentic_dev.story_generator import generate_stories
 from agentic_dev.support_queue import (
@@ -200,6 +201,37 @@ def main() -> None:
         help="Fail when forbidden generated artifacts or environment files are tracked.",
     )
     artifact_policy_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
+    runtime_config_parser = subparsers.add_parser(
+        "runtime-config",
+        help="Show or validate the project runtime config.",
+    )
+    runtime_config_subparsers = runtime_config_parser.add_subparsers(
+        dest="runtime_config_command",
+        required=True,
+    )
+
+    runtime_config_show_parser = runtime_config_subparsers.add_parser(
+        "show",
+        help="Print the project runtime config.",
+    )
+    runtime_config_show_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
+    runtime_config_validate_parser = runtime_config_subparsers.add_parser(
+        "validate",
+        help="Validate the project runtime config.",
+    )
+    runtime_config_validate_parser.add_argument(
         "--project",
         type=Path,
         default=Path.cwd(),
@@ -428,6 +460,14 @@ def main() -> None:
 
             if not result.passed:
                 parser.exit(status=1)
+
+        if args.command == "runtime-config":
+            if args.runtime_config_command == "show":
+                print(show_runtime_config(args.project).rstrip())
+
+            if args.runtime_config_command == "validate":
+                result = validate_runtime_config(args.project)
+                print(f"Runtime config is valid: {result.config_path}")
 
         if args.command == "support-ticket":
             if args.support_ticket_command == "create":
