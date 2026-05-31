@@ -24,7 +24,11 @@ AGENT_SPECIFIC_RULES = {
     "developer_agent": "Do not write tests. Implementation only.",
     "test_agent": (
         "Do not modify implementation code unless a tiny fix is required to make tests "
-        "runnable, and explain any such fix."
+        "runnable, and explain any such fix.\n\n"
+        "Every story must address unit, integration, mock E2E, live read-only, and remote "
+        "dev smoke test layers. You may add tests, update tests, confirm existing coverage, "
+        "or explain why a layer is not applicable. Do not fake tests just to satisfy a layer; "
+        "if a layer does not apply, provide a clear reason in test_plan.yaml or your report."
     ),
     "local_reviewer_agent": "Do not approve unless pytest and Ruff pass.",
     "security_quality_agent": (

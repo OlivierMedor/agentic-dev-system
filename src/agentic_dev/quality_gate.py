@@ -5,6 +5,9 @@ from pathlib import Path
 
 import yaml
 
+from agentic_dev.test_layers import TEST_LAYER_PASSED, load_yaml_mapping
+from agentic_dev.test_layers import test_plan_uses_test_layer_schema
+
 
 READY_FOR_REVIEW = "READY_FOR_REVIEW"
 REQUEST_CHANGES = "REQUEST_CHANGES"
@@ -95,6 +98,32 @@ def build_next_action(ready_for_review: bool) -> str:
     return "Fix the failed checks, regenerate any missing reports, then run the quality gate again."
 
 
+def add_test_layer_checks(
+    story_path: Path,
+    passed_checks: list[str],
+    failed_checks: list[str],
+) -> None:
+    result_path = story_path / "reports" / "test_layer_result.yaml"
+
+    if result_path.exists():
+        result_data = load_yaml_mapping(result_path, "test_layer_result.yaml")
+        status = result_data.get("status")
+
+        if status == TEST_LAYER_PASSED:
+            passed_checks.append("Test layer result status is PASSED.")
+        else:
+            failed_checks.append(
+                "Test layer result must have status PASSED before quality gate approval."
+            )
+        return
+
+    if test_plan_uses_test_layer_schema(story_path):
+        failed_checks.append(
+            "test_plan.yaml uses test_layers_version: 1 but reports/test_layer_result.yaml "
+            "is missing. Run agentic test-layers for this story."
+        )
+
+
 def write_yaml_result(path: Path, result: QualityGateResult) -> None:
     data = {
         "story": result.story,
@@ -181,6 +210,8 @@ def run_quality_gate(project_path: Path, story: str) -> QualityGateResult:
         passed_checks.append("Local reviewer marked the story READY_FOR_REVIEW.")
     else:
         failed_checks.append("Local reviewer report does not contain READY_FOR_REVIEW.")
+
+    add_test_layer_checks(story_path, passed_checks, failed_checks)
 
     ready_for_review = not failed_checks
     status = READY_FOR_REVIEW if ready_for_review else REQUEST_CHANGES

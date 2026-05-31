@@ -9,6 +9,7 @@ import yaml
 from agentic_dev.quality_gate import READY_FOR_REVIEW, REQUEST_CHANGES, QualityGateResult
 from agentic_dev.quality_gate import run_quality_gate
 from agentic_dev.review_bundle import ReviewBundleResult, create_review_bundle
+from agentic_dev.test_layers import TestLayerResult, run_test_layers, test_plan_uses_test_layer_schema
 
 
 STATUS_READY_FOR_REVIEW = "ready_for_review"
@@ -24,6 +25,7 @@ class FinalizeStoryResult:
     review_bundle_path: Path
     quality_gate_result_path: Path
     quality_gate_report_path: Path
+    test_layer_result_path: Path | None
     finalize_report_path: Path
     finalize_result_path: Path
     next_action: str
@@ -44,6 +46,7 @@ def finalize_story(project_path: Path, story: str, force: bool = False) -> Final
     reports_path.mkdir(parents=True, exist_ok=True)
 
     review_bundle_result = create_review_bundle(project_path, story)
+    test_layer_result = run_test_layers_if_applicable(project_path, story_path, story)
     quality_gate_result = run_quality_gate(project_path, story)
 
     status, ready_for_review = status_from_quality_gate(quality_gate_result)
@@ -58,6 +61,7 @@ def finalize_story(project_path: Path, story: str, force: bool = False) -> Final
         review_bundle_path=review_bundle_result.review_bundle_path,
         quality_gate_result_path=quality_gate_result.result_path,
         quality_gate_report_path=quality_gate_result.report_path,
+        test_layer_result_path=test_layer_result.result_path if test_layer_result else None,
         finalize_report_path=reports_path / "finalize_story_report.md",
         finalize_result_path=reports_path / "finalize_story_result.yaml",
         next_action=quality_gate_result.next_action,
@@ -70,6 +74,17 @@ def finalize_story(project_path: Path, story: str, force: bool = False) -> Final
     write_finalize_report(result, quality_gate_result, review_bundle_result, force)
 
     return result
+
+
+def run_test_layers_if_applicable(
+    project_path: Path,
+    story_path: Path,
+    story: str,
+) -> TestLayerResult | None:
+    if not test_plan_uses_test_layer_schema(story_path):
+        return None
+
+    return run_test_layers(project_path, story)
 
 
 def status_from_quality_gate(quality_gate_result: QualityGateResult) -> tuple[str, bool]:
@@ -114,6 +129,9 @@ def write_finalize_result(result: FinalizeStoryResult) -> None:
         "ready_for_review": result.ready_for_review,
         "review_bundle_path": str(result.review_bundle_path),
         "quality_gate_result_path": str(result.quality_gate_result_path),
+        "test_layer_result_path": str(result.test_layer_result_path)
+        if result.test_layer_result_path
+        else None,
         "finalize_report_path": str(result.finalize_report_path),
         "next_action": result.next_action,
     }
@@ -136,6 +154,7 @@ def write_finalize_report(
 ## What finalize-story did
 
 - Created or refreshed the review bundle at `{result.review_bundle_path}`.
+- Ran test layer validation when `test_plan.yaml` used `test_layers_version: 1`.
 - Ran the quality gate and wrote `{result.quality_gate_result_path}`.
 - Regenerated the review bundle after the quality gate so final evidence is captured.
 - Wrote finalize result data to `{result.finalize_result_path}`.
@@ -144,6 +163,7 @@ def write_finalize_report(
 ## Quality gate result
 
 - Quality gate status: {quality_gate_result.status}
+- Test layer result: {format_optional_path(result.test_layer_result_path)}
 - Ready for review: {result.ready_for_review}
 - pytest in final review bundle passed: {review_bundle_result.pytest_passed}
 - Ruff in final review bundle passed: {review_bundle_result.ruff_passed}
@@ -165,3 +185,10 @@ Human or cloud review is still required before merge.
 """
 
     result.finalize_report_path.write_text(content, encoding="utf-8")
+
+
+def format_optional_path(path: Path | None) -> str:
+    if path is None:
+        return "not applicable"
+
+    return str(path)
