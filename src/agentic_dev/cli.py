@@ -22,6 +22,7 @@ from agentic_dev.support_queue import (
     format_support_ticket_list,
     list_support_tickets,
 )
+from agentic_dev.test_layers import run_test_layers
 
 
 def main() -> None:
@@ -70,6 +71,22 @@ def main() -> None:
         help="Target project folder. Defaults to the current directory.",
     )
     quality_gate_parser.add_argument(
+        "--story",
+        required=True,
+        help="Story folder name under the project's stories folder.",
+    )
+
+    test_layers_parser = subparsers.add_parser(
+        "test-layers",
+        help="Validate that a story test plan addresses all standard test layers.",
+    )
+    test_layers_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    test_layers_parser.add_argument(
         "--story",
         required=True,
         help="Story folder name under the project's stories folder.",
@@ -379,6 +396,14 @@ def main() -> None:
 
             print(f"Quality gate status: {result.status}")
             print(f"Ready for review: {result.ready_for_review}")
+            print(f"Result written to: {result.result_path}")
+            print(f"Report written to: {result.report_path}")
+            print(f"Next action: {result.next_action}")
+
+        if args.command == "test-layers":
+            result = run_test_layers(args.project, args.story)
+
+            print(f"Test layer status: {result.status}")
             print(f"Result written to: {result.result_path}")
             print(f"Report written to: {result.report_path}")
             print(f"Next action: {result.next_action}")

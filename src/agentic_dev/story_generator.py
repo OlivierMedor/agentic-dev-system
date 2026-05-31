@@ -6,6 +6,7 @@ from typing import Any
 import yaml
 
 from agentic_dev.scaffolding import CORE_AGENT_INSTRUCTIONS, write_if_missing
+from agentic_dev.test_layers import DEFAULT_TEST_LAYER_PLAN, TEST_LAYER_NAMES
 
 
 DEFAULT_BLUEPRINT_RELATIVE_PATH = Path("blueprints") / "blueprint.yaml"
@@ -150,14 +151,59 @@ def format_test_plan_yaml(story: dict[str, Any]) -> str:
     if not isinstance(test_plan, dict):
         test_plan = {}
 
-    return yaml.safe_dump(
-        {
-            "unit_tests": test_plan.get("unit_tests", []),
-            "integration_tests": test_plan.get("integration_tests", []),
-            "frequency": test_plan.get("frequency", "TODO"),
-        },
-        sort_keys=False,
-    )
+    return yaml.safe_dump(build_test_layer_plan(test_plan), sort_keys=False)
+
+
+def build_test_layer_plan(test_plan: dict[str, Any]) -> dict[str, Any]:
+    generated_plan: dict[str, Any] = {
+        "test_layers_version": DEFAULT_TEST_LAYER_PLAN["test_layers_version"],
+    }
+
+    for layer_name in TEST_LAYER_NAMES:
+        generated_plan[layer_name] = normalize_test_layer(layer_name, test_plan)
+
+    return generated_plan
+
+
+def normalize_test_layer(layer_name: str, test_plan: dict[str, Any]) -> dict[str, Any]:
+    defaults = DEFAULT_TEST_LAYER_PLAN[layer_name]
+    layer = test_plan.get(layer_name)
+
+    if isinstance(layer, dict):
+        evidence = layer.get("evidence_or_reason", defaults["evidence_or_reason"])
+        return {
+            "required": layer.get("required", defaults["required"]),
+            "action": layer.get("action", defaults["action"]),
+            "frequency": layer.get("frequency", defaults["frequency"]),
+            "evidence_or_reason": evidence_or_default(evidence, defaults["evidence_or_reason"]),
+        }
+
+    if layer is not None:
+        return {
+            "required": defaults["required"],
+            "action": defaults["action"],
+            "frequency": defaults["frequency"],
+            "evidence_or_reason": evidence_or_default(layer, defaults["evidence_or_reason"]),
+        }
+
+    return {
+        "required": defaults["required"],
+        "action": defaults["action"],
+        "frequency": defaults["frequency"],
+        "evidence_or_reason": defaults["evidence_or_reason"],
+    }
+
+
+def evidence_or_default(value: Any, default: str) -> str:
+    if isinstance(value, list):
+        evidence = "; ".join(str(item) for item in value if str(item).strip())
+        return evidence or default
+
+    if value is None:
+        return default
+
+    evidence = str(value).strip()
+    return evidence or default
 
 
 def format_monitoring_plan_yaml(story: dict[str, Any]) -> str:

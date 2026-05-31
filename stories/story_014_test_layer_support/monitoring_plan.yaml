@@ -1,0 +1,7 @@
+logs_required: true
+watch_for:
+- invalid_test_plan
+- missing_test_layer_result
+- missing_test_layer_evidence
+- quality_gate_test_layer_failure
+- finalize_story_test_layer_failure

@@ -8,6 +8,7 @@ from agentic_dev.cli import main
 from agentic_dev.finalize_story import finalize_story
 from agentic_dev.quality_gate import READY_FOR_REVIEW, REQUEST_CHANGES, QualityGateResult
 from agentic_dev.review_bundle import ReviewBundleResult
+from agentic_dev.test_layers import TEST_LAYER_PASSED, TestLayerResult as LayerValidationResult
 
 
 STORY = "story_008_finalize_story_command"
@@ -28,6 +29,46 @@ def create_story(project_path: Path, story: str = STORY) -> Path:
 
 def read_yaml(path: Path) -> dict:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
+
+
+def write_test_layer_plan(story_path: Path) -> None:
+    test_plan = {
+        "test_layers_version": 1,
+        "unit_tests": {
+            "required": True,
+            "action": "add_or_update",
+            "frequency": "every_commit",
+            "evidence_or_reason": "Unit tests were added.",
+        },
+        "integration_tests": {
+            "required": True,
+            "action": "confirm_existing",
+            "frequency": "every_pull_request",
+            "evidence_or_reason": "Existing integration tests apply.",
+        },
+        "mock_e2e_tests": {
+            "required": True,
+            "action": "confirm_existing",
+            "frequency": "before_merge",
+            "evidence_or_reason": "Existing mock E2E tests apply.",
+        },
+        "live_read_only_checks": {
+            "required": False,
+            "action": "not_applicable_with_reason",
+            "frequency": "scheduled_or_before_release",
+            "evidence_or_reason": "No live services are touched.",
+        },
+        "remote_dev_smoke_tests": {
+            "required": False,
+            "action": "not_applicable_with_reason",
+            "frequency": "after_remote_dev_deploy",
+            "evidence_or_reason": "No remote dev environment exists.",
+        },
+    }
+    (story_path / "test_plan.yaml").write_text(
+        yaml.safe_dump(test_plan, sort_keys=False),
+        encoding="utf-8",
+    )
 
 
 def install_finalize_doubles(
@@ -114,6 +155,47 @@ def test_finalize_story_creates_reports_and_regenerates_review_bundle(
     assert result.finalize_result_path.exists()
     assert result.quality_gate_result_path.exists()
     assert result.quality_gate_report_path.exists()
+
+
+def test_finalize_story_runs_test_layers_before_quality_gate_when_applicable(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    story_path = create_story(tmp_path)
+    write_test_layer_plan(story_path)
+    calls = install_finalize_doubles(monkeypatch, READY_FOR_REVIEW)
+
+    def fake_run_test_layers(project_path: Path, story: str) -> LayerValidationResult:
+        calls.append(f"test_layers:{story}")
+        reports_path = project_path.resolve() / "stories" / story / "reports"
+        reports_path.mkdir(parents=True, exist_ok=True)
+        result_path = reports_path / "test_layer_result.yaml"
+        report_path = reports_path / "test_layer_report.md"
+        result_path.write_text(f"status: {TEST_LAYER_PASSED}\n", encoding="utf-8")
+        report_path.write_text("# Test Layer Report\n\nPASSED\n", encoding="utf-8")
+        return LayerValidationResult(
+            story=story,
+            status=TEST_LAYER_PASSED,
+            passed_checks=["all layers addressed"],
+            failed_checks=[],
+            layers={},
+            next_action="Continue to quality gate.",
+            result_path=result_path,
+            report_path=report_path,
+        )
+
+    monkeypatch.setattr(finalize_story_module, "run_test_layers", fake_run_test_layers)
+
+    result = finalize_story(tmp_path, STORY)
+
+    assert calls == [
+        f"review_bundle:{STORY}",
+        f"test_layers:{STORY}",
+        f"quality_gate:{STORY}",
+        f"review_bundle:{STORY}",
+    ]
+    assert result.test_layer_result_path == story_path / "reports" / "test_layer_result.yaml"
+    assert result.test_layer_result_path.exists()
 
 
 def test_finalize_story_updates_status_ready_for_review_and_preserves_story_id(

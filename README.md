@@ -140,6 +140,32 @@ docker compose run --rm dev agentic quality-gate --story story_005_quality_gate
 
 The command checks that required story files, agent reports, review bundle files, passing pytest output, passing Ruff output, and local reviewer approval are present. It writes `stories/<story>/reports/quality_gate_result.yaml` and `stories/<story>/reports/quality_gate_report.md` with either `READY_FOR_REVIEW` or `REQUEST_CHANGES`.
 
+## Validate test layers
+
+Run this from the repo root to check that a story test plan addresses every standard testing
+layer:
+
+```powershell
+docker compose run --rm dev agentic test-layers --story story_014_test_layer_support
+```
+
+Story test plans that use `test_layers_version: 1` must address `unit_tests`,
+`integration_tests`, `mock_e2e_tests`, `live_read_only_checks`, and
+`remote_dev_smoke_tests`. Each layer declares whether it is required, which action was taken or
+planned, how often it should run, and the evidence or reason.
+
+Actual tests live in project-level test folders such as `tests/`; `stories/<story>/test_plan.yaml`
+declares the coverage plan for review. Not every story needs a new test in every layer, but every
+story using the schema must address every layer. If a layer does not apply, use
+`not_applicable_with_reason` or `scheduled_later_with_reason` and explain why.
+
+The command writes `stories/<story>/reports/test_layer_result.yaml` and
+`stories/<story>/reports/test_layer_report.md`. When a test layer result exists, the quality gate
+requires it to have `status: PASSED`. When `test_plan.yaml` uses `test_layers_version: 1`, the
+quality gate requests changes if the test layer result is missing.
+
+See `docs/test_layers.md` for the schema and layer definitions.
+
 ## Finalize a story
 
 Run this from the repo root after agent work and local review are complete:
@@ -149,7 +175,8 @@ docker compose run --rm dev agentic finalize-story --story story_008_finalize_st
 ```
 
 The command validates that `stories/<story>/` exists, creates or refreshes the review bundle,
-runs the quality gate, regenerates the review bundle so final evidence is captured, writes
+validates test layers when `test_plan.yaml` uses `test_layers_version: 1`, runs the quality gate,
+regenerates the review bundle so final evidence is captured, writes
 `stories/<story>/reports/finalize_story_result.yaml`, writes
 `stories/<story>/reports/finalize_story_report.md`, and updates `status.yaml`.
 
@@ -239,6 +266,7 @@ artifact folders and `.env.example`.
 docker compose run --rm dev pytest
 docker compose run --rm dev ruff check .
 docker compose run --rm dev agentic artifact-policy
+docker compose run --rm dev agentic test-layers --story story_014_test_layer_support
 ```
 
 ## Continuous integration

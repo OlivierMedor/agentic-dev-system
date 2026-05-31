@@ -466,3 +466,73 @@ stories:
         - invalid_approval_mode
         - unsafe_command_policy
         - missing_cloud_reviewer_config
+
+  - id: STORY-014
+    slug: story_014_test_layer_support
+    title: Add test layer support
+    goal: Create structured support for unit, integration, mock E2E, live read-only, and remote dev smoke test layers in story test plans and quality gates.
+    why: Every story should address the full testing picture. A story may add new tests, update existing tests, confirm existing coverage, or explain why a layer is not applicable. The quality gate should be able to verify that the required testing layers were addressed before human/cloud review.
+    acceptance_criteria:
+      - Add a standard test layer schema for story test plans.
+      - Add an agentic test-layers command.
+      - test-layers validates that each testing layer is addressed.
+      - test-layers writes reports/test_layer_result.yaml.
+      - test-layers writes reports/test_layer_report.md.
+      - Story test plans support unit_tests, integration_tests, mock_e2e_tests, live_read_only_checks, and remote_dev_smoke_tests.
+      - Each layer must have required, action, frequency, and evidence_or_reason fields.
+      - Valid actions include add_or_update, update_existing, confirm_existing, not_applicable_with_reason, scheduled_later_with_reason.
+      - Update story generation so new stories get the full test layer template.
+      - Update prompt pack generation so Test Agent prompts explain the test layer requirements.
+      - Update quality gate so it checks test layer results when a story uses the new test layer schema.
+      - Update finalize-story so it runs test-layers before quality-gate when applicable.
+      - Add docs/test_layers.md explaining the testing layers.
+      - Add tests for the test layer validation logic.
+      - README is updated with usage instructions.
+    not_in_scope:
+      - No Playwright/Cypress/Selenium setup.
+      - No real live API calls.
+      - No remote dev environment yet.
+      - No actual deployment smoke tests yet.
+      - No LangGraph yet.
+    definition_of_done:
+      - pytest passes.
+      - ruff passes.
+      - artifact-policy passes.
+      - runtime-config validate passes.
+      - test-layers passes for story_014_test_layer_support.
+      - finalize-story marks this story ready for review.
+    test_plan:
+      test_layers_version: 1
+      unit_tests:
+        required: true
+        action: add_or_update
+        frequency: every_commit
+        evidence_or_reason: Add unit tests for test layer validation logic.
+      integration_tests:
+        required: true
+        action: confirm_existing
+        frequency: every_pull_request
+        evidence_or_reason: Existing CLI tests and quality gate tests cover command integration.
+      mock_e2e_tests:
+        required: true
+        action: scheduled_later_with_reason
+        frequency: before_merge
+        evidence_or_reason: Full workflow E2E will be added in a future story after test layer support exists.
+      live_read_only_checks:
+        required: false
+        action: not_applicable_with_reason
+        frequency: scheduled_or_before_release
+        evidence_or_reason: This story does not depend on external live services.
+      remote_dev_smoke_tests:
+        required: false
+        action: not_applicable_with_reason
+        frequency: after_remote_dev_deploy
+        evidence_or_reason: No remote dev environment exists yet.
+    monitoring_plan:
+      logs_required: true
+      watch_for:
+        - invalid_test_plan
+        - missing_test_layer_result
+        - missing_test_layer_evidence
+        - quality_gate_test_layer_failure
+        - finalize_story_test_layer_failure

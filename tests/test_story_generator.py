@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+import yaml
 
 from agentic_dev.cli import main
 from agentic_dev.scaffolding import CORE_AGENT_INSTRUCTIONS
@@ -78,6 +79,39 @@ def test_generate_stories_reads_yaml_and_creates_expected_workspace(tmp_path: Pa
 
     monitoring_plan = (story_path / "monitoring_plan.yaml").read_text(encoding="utf-8")
     assert "generator_errors" in monitoring_plan
+
+
+def test_generate_stories_creates_full_test_layer_template(tmp_path: Path) -> None:
+    blueprint_path = tmp_path / "blueprints" / "blueprint.yaml"
+    story_slug = "story_014_test_layers"
+    write_blueprint(blueprint_path, story_slug)
+
+    generate_stories(tmp_path)
+
+    test_plan = yaml.safe_load(
+        (tmp_path / "stories" / story_slug / "test_plan.yaml").read_text(
+            encoding="utf-8",
+        ),
+    )
+    assert test_plan["test_layers_version"] == 1
+
+    for layer_name in [
+        "unit_tests",
+        "integration_tests",
+        "mock_e2e_tests",
+        "live_read_only_checks",
+        "remote_dev_smoke_tests",
+    ]:
+        assert set(test_plan[layer_name]) == {
+            "required",
+            "action",
+            "frequency",
+            "evidence_or_reason",
+        }
+        assert isinstance(test_plan[layer_name]["required"], bool)
+        assert test_plan[layer_name]["action"]
+        assert test_plan[layer_name]["frequency"]
+        assert test_plan[layer_name]["evidence_or_reason"]
 
 
 def test_generate_stories_uses_default_blueprint_path(tmp_path: Path) -> None:

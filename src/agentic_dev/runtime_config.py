@@ -99,6 +99,7 @@ command_policy:
     - docker compose run --rm dev agentic prepare-story
     - docker compose run --rm dev agentic review-bundle
     - docker compose run --rm dev agentic quality-gate
+    - docker compose run --rm dev agentic test-layers
     - docker compose run --rm dev agentic finalize-story
     - docker compose run --rm dev agentic artifact-policy
 

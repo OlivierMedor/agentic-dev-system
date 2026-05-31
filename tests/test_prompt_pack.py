@@ -141,6 +141,9 @@ def test_generated_role_prompts_include_required_agent_specific_rules(tmp_path: 
     assert "Do not write tests." in developer_prompt
     assert "Do not modify implementation code unless a tiny fix is required" in test_prompt
     assert "explain any such fix" in test_prompt
+    assert "unit, integration, mock E2E, live read-only, and remote dev smoke" in test_prompt
+    assert "add tests, update tests, confirm existing coverage" in test_prompt
+    assert "explain why a layer is not applicable" in test_prompt
     assert "Do not approve unless pytest and Ruff pass." in reviewer_prompt
 
 
