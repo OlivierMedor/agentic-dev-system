@@ -1,0 +1,29 @@
+test_layers_version: 1
+unit_tests:
+  required: true
+  action: confirm_existing
+  frequency: every_commit
+  evidence_or_reason: Existing command-level tests cover unit behavior for individual
+    workflow commands.
+integration_tests:
+  required: true
+  action: confirm_existing
+  frequency: every_pull_request
+  evidence_or_reason: Existing command tests cover integration between generated files
+    and command outputs.
+mock_e2e_tests:
+  required: true
+  action: add_or_update
+  frequency: before_merge
+  evidence_or_reason: Add tests/e2e/test_agentic_workflow.py to exercise the full
+    local workflow with mock data.
+live_read_only_checks:
+  required: false
+  action: not_applicable_with_reason
+  frequency: scheduled_or_before_release
+  evidence_or_reason: This story does not use live external APIs or services.
+remote_dev_smoke_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: after_remote_dev_deploy
+  evidence_or_reason: No remote dev deployment environment exists yet.

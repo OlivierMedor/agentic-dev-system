@@ -536,3 +536,73 @@ stories:
         - missing_test_layer_evidence
         - quality_gate_test_layer_failure
         - finalize_story_test_layer_failure
+
+  - id: STORY-015
+    slug: story_015_mock_e2e_workflow_test
+    title: Add mock E2E workflow test
+    goal: Create a project-level mock end-to-end test that verifies the core agentic workflow from project initialization through story finalization.
+    why: The system should prove that the full local workflow works, not only individual commands. A mock E2E test gives us confidence that init, blueprint story generation, story preparation, test-layer validation, and finalization work together safely without live services.
+    acceptance_criteria:
+      - Add tests/e2e/test_agentic_workflow.py.
+      - The E2E test uses a temporary project folder.
+      - The E2E test initializes the project.
+      - The E2E test creates a blueprint with a sample story.
+      - The E2E test generates story workspaces.
+      - The E2E test prepares the generated story.
+      - The E2E test creates simulated required reports and review evidence.
+      - The E2E test runs test layer validation.
+      - The E2E test finalizes the story.
+      - The E2E test confirms status.yaml is ready_for_review true.
+      - The E2E test does not use live APIs.
+      - The E2E test does not call cloud models.
+      - The E2E test does not require a real Git repo.
+      - Docs explain the difference between unit, integration, mock E2E, live checks, and smoke tests.
+    not_in_scope:
+      - No Playwright, Cypress, Selenium, or browser testing.
+      - No live API calls.
+      - No remote dev deployment.
+      - No production smoke tests.
+      - No LangGraph yet.
+      - No automatic Codex execution.
+    definition_of_done:
+      - pytest passes.
+      - ruff passes.
+      - artifact-policy passes.
+      - runtime-config validate passes.
+      - mock E2E test passes.
+      - finalize-story marks this story ready for review.
+    test_plan:
+      test_layers_version: 1
+      unit_tests:
+        required: true
+        action: confirm_existing
+        frequency: every_commit
+        evidence_or_reason: Existing command-level tests cover unit behavior for individual workflow commands.
+      integration_tests:
+        required: true
+        action: confirm_existing
+        frequency: every_pull_request
+        evidence_or_reason: Existing command tests cover integration between generated files and command outputs.
+      mock_e2e_tests:
+        required: true
+        action: add_or_update
+        frequency: before_merge
+        evidence_or_reason: Add tests/e2e/test_agentic_workflow.py to exercise the full local workflow with mock data.
+      live_read_only_checks:
+        required: false
+        action: not_applicable_with_reason
+        frequency: scheduled_or_before_release
+        evidence_or_reason: This story does not use live external APIs or services.
+      remote_dev_smoke_tests:
+        required: false
+        action: not_applicable_with_reason
+        frequency: after_remote_dev_deploy
+        evidence_or_reason: No remote dev deployment environment exists yet.
+    monitoring_plan:
+      logs_required: true
+      watch_for:
+        - e2e_workflow_failure
+        - missing_generated_story
+        - failed_test_layer_validation
+        - failed_finalize_story
+        - unexpected_live_service_usage
