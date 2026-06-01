@@ -309,6 +309,49 @@ The post-story improvement workflow is:
 5. Run `improvement-scan record --story <story> --suggestions-file <path>`.
 6. Review the improvement queue later.
 
+## Run a reactive maintenance scan
+
+When tests, logs, CI, remote dev, or an external integration fails, create a maintenance scan packet
+instead of guessing at a fix or expanding the active story:
+
+```powershell
+docker compose run --rm dev agentic maintenance-scan create --story story_022_reactive_maintenance_scan
+```
+
+Use `--logs-path <file-or-folder>` to include local log evidence in the packet. Use `--force` only
+when you intentionally want to overwrite an existing maintenance packet and template.
+
+The command validates that `stories/<story>/` exists and writes
+`stories/<story>/maintenance/maintenance_scan_packet.md` plus
+`stories/<story>/maintenance/maintenance_findings_template.yaml`. The packet includes story
+content, monitoring and test plans, status, available test-layer, quality-gate, finalize, local
+review, review bundle, pytest, and Ruff evidence, plus optional logs. It instructs reviewers to
+identify broken behavior, regressions, failing checks, missing evidence, or external dependency
+failures; it also tells them not to implement fixes, not to expand scope, and to use the findings
+template format.
+
+After the cloud or local reviewer analyzes the packet, save the findings YAML and record it into
+the pending maintenance queue:
+
+```powershell
+docker compose run --rm dev agentic maintenance-scan record --story story_022_reactive_maintenance_scan --findings-file stories/story_022_reactive_maintenance_scan/maintenance/maintenance_findings.yaml
+```
+
+The record command validates the findings YAML, creates one pending item per finding under
+`.agentic/maintenance_queue/pending/`, and writes
+`stories/<story>/maintenance/maintenance_record_report.md`. It does not promote queue items to
+stories, implement fixes, call cloud models, or call internet search.
+
+The reactive maintenance workflow is:
+
+1. A failure appears in tests, logs, CI, remote dev, or an external integration.
+2. Run `maintenance-scan create --story <story>`.
+3. Have a cloud or local reviewer analyze the packet.
+4. Save the returned findings YAML.
+5. Run `maintenance-scan record --story <story> --findings-file <path>`.
+6. Review the maintenance queue later.
+7. Promote an approved maintenance item to a repair story when it is ready for planned work.
+
 ## Check project status
 
 Run this from the repo root to see a lightweight dashboard for all story workspaces:

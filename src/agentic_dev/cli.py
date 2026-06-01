@@ -12,6 +12,10 @@ from agentic_dev.improvement_scan import (
     create_improvement_scan_packet,
     record_improvement_suggestions,
 )
+from agentic_dev.maintenance_scan import (
+    create_maintenance_scan_packet,
+    record_maintenance_findings,
+)
 from agentic_dev.merge_readiness import run_merge_readiness
 from agentic_dev.prepare_story import prepare_story
 from agentic_dev.project_status import run_project_status
@@ -306,6 +310,63 @@ def main() -> None:
         type=Path,
         required=True,
         help="Path to the completed improvement suggestions YAML file.",
+    )
+
+    maintenance_scan_parser = subparsers.add_parser(
+        "maintenance-scan",
+        help="Create and record reactive maintenance scan findings.",
+    )
+    maintenance_scan_subparsers = maintenance_scan_parser.add_subparsers(
+        dest="maintenance_scan_command",
+        required=True,
+    )
+
+    maintenance_scan_create_parser = maintenance_scan_subparsers.add_parser(
+        "create",
+        help="Create a reactive maintenance scan packet.",
+    )
+    maintenance_scan_create_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    maintenance_scan_create_parser.add_argument(
+        "--story",
+        required=True,
+        help="Story folder name under the project's stories folder.",
+    )
+    maintenance_scan_create_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing maintenance scan files.",
+    )
+    maintenance_scan_create_parser.add_argument(
+        "--logs-path",
+        type=Path,
+        help="Optional log file or folder to include in the maintenance scan packet.",
+    )
+
+    maintenance_scan_record_parser = maintenance_scan_subparsers.add_parser(
+        "record",
+        help="Record maintenance findings into the maintenance queue.",
+    )
+    maintenance_scan_record_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    maintenance_scan_record_parser.add_argument(
+        "--story",
+        required=True,
+        help="Story folder name under the project's stories folder.",
+    )
+    maintenance_scan_record_parser.add_argument(
+        "--findings-file",
+        type=Path,
+        required=True,
+        help="Path to the completed maintenance findings YAML file.",
     )
 
     merge_readiness_parser = subparsers.add_parser(
@@ -789,6 +850,45 @@ def main() -> None:
 
                 print(f"Improvement suggestions recorded for: {result.story}")
                 print(f"Suggestions file: {result.suggestions_file}")
+                print(f"Report: {result.report_path}")
+                print("\nCreated queue items:")
+                for item in result.queue_items:
+                    print(f"  - {item.item_id}: {item.item_path}")
+
+        if args.command == "maintenance-scan":
+            if args.maintenance_scan_command == "create":
+                result = create_maintenance_scan_packet(
+                    args.project,
+                    args.story,
+                    args.force,
+                    args.logs_path,
+                )
+
+                print(f"Maintenance scan packet created for: {result.story}")
+                print(f"Maintenance path: {result.maintenance_path}")
+                print("\nGenerated:")
+                for path in result.generated_files:
+                    print(f"  - {path}")
+
+                if result.included_log_files:
+                    print("\nIncluded log files:")
+                    for path in result.included_log_files:
+                        print(f"  - {path}")
+
+                if result.missing_optional_files:
+                    print("\nMissing optional evidence:")
+                    for relative_path in result.missing_optional_files:
+                        print(f"  - {relative_path}")
+
+            if args.maintenance_scan_command == "record":
+                result = record_maintenance_findings(
+                    args.project,
+                    args.story,
+                    args.findings_file,
+                )
+
+                print(f"Maintenance findings recorded for: {result.story}")
+                print(f"Findings file: {result.findings_file}")
                 print(f"Report: {result.report_path}")
                 print("\nCreated queue items:")
                 for item in result.queue_items:

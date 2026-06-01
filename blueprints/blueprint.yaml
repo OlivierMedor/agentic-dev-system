@@ -1051,3 +1051,76 @@ stories:
         - failed_improvement_queue_recording
         - out_of_scope_improvement_suggestion
         - duplicate_improvement_queue_item
+
+  - id: STORY-022
+    slug: story_022_reactive_maintenance_scan
+    title: Add reactive maintenance scan
+    goal: Create commands that generate a maintenance scan packet from story/test/log evidence and record structured maintenance findings into the maintenance queue.
+    why: When tests, logs, CI, remote dev, or external integrations fail, agents should not guess or silently change code. The system should create a structured maintenance ticket that can be reviewed by the cloud model and human owner before becoming repair work.
+    acceptance_criteria:
+      - Add maintenance-scan create command.
+      - Add maintenance-scan record command.
+      - maintenance-scan create requires --story.
+      - maintenance-scan create defaults --project to the current working directory.
+      - maintenance-scan create creates stories/<story>/maintenance/maintenance_scan_packet.md.
+      - maintenance-scan create creates stories/<story>/maintenance/maintenance_findings_template.yaml.
+      - maintenance-scan packet includes story content, monitoring plan, test plan, review bundle handoff, pytest output, ruff output, quality gate result, finalize result, and optional log files when present.
+      - maintenance-scan packet instructs the reviewer to identify broken behavior, regressions, or external dependency failures.
+      - maintenance-scan packet instructs the reviewer not to implement fixes automatically.
+      - maintenance-scan record requires --story and --findings-file.
+      - maintenance-scan record validates findings YAML.
+      - maintenance-scan record creates maintenance queue items under .agentic/maintenance_queue/pending.
+      - Each maintenance item includes source_story, severity, source_type, problem, evidence, suspected_cause, recommended_action, suggested_acceptance_criteria, and next_action.
+      - Tests verify packet creation, findings validation, and maintenance queue item creation.
+      - README documents the reactive maintenance workflow.
+    not_in_scope:
+      - No automatic repair.
+      - No automatic cloud model call.
+      - No internet lookup yet.
+      - No scheduled log monitor yet.
+      - No remote dev validation environment yet.
+      - No production incident workflow yet.
+      - No LangGraph yet.
+    definition_of_done:
+      - pytest passes.
+      - ruff passes.
+      - artifact-policy passes.
+      - runtime-config validate passes.
+      - maintenance-scan create works.
+      - maintenance-scan record works with a sample findings file.
+      - finalize-story marks this story ready for review.
+    test_plan:
+      test_layers_version: 1
+      unit_tests:
+        required: true
+        action: add_or_update
+        frequency: every_commit
+        evidence_or_reason: Add unit tests for maintenance scan packet creation and findings recording.
+      integration_tests:
+        required: true
+        action: confirm_existing
+        frequency: every_pull_request
+        evidence_or_reason: Existing command tests cover CLI integration patterns.
+      mock_e2e_tests:
+        required: true
+        action: confirm_existing
+        frequency: before_merge
+        evidence_or_reason: Existing mock E2E workflow test covers the local story workflow.
+      live_read_only_checks:
+        required: false
+        action: not_applicable_with_reason
+        frequency: scheduled_or_before_release
+        evidence_or_reason: This story does not call live APIs or external services.
+      remote_dev_smoke_tests:
+        required: false
+        action: not_applicable_with_reason
+        frequency: after_remote_dev_deploy
+        evidence_or_reason: No remote dev deployment environment exists yet.
+    monitoring_plan:
+      logs_required: true
+      watch_for:
+        - missing_maintenance_scan_packet
+        - invalid_maintenance_findings_yaml
+        - failed_maintenance_queue_recording
+        - accidental_auto_fix_attempt
+        - external_dependency_failure
