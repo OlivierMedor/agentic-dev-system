@@ -330,8 +330,31 @@ Record a decision and move the item:
 docker compose run --rm dev agentic queue set-status --item IMP-20260601-120000 --status approved --decision-note "Accepted for future planning."
 ```
 
-Approved queue items do not create stories automatically yet. The queues do not call cloud models,
-notify humans, run agents, commit, push, merge, or deploy.
+Promote an approved queue item into a story:
+
+```powershell
+docker compose run --rm dev agentic queue promote-to-story --item IMP-20260601-120000
+```
+
+The command finds the item across improvement, maintenance, and feature queues unless `--type` is
+provided. It reads `blueprints/blueprint.yaml`, picks the next available `STORY-###` number from
+the blueprint and existing story folders, creates a safe slug from the queue item title, appends a
+story entry, creates the story workspace, writes
+`stories/<new_story>/reports/promotion_report.md`, writes `reports/queue_promotion_report.md`, and
+records `promoted_story_id` and `promoted_story_slug` back into the queue item YAML.
+
+By default, only approved items can be promoted. Use `--allow-pending` only for an explicit manual
+override:
+
+```powershell
+docker compose run --rm dev agentic queue promote-to-story --item IMP-20260601-120000 --allow-pending
+```
+
+To move the queue item after promotion, add either `--close-after-promotion` or
+`--park-after-promotion`.
+
+Queue promotion does not execute the new story, call cloud models, notify humans, run agents,
+commit, push, merge, or deploy.
 
 ## Use the support queue
 

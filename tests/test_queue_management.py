@@ -10,6 +10,7 @@ from agentic_dev.queue_management import (
     format_queue_item,
     format_queue_list,
     list_queue_items,
+    promote_queue_item_to_story,
     set_queue_item_status,
     show_queue_item,
 )
@@ -46,6 +47,29 @@ def read_yaml(path: Path) -> dict:
     return loaded or {}
 
 
+def write_minimal_blueprint(tmp_path: Path) -> Path:
+    blueprint_path = tmp_path / "blueprints" / "blueprint.yaml"
+    blueprint_path.parent.mkdir(parents=True)
+    blueprint_path.write_text(
+        """name: Test Blueprint
+stories:
+  - id: STORY-001
+    slug: story_001_existing
+    title: Existing Story
+    goal: Keep the first story in the plan.
+    why: It gives promotion a starting point.
+    acceptance_criteria:
+      - Existing criterion.
+    not_in_scope:
+      - Existing exclusion.
+    definition_of_done:
+      - Existing done item.
+""",
+        encoding="utf-8",
+    )
+    return blueprint_path
+
+
 def create_sample_item(
     tmp_path: Path,
     queue_type: str = "improvement",
@@ -61,6 +85,16 @@ def create_sample_item(
         details="Add coverage for queue commands.",
     )
     return result.item_id
+
+
+def create_approved_sample_item(
+    tmp_path: Path,
+    queue_type: str = "improvement",
+    title: str = "Improve the local report",
+) -> str:
+    item_id = create_sample_item(tmp_path, queue_type=queue_type, title=title)
+    set_queue_item_status(tmp_path, item_id, "approved", "Approved for promotion.")
+    return item_id
 
 
 @pytest.mark.parametrize(
@@ -252,6 +286,172 @@ def test_queue_set_status_rejects_invalid_status(tmp_path: Path) -> None:
         set_queue_item_status(tmp_path, item_id, "waiting")
 
     assert "pending, approved, rejected, parked, closed" in str(error.value)
+
+
+@pytest.mark.parametrize(
+    ("queue_type", "title", "expected_slug"),
+    [
+        ("improvement", "Simplify review bundle output", "story_002_simplify_review_bundle_output"),
+        ("maintenance", "Refresh stale dependency pins", "story_002_refresh_stale_dependency_pins"),
+        ("feature", "Add queue dashboard", "story_002_add_queue_dashboard"),
+    ],
+)
+def test_approved_queue_item_can_be_promoted_to_story(
+    tmp_path: Path,
+    queue_type: str,
+    title: str,
+    expected_slug: str,
+) -> None:
+    blueprint_path = write_minimal_blueprint(tmp_path)
+    item_id = create_approved_sample_item(tmp_path, queue_type=queue_type, title=title)
+
+    result = promote_queue_item_to_story(tmp_path, item_id)
+
+    assert result.item_id == item_id
+    assert result.queue_type == queue_type
+    assert result.old_status == "approved"
+    assert result.new_status == "approved"
+    assert result.story_id == "STORY-002"
+    assert result.story_slug == expected_slug
+    assert result.blueprint_path == blueprint_path.resolve()
+    assert result.story_path == tmp_path.resolve() / "stories" / expected_slug
+    assert result.story_path.exists()
+
+    blueprint = read_yaml(blueprint_path)
+    promoted_story = blueprint["stories"][-1]
+    assert promoted_story["id"] == "STORY-002"
+    assert promoted_story["slug"] == expected_slug
+    assert promoted_story["title"] == title
+    assert promoted_story["acceptance_criteria"]
+    assert promoted_story["not_in_scope"]
+    assert promoted_story["definition_of_done"]
+    assert promoted_story["test_plan"]["unit_tests"]["required"] is True
+    assert promoted_story["monitoring_plan"]["logs_required"] is True
+
+    story_markdown = (result.story_path / "story.md").read_text(encoding="utf-8")
+    assert f"# STORY-002: {title}" in story_markdown
+    assert "## Acceptance Criteria" in story_markdown
+    assert "## Not In Scope" in story_markdown
+    assert "## Definition of Done" in story_markdown
+    assert (result.story_path / "test_plan.yaml").exists()
+    assert (result.story_path / "monitoring_plan.yaml").exists()
+
+    assert result.story_report_path.exists()
+    assert result.project_report_path.exists()
+    report = result.story_report_path.read_text(encoding="utf-8")
+    assert "Queue Promotion Report" in report
+    assert "The command did not call cloud models." in report
+
+    promoted_item = read_yaml(result.destination_path)
+    assert promoted_item["promoted_story_id"] == "STORY-002"
+    assert promoted_item["promoted_story_slug"] == expected_slug
+
+
+def test_pending_queue_item_cannot_be_promoted_by_default(tmp_path: Path) -> None:
+    write_minimal_blueprint(tmp_path)
+    item_id = create_sample_item(tmp_path, title="Pending idea")
+
+    with pytest.raises(ValueError, match="cannot be promoted without --allow-pending") as error:
+        promote_queue_item_to_story(tmp_path, item_id)
+
+    assert item_id in str(error.value)
+    assert not (tmp_path / "stories").exists()
+
+
+def test_pending_queue_item_can_be_promoted_with_allow_pending(tmp_path: Path) -> None:
+    write_minimal_blueprint(tmp_path)
+    item_id = create_sample_item(tmp_path, title="Manual override promotion")
+
+    result = promote_queue_item_to_story(tmp_path, item_id, allow_pending=True)
+
+    assert result.allowed_pending is True
+    assert result.old_status == "pending"
+    assert result.new_status == "pending"
+    assert result.story_id == "STORY-002"
+    assert result.story_slug == "story_002_manual_override_promotion"
+    assert result.destination_path == (
+        tmp_path.resolve() / ".agentic" / "improvement_queue" / "pending" / f"{item_id}.yaml"
+    )
+    assert read_yaml(result.destination_path)["promoted_story_id"] == "STORY-002"
+
+
+def test_promote_queue_item_raises_clear_error_for_missing_item(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError, match="Queue item was not found") as error:
+        promote_queue_item_to_story(tmp_path, "IMP-404")
+
+    assert "IMP-404" in str(error.value)
+
+
+def test_promote_queue_item_uses_next_story_id_and_safe_slug(tmp_path: Path) -> None:
+    write_minimal_blueprint(tmp_path)
+    existing_story_path = tmp_path / "stories" / "story_009_existing_workspace"
+    existing_story_path.mkdir(parents=True)
+    (existing_story_path / "story.md").write_text(
+        "# STORY-009: Existing Workspace\n",
+        encoding="utf-8",
+    )
+    item_id = create_approved_sample_item(tmp_path, title="Add CSV / JSON export!!")
+
+    result = promote_queue_item_to_story(tmp_path, item_id)
+
+    assert result.story_id == "STORY-010"
+    assert result.story_slug == "story_010_add_csv_json_export"
+    blueprint = read_yaml(tmp_path / "blueprints" / "blueprint.yaml")
+    assert blueprint["stories"][-1]["id"] == "STORY-010"
+    assert blueprint["stories"][-1]["slug"] == "story_010_add_csv_json_export"
+
+
+def test_close_after_promotion_moves_item_to_closed(tmp_path: Path) -> None:
+    write_minimal_blueprint(tmp_path)
+    item_id = create_approved_sample_item(tmp_path, title="Close promoted item")
+    approved_path = (
+        tmp_path / ".agentic" / "improvement_queue" / "approved" / f"{item_id}.yaml"
+    )
+
+    result = promote_queue_item_to_story(tmp_path, item_id, close_after_promotion=True)
+
+    closed_path = tmp_path / ".agentic" / "improvement_queue" / "closed" / f"{item_id}.yaml"
+    assert result.post_promotion_status == "closed"
+    assert result.new_status == "closed"
+    assert result.destination_path == closed_path.resolve()
+    assert not approved_path.exists()
+    assert closed_path.exists()
+    closed_item = read_yaml(closed_path)
+    assert closed_item["status"] == "closed"
+    assert closed_item["promoted_story_id"] == "STORY-002"
+    assert closed_item["decision_history"][-1]["to"] == "closed"
+
+
+def test_promote_cli_uses_current_directory_without_git_or_cloud_credentials(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    write_minimal_blueprint(tmp_path)
+    item_id = create_approved_sample_item(tmp_path, title="Promote without repository")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.delenv("GH_TOKEN", raising=False)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "agentic",
+            "queue",
+            "promote-to-story",
+            "--item",
+            item_id,
+        ],
+    )
+
+    main()
+
+    output = capsys.readouterr().out
+    assert "Queue item promoted:" in output
+    assert "STORY-002" in output
+    assert "story_002_promote_without_repository" in output
+    assert not (tmp_path / ".git").exists()
+    assert (tmp_path / "stories" / "story_002_promote_without_repository").exists()
 
 
 def test_queue_cli_commands_do_not_require_git_or_cloud_credentials(
