@@ -21,7 +21,9 @@ from agentic_dev.queue_management import (
     create_queue_item,
     format_queue_item,
     format_queue_list,
+    format_queue_promotion,
     list_queue_items,
+    promote_queue_item_to_story,
     set_queue_item_status,
     show_queue_item,
 )
@@ -549,6 +551,40 @@ def main() -> None:
         help="Target project folder. Defaults to the current directory.",
     )
 
+    queue_promote_parser = queue_subparsers.add_parser(
+        "promote-to-story",
+        help="Promote an approved queue item into a blueprint story and story workspace.",
+    )
+    queue_promote_parser.add_argument("--item", required=True, help="Queue item ID.")
+    queue_promote_parser.add_argument(
+        "--type",
+        dest="queue_type",
+        choices=QUEUE_TYPES,
+        help="Optional queue type hint.",
+    )
+    queue_promote_parser.add_argument(
+        "--allow-pending",
+        action="store_true",
+        help="Allow manually promoting a pending item.",
+    )
+    post_promotion_group = queue_promote_parser.add_mutually_exclusive_group()
+    post_promotion_group.add_argument(
+        "--close-after-promotion",
+        action="store_true",
+        help="Move the queue item to closed after promotion.",
+    )
+    post_promotion_group.add_argument(
+        "--park-after-promotion",
+        action="store_true",
+        help="Move the queue item to parked after promotion.",
+    )
+    queue_promote_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
     args = parser.parse_args()
 
     try:
@@ -794,5 +830,16 @@ def main() -> None:
                 print(f"Status: {result.old_status} -> {result.new_status}")
                 print(f"Source path: {result.source_path}")
                 print(f"Destination path: {result.destination_path}")
+
+            if args.queue_command == "promote-to-story":
+                result = promote_queue_item_to_story(
+                    project_path=args.project,
+                    item_id=args.item,
+                    queue_type=args.queue_type,
+                    allow_pending=args.allow_pending,
+                    close_after_promotion=args.close_after_promotion,
+                    park_after_promotion=args.park_after_promotion,
+                )
+                print(format_queue_promotion(result))
     except (FileNotFoundError, ValueError) as error:
         parser.exit(status=1, message=f"Error: {error}\n")

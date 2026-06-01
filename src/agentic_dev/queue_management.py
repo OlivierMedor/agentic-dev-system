@@ -3,9 +3,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+import re
 from typing import Any
 
 import yaml
+
+from agentic_dev.story_generator import (
+    DEFAULT_BLUEPRINT_RELATIVE_PATH,
+    create_story_workspace,
+    load_blueprint,
+)
 
 
 QUEUE_TYPES = ("improvement", "maintenance", "feature")
@@ -75,6 +82,26 @@ class QueueSetStatusResult:
     new_status: str
     source_path: Path
     destination_path: Path
+    data: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class QueuePromoteToStoryResult:
+    item_id: str
+    queue_type: str
+    old_status: str
+    new_status: str
+    source_path: Path
+    destination_path: Path
+    story_id: str
+    story_slug: str
+    story_path: Path
+    blueprint_path: Path
+    story_report_path: Path
+    project_report_path: Path
+    created_paths: list[Path]
+    allowed_pending: bool
+    post_promotion_status: str | None
     data: dict[str, Any]
 
 
@@ -195,7 +222,11 @@ def set_queue_item_status(
     item_data["decision_history"] = history
 
     destination_path = directories[status] / item_filename(text_value(item_data, "id", item_id))
-    write_yaml_mapping(destination_path, item_data, allow_overwrite=destination_path == located_item.path)
+    write_yaml_mapping(
+        destination_path,
+        item_data,
+        allow_overwrite=destination_path == located_item.path,
+    )
     remove_source_if_moved(located_item.path, destination_path)
 
     return QueueSetStatusResult(
@@ -207,6 +238,99 @@ def set_queue_item_status(
         destination_path=destination_path,
         data=item_data,
     )
+
+
+def promote_queue_item_to_story(
+    project_path: Path,
+    item_id: str,
+    queue_type: str | None = None,
+    allow_pending: bool = False,
+    close_after_promotion: bool = False,
+    park_after_promotion: bool = False,
+) -> QueuePromoteToStoryResult:
+    project_path = project_path.resolve()
+    if close_after_promotion and park_after_promotion:
+        raise ValueError("Use only one post-promotion move option: closed or parked.")
+
+    located_item = find_queue_item(project_path, item_id, queue_type)
+    if located_item.status != "approved":
+        if located_item.status == "pending" and allow_pending:
+            pass
+        elif located_item.status == "pending":
+            raise ValueError(
+                "Queue item is pending and cannot be promoted without --allow-pending: "
+                f"{item_id}",
+            )
+        else:
+            raise ValueError(
+                "Queue item must be approved before promotion. "
+                f"{item_id} currently has status {located_item.status}.",
+            )
+
+    if text_value(located_item.data, "promoted_story_id", ""):
+        raise ValueError(
+            "Queue item has already been promoted to "
+            f"{text_value(located_item.data, 'promoted_story_id', 'a story')}.",
+        )
+
+    blueprint_path = project_path / DEFAULT_BLUEPRINT_RELATIVE_PATH
+    blueprint = load_blueprint(blueprint_path)
+    stories = blueprint.get("stories")
+    if not isinstance(stories, list):
+        raise ValueError("Blueprint must include a top-level 'stories' list.")
+
+    story_number = next_story_number(project_path, stories)
+    title = text_value(located_item.data, "title", "").strip() or item_id
+    story_id = format_story_id(story_number)
+    story_slug = unique_story_slug(project_path, stories, story_number, title)
+    story = build_promoted_story(story_id, story_slug, title, located_item)
+    story_path = project_path / "stories" / story_slug
+    if story_path.exists():
+        raise ValueError(f"Story workspace already exists: {story_path}")
+
+    append_story_to_blueprint(blueprint_path, blueprint, story)
+    created_paths = create_story_workspace(project_path, story)
+
+    promoted_at = timestamp_now()
+    post_promotion_status = selected_post_promotion_status(
+        close_after_promotion,
+        park_after_promotion,
+    )
+    item_data = build_promoted_queue_item_data(
+        located_item=located_item,
+        item_id=item_id,
+        story_id=story_id,
+        story_slug=story_slug,
+        promoted_at=promoted_at,
+        post_promotion_status=post_promotion_status,
+    )
+    destination_path = write_promoted_queue_item(
+        project_path=project_path,
+        located_item=located_item,
+        item_data=item_data,
+        post_promotion_status=post_promotion_status,
+    )
+
+    result = QueuePromoteToStoryResult(
+        item_id=text_value(item_data, "id", item_id),
+        queue_type=located_item.queue_type,
+        old_status=located_item.status,
+        new_status=text_value(item_data, "status", located_item.status),
+        source_path=located_item.path,
+        destination_path=destination_path,
+        story_id=story_id,
+        story_slug=story_slug,
+        story_path=story_path,
+        blueprint_path=blueprint_path,
+        story_report_path=story_path / "reports" / "promotion_report.md",
+        project_report_path=project_path / "reports" / "queue_promotion_report.md",
+        created_paths=created_paths,
+        allowed_pending=located_item.status == "pending" and allow_pending,
+        post_promotion_status=post_promotion_status,
+        data=item_data,
+    )
+    write_promotion_reports(result, located_item.data)
+    return result
 
 
 def count_queue_items(project_path: Path) -> dict[str, dict[str, int]]:
@@ -285,6 +409,24 @@ def format_queue_item(result: QueueShowResult) -> str:
     decision_note = text_value(item, "decision_note", "")
     if decision_note:
         lines.extend(["", "Decision note:", decision_note])
+
+    return "\n".join(lines)
+
+
+def format_queue_promotion(result: QueuePromoteToStoryResult) -> str:
+    lines = [
+        f"Queue item promoted: {result.item_id}",
+        f"Story: {result.story_id} ({result.story_slug})",
+        f"Blueprint: {result.blueprint_path}",
+        f"Story path: {result.story_path}",
+        f"Promotion report: {result.story_report_path}",
+        f"Project report: {result.project_report_path}",
+        f"Queue status: {result.old_status} -> {result.new_status}",
+    ]
+    if result.allowed_pending:
+        lines.append("Pending override: used --allow-pending")
+    if result.post_promotion_status:
+        lines.append(f"Post-promotion move: {result.post_promotion_status}")
 
     return "\n".join(lines)
 
@@ -377,6 +519,356 @@ def find_queue_item(
 
     type_hint = f" in {queue_type} queue" if queue_type else ""
     raise FileNotFoundError(f"Queue item was not found{type_hint}: {item_id}")
+
+
+def next_story_number(project_path: Path, stories: list[Any]) -> int:
+    numbers: list[int] = []
+
+    for story in stories:
+        if isinstance(story, dict):
+            numbers.extend(story_numbers_from_text(text_value(story, "id", "")))
+            numbers.extend(story_numbers_from_text(text_value(story, "slug", "")))
+
+    stories_path = project_path / "stories"
+    if stories_path.exists():
+        for story_path in stories_path.iterdir():
+            if not story_path.is_dir():
+                continue
+            numbers.extend(story_numbers_from_text(story_path.name))
+            story_markdown = story_path / "story.md"
+            if story_markdown.exists():
+                numbers.extend(story_numbers_from_text(read_text_prefix(story_markdown)))
+
+    return max(numbers, default=0) + 1
+
+
+def format_story_id(story_number: int) -> str:
+    if story_number < 1:
+        raise ValueError(f"Invalid story number: {story_number}")
+
+    return f"STORY-{story_number:03d}"
+
+
+def safe_story_slug_text(title: str) -> str:
+    slug = re.sub(r"[^a-z0-9]+", "_", title.lower()).strip("_")
+    slug = re.sub(r"_+", "_", slug)
+    return slug or "queue_item"
+
+
+def unique_story_slug(
+    project_path: Path,
+    stories: list[Any],
+    story_number: int,
+    title: str,
+) -> str:
+    used_slugs = {
+        text_value(story, "slug", "")
+        for story in stories
+        if isinstance(story, dict)
+    }
+    base = f"story_{story_number:03d}_{safe_story_slug_text(title)}"
+    candidate = base
+    counter = 2
+
+    while candidate in used_slugs or (project_path / "stories" / candidate).exists():
+        candidate = f"{base}_{counter}"
+        counter += 1
+
+    return candidate
+
+
+def story_numbers_from_text(value: str) -> list[int]:
+    numbers: list[int] = []
+    for match in re.finditer(r"\bSTORY-(\d+)\b|(?:^|/)story_(\d+)(?:_|$)", value):
+        raw_number = match.group(1) or match.group(2)
+        if raw_number:
+            numbers.append(int(raw_number))
+
+    return numbers
+
+
+def read_text_prefix(path: Path, character_limit: int = 500) -> str:
+    return path.read_text(encoding="utf-8", errors="replace")[:character_limit]
+
+
+def build_promoted_story(
+    story_id: str,
+    story_slug: str,
+    title: str,
+    located_item: LocatedQueueItem,
+) -> dict[str, Any]:
+    details = text_value(located_item.data, "details", "").strip()
+    category = text_value(located_item.data, "category", "").strip()
+    source_story = text_value(located_item.data, "source_story", "").strip()
+    queue_context = (
+        f"{located_item.queue_type} queue item "
+        f"{text_value(located_item.data, 'id', '')}"
+    )
+    source_context = f" Source story: {source_story}." if source_story else ""
+    category_context = f" Category: {category}." if category else ""
+    goal = details or f"Implement the approved queue item: {title}."
+
+    return {
+        "id": story_id,
+        "slug": story_slug,
+        "title": title,
+        "goal": goal,
+        "why": (
+            f"This story was promoted from {queue_context} so it can be "
+            f"planned, implemented, tested, and reviewed through the standard workflow."
+            f"{source_context}{category_context}"
+        ),
+        "acceptance_criteria": [
+            f"Implement the approved queue item: {title}.",
+            "Add or update tests that cover the promoted behavior.",
+            "Update documentation when the user-facing workflow changes.",
+            "Keep the work scoped to the promoted queue item.",
+        ],
+        "not_in_scope": [
+            "No unrelated changes.",
+            "No automatic cloud model calls.",
+            "No automatic story execution.",
+            "No automatic merge or deployment.",
+        ],
+        "definition_of_done": [
+            "pytest passes.",
+            "ruff passes.",
+            "artifact-policy passes.",
+            "runtime-config validate passes.",
+            "The promoted queue item is implemented and reviewed.",
+            "finalize-story marks this story ready for review.",
+        ],
+        "test_plan": {
+            "test_layers_version": 1,
+            "unit_tests": {
+                "required": True,
+                "action": "add_or_update",
+                "frequency": "every_commit",
+                "evidence_or_reason": "Add or update unit tests for the promoted queue item.",
+            },
+            "integration_tests": {
+                "required": True,
+                "action": "confirm_existing",
+                "frequency": "every_pull_request",
+                "evidence_or_reason": (
+                    "Confirm existing integration coverage still covers the affected workflow."
+                ),
+            },
+            "mock_e2e_tests": {
+                "required": True,
+                "action": "confirm_existing",
+                "frequency": "before_merge",
+                "evidence_or_reason": (
+                    "Confirm mock E2E coverage remains valid for the local workflow."
+                ),
+            },
+            "live_read_only_checks": {
+                "required": False,
+                "action": "not_applicable_with_reason",
+                "frequency": "scheduled_or_before_release",
+                "evidence_or_reason": (
+                    "The promoted story should not require live service access by default."
+                ),
+            },
+            "remote_dev_smoke_tests": {
+                "required": False,
+                "action": "not_applicable_with_reason",
+                "frequency": "after_remote_dev_deploy",
+                "evidence_or_reason": (
+                    "No remote dev environment is assumed for promoted queue items."
+                ),
+            },
+        },
+        "monitoring_plan": {
+            "logs_required": True,
+            "watch_for": [
+                "implementation_failure",
+                "regression",
+                "missing_test_coverage",
+                "unexpected_scope_expansion",
+            ],
+        },
+    }
+
+
+def append_story_to_blueprint(
+    blueprint_path: Path,
+    blueprint: dict[str, Any],
+    story: dict[str, Any],
+) -> None:
+    stories = blueprint.get("stories")
+    if not isinstance(stories, list):
+        raise ValueError("Blueprint must include a top-level 'stories' list.")
+
+    if any(
+        isinstance(existing_story, dict)
+        and text_value(existing_story, "id", "") == text_value(story, "id", "")
+        for existing_story in stories
+    ):
+        raise ValueError(f"Blueprint already contains story id: {text_value(story, 'id', '')}")
+
+    if any(
+        isinstance(existing_story, dict)
+        and text_value(existing_story, "slug", "") == text_value(story, "slug", "")
+        for existing_story in stories
+    ):
+        raise ValueError(f"Blueprint already contains story slug: {text_value(story, 'slug', '')}")
+
+    if (
+        stories_is_last_top_level_section(blueprint_path)
+        and stories_uses_block_sequence(blueprint_path)
+    ):
+        story_yaml = yaml.safe_dump([story], sort_keys=False).rstrip()
+        indented_story_yaml = "\n".join(f"  {line}" for line in story_yaml.splitlines())
+        current_text = blueprint_path.read_text(encoding="utf-8")
+        updated_text = f"{current_text.rstrip()}\n\n{indented_story_yaml}\n"
+        blueprint_path.write_text(updated_text, encoding="utf-8")
+        return
+
+    updated_blueprint = dict(blueprint)
+    updated_blueprint["stories"] = [*stories, story]
+    write_yaml_mapping(blueprint_path, updated_blueprint)
+
+
+def stories_is_last_top_level_section(blueprint_path: Path) -> bool:
+    last_top_level_key = ""
+    for line in blueprint_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip() or line.lstrip().startswith("#") or line.startswith((" ", "\t", "-")):
+            continue
+        match = re.match(r"([A-Za-z0-9_-]+):", line)
+        if match:
+            last_top_level_key = match.group(1)
+
+    return last_top_level_key == "stories"
+
+
+def stories_uses_block_sequence(blueprint_path: Path) -> bool:
+    for line in blueprint_path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("stories:"):
+            return line.strip() == "stories:"
+
+    return False
+
+
+def selected_post_promotion_status(
+    close_after_promotion: bool,
+    park_after_promotion: bool,
+) -> str | None:
+    if close_after_promotion:
+        return "closed"
+
+    if park_after_promotion:
+        return "parked"
+
+    return None
+
+
+def build_promoted_queue_item_data(
+    located_item: LocatedQueueItem,
+    item_id: str,
+    story_id: str,
+    story_slug: str,
+    promoted_at: str,
+    post_promotion_status: str | None,
+) -> dict[str, Any]:
+    item_data = dict(located_item.data)
+    item_data["promoted_story_id"] = story_id
+    item_data["promoted_story_slug"] = story_slug
+    item_data["promoted_at"] = promoted_at
+
+    if post_promotion_status is None:
+        return item_data
+
+    item_data["status"] = post_promotion_status
+    item_data["next_action"] = NEXT_ACTION_BY_STATUS[post_promotion_status]
+    item_data["status_changed_at"] = promoted_at
+
+    history = item_data.get("decision_history")
+    if not isinstance(history, list):
+        history = []
+    history.append(
+        {
+            "from": located_item.status,
+            "to": post_promotion_status,
+            "changed_at": promoted_at,
+            "decision_note": f"Promoted to {story_id} ({story_slug}).",
+        },
+    )
+    item_data["decision_history"] = history
+
+    return item_data
+
+
+def write_promoted_queue_item(
+    project_path: Path,
+    located_item: LocatedQueueItem,
+    item_data: dict[str, Any],
+    post_promotion_status: str | None,
+) -> Path:
+    destination_status = post_promotion_status or located_item.status
+    directories = ensure_queue_directories(project_path, located_item.queue_type)
+    destination_path = directories[destination_status] / item_filename(
+        text_value(item_data, "id", located_item.path.stem),
+    )
+    write_yaml_mapping(
+        destination_path,
+        item_data,
+        allow_overwrite=destination_path == located_item.path,
+    )
+    remove_source_if_moved(located_item.path, destination_path)
+    return destination_path
+
+
+def write_promotion_reports(
+    result: QueuePromoteToStoryResult,
+    original_item_data: dict[str, Any],
+) -> None:
+    report = format_promotion_report(result, original_item_data)
+    result.story_report_path.parent.mkdir(parents=True, exist_ok=True)
+    result.story_report_path.write_text(report, encoding="utf-8")
+    result.project_report_path.parent.mkdir(parents=True, exist_ok=True)
+    result.project_report_path.write_text(report, encoding="utf-8")
+
+
+def format_promotion_report(
+    result: QueuePromoteToStoryResult,
+    original_item_data: dict[str, Any],
+) -> str:
+    pending_override = "yes" if result.allowed_pending else "no"
+    post_status = result.post_promotion_status or "unchanged"
+
+    return f"""# Queue Promotion Report
+
+## Summary
+
+- Queue item: {result.item_id}
+- Queue type: {result.queue_type}
+- Queue status: {result.old_status} -> {result.new_status}
+- Promoted story: {result.story_id}
+- Story slug: {result.story_slug}
+- Pending override used: {pending_override}
+- Post-promotion status: {post_status}
+
+## Paths
+
+- Blueprint: {result.blueprint_path}
+- Story workspace: {result.story_path}
+- Queue item source: {result.source_path}
+- Queue item current path: {result.destination_path}
+
+## Queue Item
+
+- Title: {text_value(original_item_data, "title", "")}
+- Source story: {text_value(original_item_data, "source_story", "") or "none"}
+- Category: {text_value(original_item_data, "category", "") or "none"}
+- Priority: {text_value(original_item_data, "priority", "") or "none"}
+
+## Notes
+
+- The command created the story workspace but did not execute agents.
+- The command did not call cloud models.
+- The command did not commit, push, merge, or deploy.
+"""
 
 
 def selected_queue_types(queue_type: str) -> tuple[str, ...]:

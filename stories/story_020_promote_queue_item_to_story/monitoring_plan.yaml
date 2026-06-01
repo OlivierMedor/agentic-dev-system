@@ -1,0 +1,8 @@
+logs_required: true
+watch_for:
+- missing_queue_item
+- queue_item_not_approved
+- invalid_story_id_generation
+- invalid_story_slug_generation
+- blueprint_update_failure
+- story_generation_failure
