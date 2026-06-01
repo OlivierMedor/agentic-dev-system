@@ -271,6 +271,44 @@ The final merge-readiness workflow is:
 7. Have the human owner review the PR and GitHub Actions.
 8. Have the human owner decide whether to merge.
 
+## Run a post-story improvement scan
+
+After a story is completed, create an improvement scan packet so a research agent, local agent, or
+manual cloud model can suggest focused future improvements without expanding the completed story:
+
+```powershell
+docker compose run --rm dev agentic improvement-scan create --story story_021_post_story_improvement_scan
+```
+
+The command validates that `stories/<story>/` exists and writes
+`stories/<story>/improvements/improvement_scan_packet.md` plus
+`stories/<story>/improvements/improvement_suggestions_template.yaml`. The packet includes story
+content, available reports, test-layer and finalize evidence, local review evidence, and review
+bundle handoff context. It instructs reviewers to suggest improvements only within the completed
+story's scope, avoid unrelated features, avoid expanding the completed story, and use the
+suggestions template format.
+
+After the reviewer returns suggestions, save them as YAML using the generated template shape and
+record them into the pending improvement queue:
+
+```powershell
+docker compose run --rm dev agentic improvement-scan record --story story_021_post_story_improvement_scan --suggestions-file stories/story_021_post_story_improvement_scan/improvements/improvement_suggestions.yaml
+```
+
+The record command validates the suggestions YAML, creates one pending item per suggestion under
+`.agentic/improvement_queue/pending/`, and writes
+`stories/<story>/improvements/improvement_record_report.md`. It does not promote queue items to
+stories, implement suggestions, call cloud models, or call internet search.
+
+The post-story improvement workflow is:
+
+1. Run `finalize-story`.
+2. Run `improvement-scan create --story <story>`.
+3. Send `improvement_scan_packet.md` to the research, cloud, or local reviewer.
+4. Save the returned suggestions YAML.
+5. Run `improvement-scan record --story <story> --suggestions-file <path>`.
+6. Review the improvement queue later.
+
 ## Check project status
 
 Run this from the repo root to see a lightweight dashboard for all story workspaces:

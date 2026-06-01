@@ -1,0 +1,9 @@
+suggestions:
+  - title: Add clearer validation errors
+    category: maintainability
+    priority: medium
+    details: Explain the proposed improvement.
+    expected_benefit: Explain why this helps.
+    suggested_acceptance_criteria:
+      - Add tests for clearer validation errors.
+      - Update docs with examples.
