@@ -6,6 +6,7 @@ from pathlib import Path
 from agentic_dev.agent_assignment import assign_agents
 from agentic_dev.artifact_policy import check_artifact_policy, format_artifact_policy_report
 from agentic_dev.cloud_review_packet import create_cloud_review_packet
+from agentic_dev.cloud_review_result import record_cloud_review
 from agentic_dev.finalize_story import finalize_story
 from agentic_dev.prepare_story import prepare_story
 from agentic_dev.prompt_pack import generate_prompt_pack
@@ -211,6 +212,28 @@ def main() -> None:
         "--force",
         action="store_true",
         help="Overwrite existing cloud review packet files.",
+    )
+
+    record_cloud_review_parser = subparsers.add_parser(
+        "record-cloud-review",
+        help="Record a manual cloud review decision for a story.",
+    )
+    record_cloud_review_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    record_cloud_review_parser.add_argument(
+        "--story",
+        required=True,
+        help="Story folder name under the project's stories folder.",
+    )
+    record_cloud_review_parser.add_argument(
+        "--result-file",
+        type=Path,
+        required=True,
+        help="Path to the saved cloud model review result file.",
     )
 
     artifact_policy_parser = subparsers.add_parser(
@@ -478,6 +501,17 @@ def main() -> None:
                 print("\nMissing optional evidence:")
                 for relative_path in result.missing_optional_files:
                     print(f"  - {relative_path}")
+
+        if args.command == "record-cloud-review":
+            result = record_cloud_review(args.project, args.story, args.result_file)
+
+            print(f"Cloud review recorded for: {result.story}")
+            print(f"Decision: {result.decision}")
+            print(f"Ready for human merge decision: {result.ready_for_human_merge_decision}")
+            print(f"Result: {result.cloud_review_result_path}")
+            print(f"Report: {result.cloud_review_report_path}")
+            print(f"Status: {result.status_path}")
+            print(f"Next action: {result.next_action}")
 
         if args.command == "artifact-policy":
             result = check_artifact_policy(args.project)

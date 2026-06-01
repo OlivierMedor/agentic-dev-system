@@ -606,3 +606,79 @@ stories:
         - failed_test_layer_validation
         - failed_finalize_story
         - unexpected_live_service_usage
+
+  - id: STORY-016
+    slug: story_016_cloud_review_result_recording
+    title: Add cloud review export and result recording
+    goal: Create a one-file cloud review export and a command that records the main cloud model's review decision back into the story reports.
+    why: The system needs a clean handoff to the main cloud model and a structured way to store the model's review decision before merge. This closes the loop between local quality gates, cloud review, and human approval.
+    acceptance_criteria:
+      - Update cloud-review-packet to create cloud_review_export.md.
+      - cloud_review_export.md combines prompt, context, checklist, result template, and key review evidence into one file.
+      - Add a record-cloud-review command.
+      - record-cloud-review requires --story and --result-file.
+      - record-cloud-review defaults --project to the current working directory.
+      - record-cloud-review validates that the story folder exists.
+      - record-cloud-review validates that the result file exists.
+      - record-cloud-review extracts a decision from the result file.
+      - Accepted decisions are APPROVE, APPROVE_WITH_NOTES, and REQUEST_CHANGES.
+      - record-cloud-review writes reports/cloud_review_result.yaml.
+      - record-cloud-review writes reports/cloud_review_report.md.
+      - APPROVE updates status.yaml to cloud_review_approved.
+      - APPROVE_WITH_NOTES updates status.yaml to cloud_review_approved_with_notes.
+      - REQUEST_CHANGES updates status.yaml to request_changes.
+      - record-cloud-review preserves story_id in status.yaml.
+      - The command does not call cloud models automatically.
+      - The command does not commit, push, merge, or deploy.
+      - Tests verify cloud review export generation and result recording.
+      - README documents the cloud review workflow.
+    not_in_scope:
+      - No automatic OpenAI API calls.
+      - No automatic ChatGPT upload.
+      - No GitHub PR bot comments.
+      - No automatic merge.
+      - No deployment.
+      - No LangGraph yet.
+    definition_of_done:
+      - pytest passes.
+      - ruff passes.
+      - artifact-policy passes.
+      - runtime-config validate passes.
+      - cloud-review-packet creates cloud_review_export.md.
+      - record-cloud-review is tested with sample result files.
+      - finalize-story marks this story ready for review.
+    test_plan:
+      test_layers_version: 1
+      unit_tests:
+        required: true
+        action: add_or_update
+        frequency: every_commit
+        evidence_or_reason: Add unit tests for cloud review export and result decision parsing.
+      integration_tests:
+        required: true
+        action: confirm_existing
+        frequency: every_pull_request
+        evidence_or_reason: Existing CLI tests and command tests cover project command integration.
+      mock_e2e_tests:
+        required: true
+        action: confirm_existing
+        frequency: before_merge
+        evidence_or_reason: Existing mock E2E workflow test covers the local story workflow; this story adds command-level tests.
+      live_read_only_checks:
+        required: false
+        action: not_applicable_with_reason
+        frequency: scheduled_or_before_release
+        evidence_or_reason: This story does not call live APIs or external services.
+      remote_dev_smoke_tests:
+        required: false
+        action: not_applicable_with_reason
+        frequency: after_remote_dev_deploy
+        evidence_or_reason: No remote dev environment exists yet.
+    monitoring_plan:
+      logs_required: true
+      watch_for:
+        - missing_cloud_review_export
+        - invalid_cloud_review_decision
+        - missing_cloud_review_result
+        - accidental_cloud_model_api_call
+        - invalid_story_status_update

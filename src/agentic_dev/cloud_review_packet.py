@@ -9,6 +9,7 @@ PACKET_FILENAMES = [
     "cloud_review_context.md",
     "cloud_review_checklist.md",
     "cloud_review_result_template.md",
+    "cloud_review_export.md",
 ]
 
 OPTIONAL_EVIDENCE_FILES = [
@@ -62,17 +63,29 @@ def create_cloud_review_packet(project_path: Path, story: str, force: bool = Fal
     story_content = read_text(story_file)
     evidence = read_optional_evidence(story_path)
 
+    prompt = build_prompt()
+    context = build_context(story, story_content, evidence)
+    checklist = build_checklist()
+    result_template = build_result_template()
+
     files_to_content = {
-        packet_path / "cloud_review_prompt.md": build_prompt(),
-        packet_path / "cloud_review_context.md": build_context(story, story_content, evidence),
-        packet_path / "cloud_review_checklist.md": build_checklist(),
-        packet_path / "cloud_review_result_template.md": build_result_template(),
+        packet_path / "cloud_review_prompt.md": prompt,
+        packet_path / "cloud_review_context.md": context,
+        packet_path / "cloud_review_checklist.md": checklist,
+        packet_path / "cloud_review_result_template.md": result_template,
+        packet_path / "cloud_review_export.md": build_export(
+            prompt,
+            context,
+            checklist,
+            result_template,
+        ),
     }
 
     generated_files: list[Path] = []
     for path, content in files_to_content.items():
         write_text(path, content)
-        generated_files.append(path)
+        if path.name != "cloud_review_export.md":
+            generated_files.append(path)
 
     gitkeep_path = packet_path / ".gitkeep"
     if not gitkeep_path.exists():
@@ -244,4 +257,28 @@ APPROVE | APPROVE_WITH_NOTES | REQUEST_CHANGES
 ## Questions for human reviewer
 
 -
+"""
+
+
+def build_export(prompt: str, context: str, checklist: str, result_template: str) -> str:
+    return f"""# Cloud Review Export
+
+This is the single file to paste or upload to the main cloud model for review.
+Do not call cloud models automatically from the local workflow.
+
+---
+
+{prompt.rstrip()}
+
+---
+
+{context.rstrip()}
+
+---
+
+{checklist.rstrip()}
+
+---
+
+{result_template.rstrip()}
 """
