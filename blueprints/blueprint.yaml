@@ -682,3 +682,78 @@ stories:
         - missing_cloud_review_result
         - accidental_cloud_model_api_call
         - invalid_story_status_update
+
+  - id: STORY-017
+    slug: story_017_merge_readiness_gate
+    title: Add merge readiness gate
+    goal: Create a command that checks whether a story is ready for the human owner to make the final merge decision after local gates and cloud review.
+    why: The system needs a final local checkpoint after cloud review is recorded. It should clearly say whether the story is ready for human merge approval, ready with notes, or still needs changes. The command must not merge automatically.
+    acceptance_criteria:
+      - Add a merge-readiness command.
+      - merge-readiness requires --story.
+      - merge-readiness defaults --project to the current working directory.
+      - merge-readiness validates that the story folder exists.
+      - merge-readiness reads reports/quality_gate_result.yaml if present.
+      - merge-readiness reads reports/finalize_story_result.yaml if present.
+      - merge-readiness reads reports/test_layer_result.yaml if present.
+      - merge-readiness reads reports/cloud_review_result.yaml if present.
+      - merge-readiness returns READY_FOR_HUMAN_MERGE_DECISION when local gates pass and cloud review decision is APPROVE.
+      - merge-readiness returns READY_WITH_NOTES_FOR_HUMAN_MERGE_DECISION when local gates pass and cloud review decision is APPROVE_WITH_NOTES.
+      - merge-readiness returns REQUEST_CHANGES when cloud review decision is REQUEST_CHANGES or required evidence is missing.
+      - merge-readiness writes reports/merge_readiness_result.yaml.
+      - merge-readiness writes reports/merge_readiness_report.md.
+      - merge-readiness updates status.yaml safely.
+      - merge-readiness preserves story_id in status.yaml.
+      - merge-readiness does not commit, push, merge, deploy, or call cloud models.
+      - README documents the final merge-readiness workflow.
+      - Tests verify merge-readiness behavior for approve, approve with notes, request changes, and missing evidence.
+    not_in_scope:
+      - No automatic GitHub merge.
+      - No automatic GitHub PR approval.
+      - No deployment.
+      - No production release bundle.
+      - No remote dev validation.
+      - No cloud API call.
+      - No LangGraph yet.
+    definition_of_done:
+      - pytest passes.
+      - ruff passes.
+      - artifact-policy passes.
+      - runtime-config validate passes.
+      - merge-readiness works with sample cloud review results.
+      - finalize-story marks this story ready for review.
+    test_plan:
+      test_layers_version: 1
+      unit_tests:
+        required: true
+        action: add_or_update
+        frequency: every_commit
+        evidence_or_reason: Add unit tests for merge readiness status decisions and missing evidence handling.
+      integration_tests:
+        required: true
+        action: confirm_existing
+        frequency: every_pull_request
+        evidence_or_reason: Existing command tests cover project command integration.
+      mock_e2e_tests:
+        required: true
+        action: confirm_existing
+        frequency: before_merge
+        evidence_or_reason: Existing mock E2E workflow test covers the local story workflow.
+      live_read_only_checks:
+        required: false
+        action: not_applicable_with_reason
+        frequency: scheduled_or_before_release
+        evidence_or_reason: This story does not call live APIs or external services.
+      remote_dev_smoke_tests:
+        required: false
+        action: not_applicable_with_reason
+        frequency: after_remote_dev_deploy
+        evidence_or_reason: No remote dev environment exists yet.
+    monitoring_plan:
+      logs_required: true
+      watch_for:
+        - missing_cloud_review_result
+        - failed_quality_gate
+        - failed_test_layer_result
+        - invalid_merge_readiness_status
+        - accidental_auto_merge_attempt

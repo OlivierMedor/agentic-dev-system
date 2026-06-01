@@ -234,14 +234,41 @@ decision. `APPROVE` and `APPROVE_WITH_NOTES` mark the story ready for a human me
 `REQUEST_CHANGES` marks the story as needing changes. The command does not call cloud models,
 commit, push, merge, or deploy, and cloud review is not automatic merge approval.
 
-The full cloud review workflow is:
+## Check merge readiness
+
+Run this from the repo root after cloud review has been recorded:
+
+```powershell
+docker compose run --rm dev agentic merge-readiness --story story_017_merge_readiness_gate
+```
+
+The command checks local evidence from `reports/quality_gate_result.yaml`,
+`reports/finalize_story_result.yaml`, optional `reports/test_layer_result.yaml`, and
+`reports/cloud_review_result.yaml`. It writes
+`stories/<story>/reports/merge_readiness_result.yaml` and
+`stories/<story>/reports/merge_readiness_report.md`, then updates `status.yaml` while preserving
+the existing `story_id`.
+
+When local gates pass and cloud review is `APPROVE`, the result is
+`READY_FOR_HUMAN_MERGE_DECISION`. When local gates pass and cloud review is
+`APPROVE_WITH_NOTES`, the result is `READY_WITH_NOTES_FOR_HUMAN_MERGE_DECISION`. Missing evidence,
+failed local gates, a non-passing test layer result, or `REQUEST_CHANGES` from cloud review keeps
+the result at `REQUEST_CHANGES`.
+
+This command does not read GitHub Actions status, call cloud models, commit, push, merge, or
+deploy. The human owner must still review the PR and confirm GitHub Actions are passing before
+merging.
+
+The final merge-readiness workflow is:
 
 1. Run `finalize-story`.
 2. Run `cloud-review-packet`.
 3. Paste or upload `stories/<story>/cloud_review_packet/cloud_review_export.md` to the main cloud model.
 4. Save the cloud model answer to a local Markdown file.
 5. Run `record-cloud-review --story <story> --result-file <path>`.
-6. Have the human owner decide whether to merge.
+6. Run `merge-readiness --story <story>`.
+7. Have the human owner review the PR and GitHub Actions.
+8. Have the human owner decide whether to merge.
 
 ## Use the support queue
 
