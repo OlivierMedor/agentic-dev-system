@@ -352,6 +352,49 @@ The reactive maintenance workflow is:
 6. Review the maintenance queue later.
 7. Promote an approved maintenance item to a repair story when it is ready for planned work.
 
+## Run a project feature discovery scan
+
+Periodically create a project-level feature discovery packet to ask what new capabilities would
+improve the whole project. This is different from post-story improvement scans and maintenance
+scans: suggestions are for new features, not small story follow-ups or repairs.
+
+```powershell
+docker compose run --rm dev agentic feature-scan create
+```
+
+Use `--focus "<area>"` to steer the scan toward a theme such as `agent runtime`, `cloud review`,
+or `portfolio polish`. Use `--force` only when you intentionally want to overwrite the existing
+feature scan packet and template.
+
+The command writes `.agentic/feature_scan/feature_scan_packet.md` and
+`.agentic/feature_scan/feature_suggestions_template.yaml`. The packet includes blueprint context,
+project status, story statuses, queue counts, README context, existing feature queue items, and
+docs when present. It asks the reviewer to separate project-derived observations from
+external/internet-derived observations, use internet research only when available, avoid invented
+sources, and include URLs only for sources actually used.
+
+After the cloud, research, or local reviewer returns suggestions, save the YAML and record it into
+the pending feature queue:
+
+```powershell
+docker compose run --rm dev agentic feature-scan record --suggestions-file .agentic/feature_scan/feature_suggestions.yaml
+```
+
+The record command validates the suggestions YAML, creates one pending item per suggestion under
+`.agentic/feature_queue/pending/`, and writes
+`.agentic/feature_scan/feature_record_report.md`. It does not promote queue items to stories,
+implement features, call cloud models, or call internet search.
+
+The project feature discovery workflow is:
+
+1. Run `feature-scan create`.
+2. Send `feature_scan_packet.md` to a cloud, research, or local reviewer.
+3. Let the reviewer optionally perform internet research.
+4. Save the returned suggestions YAML.
+5. Run `feature-scan record --suggestions-file <path>`.
+6. Review the feature queue later.
+7. Approve and promote selected features to stories when they are ready for planned work.
+
 ## Check project status
 
 Run this from the repo root to see a lightweight dashboard for all story workspaces:
@@ -489,7 +532,8 @@ docker compose run --rm dev agentic artifact-policy
 ```
 
 The command uses `git ls-files` and fails if tracked files include generated review bundle files,
-generated cloud review packet files, support queue runtime YAML or Markdown files,
+generated cloud review packet files, support queue runtime YAML or Markdown files, feature scan
+runtime YAML or Markdown files,
 `review_to_chatgpt/`, zip files, `.env`, or `.env.*` files. It allows `.gitkeep` inside generated
 artifact folders and `.env.example`.
 

@@ -26,6 +26,9 @@ stories/**/cloud_review_packet/*
 .agentic/support_queue/**/*.yaml
 .agentic/support_queue/**/*.md
 !.agentic/support_queue/**/.gitkeep
+.agentic/feature_scan/*.md
+.agentic/feature_scan/*.yaml
+!.agentic/feature_scan/.gitkeep
 reports/project_status_report.md
 # OS
 .DS_Store

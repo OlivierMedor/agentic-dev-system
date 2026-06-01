@@ -1,0 +1,7 @@
+logs_required: true
+watch_for:
+- missing_feature_scan_packet
+- invalid_feature_suggestions_yaml
+- failed_feature_queue_recording
+- invented_external_sources
+- accidental_feature_auto_implementation

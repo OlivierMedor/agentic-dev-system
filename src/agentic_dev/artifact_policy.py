@@ -62,6 +62,15 @@ def find_artifact_policy_violations(tracked_files: list[str]) -> list[ArtifactPo
             )
             continue
 
+        if is_feature_scan_runtime_path(parts, filename):
+            violations.append(
+                ArtifactPolicyViolation(
+                    path=normalized_path,
+                    reason="feature scan runtime file is tracked",
+                ),
+            )
+            continue
+
         if parts and parts[0] == "review_to_chatgpt":
             violations.append(
                 ArtifactPolicyViolation(
@@ -116,6 +125,16 @@ def is_support_queue_runtime_path(parts: list[str], filename: str) -> bool:
     return Path(filename).suffix.lower() in {".yaml", ".md"}
 
 
+def is_feature_scan_runtime_path(parts: list[str], filename: str) -> bool:
+    if filename == ".gitkeep":
+        return False
+
+    if len(parts) < 3 or parts[0] != ".agentic" or parts[1] != "feature_scan":
+        return False
+
+    return Path(filename).suffix.lower() in {".yaml", ".md"}
+
+
 def is_env_file(filename: str) -> bool:
     if filename == ".env.example":
         return False
@@ -163,7 +182,7 @@ def format_artifact_policy_report(result: ArtifactPolicyResult) -> str:
         "Artifact policy failed: forbidden tracked files were found.",
         "",
         "Tracked files must not include generated review artifacts, support queue runtime files, "
-        "zip files, or environment files.",
+        "feature scan runtime files, zip files, or environment files.",
         "",
         "Violations:",
     ]
