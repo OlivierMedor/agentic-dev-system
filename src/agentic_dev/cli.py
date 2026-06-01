@@ -8,6 +8,7 @@ from agentic_dev.artifact_policy import check_artifact_policy, format_artifact_p
 from agentic_dev.cloud_review_packet import create_cloud_review_packet
 from agentic_dev.cloud_review_result import record_cloud_review
 from agentic_dev.finalize_story import finalize_story
+from agentic_dev.feature_scan import create_feature_scan_packet, record_feature_suggestions
 from agentic_dev.improvement_scan import (
     create_improvement_scan_packet,
     record_improvement_suggestions,
@@ -367,6 +368,52 @@ def main() -> None:
         type=Path,
         required=True,
         help="Path to the completed maintenance findings YAML file.",
+    )
+
+    feature_scan_parser = subparsers.add_parser(
+        "feature-scan",
+        help="Create and record project-level feature discovery suggestions.",
+    )
+    feature_scan_subparsers = feature_scan_parser.add_subparsers(
+        dest="feature_scan_command",
+        required=True,
+    )
+
+    feature_scan_create_parser = feature_scan_subparsers.add_parser(
+        "create",
+        help="Create a project feature discovery scan packet.",
+    )
+    feature_scan_create_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    feature_scan_create_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing feature scan files.",
+    )
+    feature_scan_create_parser.add_argument(
+        "--focus",
+        help="Optional focus area for feature discovery.",
+    )
+
+    feature_scan_record_parser = feature_scan_subparsers.add_parser(
+        "record",
+        help="Record project-level feature suggestions into the feature queue.",
+    )
+    feature_scan_record_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    feature_scan_record_parser.add_argument(
+        "--suggestions-file",
+        type=Path,
+        required=True,
+        help="Path to the completed feature suggestions YAML file.",
     )
 
     merge_readiness_parser = subparsers.add_parser(
@@ -889,6 +936,38 @@ def main() -> None:
 
                 print(f"Maintenance findings recorded for: {result.story}")
                 print(f"Findings file: {result.findings_file}")
+                print(f"Report: {result.report_path}")
+                print("\nCreated queue items:")
+                for item in result.queue_items:
+                    print(f"  - {item.item_id}: {item.item_path}")
+
+        if args.command == "feature-scan":
+            if args.feature_scan_command == "create":
+                result = create_feature_scan_packet(
+                    args.project,
+                    force=args.force,
+                    focus=args.focus,
+                )
+
+                print(f"Feature scan packet created for: {result.project_path}")
+                print(f"Feature scan path: {result.feature_scan_path}")
+                print("\nGenerated:")
+                for path in result.generated_files:
+                    print(f"  - {path}")
+
+                if result.missing_optional_files:
+                    print("\nMissing optional context:")
+                    for relative_path in result.missing_optional_files:
+                        print(f"  - {relative_path}")
+
+            if args.feature_scan_command == "record":
+                result = record_feature_suggestions(
+                    args.project,
+                    args.suggestions_file,
+                )
+
+                print(f"Feature suggestions recorded for: {result.project_path}")
+                print(f"Suggestions file: {result.suggestions_file}")
                 print(f"Report: {result.report_path}")
                 print("\nCreated queue items:")
                 for item in result.queue_items:
