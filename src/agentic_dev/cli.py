@@ -8,6 +8,7 @@ from agentic_dev.artifact_policy import check_artifact_policy, format_artifact_p
 from agentic_dev.cloud_review_packet import create_cloud_review_packet
 from agentic_dev.cloud_review_result import record_cloud_review
 from agentic_dev.finalize_story import finalize_story
+from agentic_dev.merge_readiness import run_merge_readiness
 from agentic_dev.prepare_story import prepare_story
 from agentic_dev.prompt_pack import generate_prompt_pack
 from agentic_dev.quality_gate import run_quality_gate
@@ -234,6 +235,22 @@ def main() -> None:
         type=Path,
         required=True,
         help="Path to the saved cloud model review result file.",
+    )
+
+    merge_readiness_parser = subparsers.add_parser(
+        "merge-readiness",
+        help="Check whether a story is ready for the human owner to make the merge decision.",
+    )
+    merge_readiness_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    merge_readiness_parser.add_argument(
+        "--story",
+        required=True,
+        help="Story folder name under the project's stories folder.",
     )
 
     artifact_policy_parser = subparsers.add_parser(
@@ -511,6 +528,21 @@ def main() -> None:
             print(f"Result: {result.cloud_review_result_path}")
             print(f"Report: {result.cloud_review_report_path}")
             print(f"Status: {result.status_path}")
+            print(f"Next action: {result.next_action}")
+
+        if args.command == "merge-readiness":
+            result = run_merge_readiness(args.project, args.story)
+
+            print(f"Merge readiness checked for: {result.story}")
+            print(f"Status: {result.status}")
+            print(
+                "Ready for human merge decision: "
+                f"{result.ready_for_human_merge_decision}"
+            )
+            print(f"Cloud review decision: {result.cloud_review_decision}")
+            print(f"Result: {result.result_path}")
+            print(f"Report: {result.report_path}")
+            print(f"Status file: {result.status_path}")
             print(f"Next action: {result.next_action}")
 
         if args.command == "artifact-policy":

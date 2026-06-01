@@ -1,0 +1,7 @@
+logs_required: true
+watch_for:
+- missing_cloud_review_result
+- failed_quality_gate
+- failed_test_layer_result
+- invalid_merge_readiness_status
+- accidental_auto_merge_attempt
