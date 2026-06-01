@@ -1,0 +1,7 @@
+logs_required: true
+watch_for:
+- missing_cloud_review_export
+- invalid_cloud_review_decision
+- missing_cloud_review_result
+- accidental_cloud_model_api_call
+- invalid_story_status_update

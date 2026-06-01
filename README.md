@@ -204,14 +204,44 @@ docker compose run --rm dev agentic cloud-review-packet --story story_010_cloud_
 ```
 
 The command validates that `stories/<story>/` and `story.md` exist, then writes
-`cloud_review_prompt.md`, `cloud_review_context.md`, `cloud_review_checklist.md`, and
-`cloud_review_result_template.md` into `stories/<story>/cloud_review_packet/`. The context
-includes story content plus available quality gate, finalize, review bundle, Git status, diff stat,
-and untracked-file evidence. Missing optional evidence is listed in the context instead of causing
-failure.
+`cloud_review_prompt.md`, `cloud_review_context.md`, `cloud_review_checklist.md`,
+`cloud_review_result_template.md`, and `cloud_review_export.md` into
+`stories/<story>/cloud_review_packet/`. The context includes story content plus available quality
+gate, finalize, review bundle, Git status, diff stat, and untracked-file evidence. Missing
+optional evidence is listed in the context instead of causing failure.
+
+Use `cloud_review_export.md` as the single file to paste or upload to the main cloud model.
 
 Use `--force` when you intentionally want to overwrite existing cloud review packet files. The
 command does not call cloud models, commit, push, merge, or deploy.
+
+## Record a cloud review result
+
+After the main cloud model returns its answer, save that answer to a local Markdown file and record
+the decision:
+
+```powershell
+docker compose run --rm dev agentic record-cloud-review --story story_010_cloud_review_packet --result-file docs/cloud_review_answer.md
+```
+
+The result file must contain exactly one accepted decision, preferably on a line such as
+`Decision: APPROVE`. Accepted decisions are `APPROVE`, `APPROVE_WITH_NOTES`, and
+`REQUEST_CHANGES`.
+
+The command writes `stories/<story>/reports/cloud_review_result.yaml` and
+`stories/<story>/reports/cloud_review_report.md`, then updates `status.yaml` with the cloud review
+decision. `APPROVE` and `APPROVE_WITH_NOTES` mark the story ready for a human merge decision;
+`REQUEST_CHANGES` marks the story as needing changes. The command does not call cloud models,
+commit, push, merge, or deploy, and cloud review is not automatic merge approval.
+
+The full cloud review workflow is:
+
+1. Run `finalize-story`.
+2. Run `cloud-review-packet`.
+3. Paste or upload `stories/<story>/cloud_review_packet/cloud_review_export.md` to the main cloud model.
+4. Save the cloud model answer to a local Markdown file.
+5. Run `record-cloud-review --story <story> --result-file <path>`.
+6. Have the human owner decide whether to merge.
 
 ## Use the support queue
 

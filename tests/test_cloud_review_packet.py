@@ -42,21 +42,41 @@ def test_cloud_review_packet_creates_expected_files(tmp_path: Path) -> None:
 
     result = create_cloud_review_packet(tmp_path, STORY)
 
-    expected_files = {
+    generated_packet_files = {
         "cloud_review_prompt.md",
         "cloud_review_context.md",
         "cloud_review_checklist.md",
         "cloud_review_result_template.md",
     }
+    expected_files = generated_packet_files | {"cloud_review_export.md"}
     packet_path = story_path / "cloud_review_packet"
 
     assert result.story == STORY
     assert result.story_path == story_path
     assert result.packet_path == packet_path
-    assert {path.name for path in result.generated_files} == expected_files
+    assert {path.name for path in result.generated_files} == generated_packet_files
 
     for filename in expected_files:
         assert (packet_path / filename).exists()
+
+
+def test_cloud_review_export_combines_review_packet_files(tmp_path: Path) -> None:
+    story_path = create_story(tmp_path)
+
+    create_cloud_review_packet(tmp_path, STORY)
+
+    export = read_packet_file(story_path, "cloud_review_export.md")
+    prompt = read_packet_file(story_path, "cloud_review_prompt.md")
+    context = read_packet_file(story_path, "cloud_review_context.md")
+    checklist = read_packet_file(story_path, "cloud_review_checklist.md")
+    result_template = read_packet_file(story_path, "cloud_review_result_template.md")
+
+    assert "paste or upload to the main cloud model" in export
+    assert "Do not call cloud models automatically" in export
+    assert prompt.rstrip() in export
+    assert context.rstrip() in export
+    assert checklist.rstrip() in export
+    assert result_template.rstrip() in export
 
 
 def test_cloud_review_prompt_includes_required_review_instructions(tmp_path: Path) -> None:
