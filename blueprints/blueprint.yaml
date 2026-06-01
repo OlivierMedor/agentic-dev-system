@@ -757,3 +757,76 @@ stories:
         - failed_test_layer_result
         - invalid_merge_readiness_status
         - accidental_auto_merge_attempt
+
+  - id: STORY-018
+    slug: story_018_project_status_command
+    title: Add project status command
+    goal: Create a command that summarizes all story workspaces and shows each story's current workflow state.
+    why: As the agentic development system grows, the user needs a simple way to see project progress without opening many files manually. The status command should act like a lightweight command-line dashboard.
+    acceptance_criteria:
+      - Add a project-status command.
+      - project-status defaults --project to the current working directory.
+      - project-status can show all stories.
+      - project-status can filter to one story with optional --story.
+      - project-status reads each story's status.yaml when present.
+      - project-status detects whether agent_plan.yaml exists.
+      - project-status detects whether prompt_pack exists.
+      - project-status detects whether test_layer_result.yaml exists and whether it passed.
+      - project-status detects whether quality_gate_result.yaml exists and whether it is ready.
+      - project-status detects whether finalize_story_result.yaml exists and whether it is ready.
+      - project-status detects whether cloud_review_result.yaml exists and what decision it contains.
+      - project-status detects whether merge_readiness_result.yaml exists and what status it contains.
+      - project-status detects whether a support ticket is blocking a story.
+      - project-status writes reports/project_status_report.md.
+      - project-status prints a readable summary to the terminal.
+      - Add tests for story status collection and summary output.
+      - README documents the status command.
+    not_in_scope:
+      - No web dashboard.
+      - No FastAPI endpoint yet.
+      - No Postgres persistence yet.
+      - No LangGraph yet.
+      - No automatic GitHub API calls.
+      - No cloud model calls.
+    definition_of_done:
+      - pytest passes.
+      - ruff passes.
+      - artifact-policy passes.
+      - runtime-config validate passes.
+      - project-status prints a useful summary.
+      - project-status writes reports/project_status_report.md.
+      - finalize-story marks this story ready for review.
+    test_plan:
+      test_layers_version: 1
+      unit_tests:
+        required: true
+        action: add_or_update
+        frequency: every_commit
+        evidence_or_reason: Add unit tests for story status collection and status summarization.
+      integration_tests:
+        required: true
+        action: confirm_existing
+        frequency: every_pull_request
+        evidence_or_reason: Existing command tests cover CLI integration patterns.
+      mock_e2e_tests:
+        required: true
+        action: confirm_existing
+        frequency: before_merge
+        evidence_or_reason: Existing mock E2E workflow test covers the local story workflow.
+      live_read_only_checks:
+        required: false
+        action: not_applicable_with_reason
+        frequency: scheduled_or_before_release
+        evidence_or_reason: This story does not call live APIs or external services.
+      remote_dev_smoke_tests:
+        required: false
+        action: not_applicable_with_reason
+        frequency: after_remote_dev_deploy
+        evidence_or_reason: No remote dev environment exists yet.
+    monitoring_plan:
+      logs_required: true
+      watch_for:
+        - missing_story_status
+        - invalid_story_status_yaml
+        - missing_project_status_report
+        - inaccurate_status_summary

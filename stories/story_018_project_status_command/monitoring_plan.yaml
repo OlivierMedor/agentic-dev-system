@@ -1,0 +1,6 @@
+logs_required: true
+watch_for:
+- missing_story_status
+- invalid_story_status_yaml
+- missing_project_status_report
+- inaccurate_status_summary

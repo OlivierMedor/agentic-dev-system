@@ -270,6 +270,29 @@ The final merge-readiness workflow is:
 7. Have the human owner review the PR and GitHub Actions.
 8. Have the human owner decide whether to merge.
 
+## Check project status
+
+Run this from the repo root to see a lightweight dashboard for all story workspaces:
+
+```powershell
+docker compose run --rm dev agentic project-status
+```
+
+The command reads `stories/*/status.yaml` and common workflow evidence, including agent plans,
+prompt packs, test-layer results, quality-gate results, finalize-story results, cloud-review
+results, merge-readiness results, local review reports, agent reports, review bundles, cloud
+review packets, and blocking support tickets. It prints a readable terminal summary and writes
+`reports/project_status_report.md`.
+
+To inspect one story only:
+
+```powershell
+docker compose run --rm dev agentic project-status --story story_018_project_status_command
+```
+
+Use `--project` to target another project folder. The command does not modify story statuses, call
+cloud models, call GitHub APIs, commit, push, merge, or deploy.
+
 ## Use the support queue
 
 Run this from the repo root when an agent is blocked and needs a structured answer:
