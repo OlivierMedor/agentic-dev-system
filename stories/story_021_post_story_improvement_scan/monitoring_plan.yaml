@@ -1,0 +1,7 @@
+logs_required: true
+watch_for:
+- missing_improvement_scan_packet
+- invalid_improvement_suggestions_yaml
+- failed_improvement_queue_recording
+- out_of_scope_improvement_suggestion
+- duplicate_improvement_queue_item
