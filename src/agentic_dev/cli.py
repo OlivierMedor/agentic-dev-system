@@ -10,6 +10,7 @@ from agentic_dev.cloud_review_result import record_cloud_review
 from agentic_dev.finalize_story import finalize_story
 from agentic_dev.merge_readiness import run_merge_readiness
 from agentic_dev.prepare_story import prepare_story
+from agentic_dev.project_status import run_project_status
 from agentic_dev.prompt_pack import generate_prompt_pack
 from agentic_dev.quality_gate import run_quality_gate
 from agentic_dev.review_bundle import create_review_bundle
@@ -251,6 +252,21 @@ def main() -> None:
         "--story",
         required=True,
         help="Story folder name under the project's stories folder.",
+    )
+
+    project_status_parser = subparsers.add_parser(
+        "project-status",
+        help="Summarize workflow status across story workspaces.",
+    )
+    project_status_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    project_status_parser.add_argument(
+        "--story",
+        help="Optional story folder name under the project's stories folder.",
     )
 
     artifact_policy_parser = subparsers.add_parser(
@@ -544,6 +560,11 @@ def main() -> None:
             print(f"Report: {result.report_path}")
             print(f"Status file: {result.status_path}")
             print(f"Next action: {result.next_action}")
+
+        if args.command == "project-status":
+            result = run_project_status(args.project, args.story)
+            print(result.terminal_summary)
+            print(f"\nReport written to: {result.report_path}")
 
         if args.command == "artifact-policy":
             result = check_artifact_policy(args.project)
