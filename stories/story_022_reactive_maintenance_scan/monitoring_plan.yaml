@@ -1,0 +1,7 @@
+logs_required: true
+watch_for:
+- missing_maintenance_scan_packet
+- invalid_maintenance_findings_yaml
+- failed_maintenance_queue_recording
+- accidental_auto_fix_attempt
+- external_dependency_failure

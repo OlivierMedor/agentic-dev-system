@@ -1,0 +1,12 @@
+findings:
+  - title: External API endpoint may have changed
+    severity: high
+    source_type: logs
+    problem: Explain the failure.
+    evidence:
+      - Include relevant log or test output.
+    suspected_cause: Explain suspected cause.
+    recommended_action: Explain the repair direction.
+    suggested_acceptance_criteria:
+      - Add or update tests.
+      - Update docs if behavior changes.
