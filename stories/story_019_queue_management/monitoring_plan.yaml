@@ -1,0 +1,7 @@
+logs_required: true
+watch_for:
+- invalid_queue_type
+- missing_queue_item
+- invalid_queue_status
+- failed_queue_status_move
+- inaccurate_queue_counts

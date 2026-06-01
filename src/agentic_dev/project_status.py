@@ -6,6 +6,8 @@ from typing import Any
 
 import yaml
 
+from agentic_dev.queue_management import QUEUE_STATUSES, QUEUE_TYPES, count_queue_items
+
 
 NOT_STARTED = "NOT_STARTED"
 IN_PROGRESS = "IN_PROGRESS"
@@ -69,6 +71,7 @@ class ProjectStatusResult:
     report_path: Path
     stories: list[StoryProjectStatus]
     summary_counts: dict[str, int]
+    queue_counts: dict[str, dict[str, int]]
     terminal_summary: str
 
 
@@ -85,14 +88,20 @@ def run_project_status(project_path: Path, story: str | None = None) -> ProjectS
     story_paths = find_story_paths(stories_path, story)
     story_statuses = [collect_story_status(project_path, story_path) for story_path in story_paths]
     summary_counts = build_summary_counts(story_statuses)
+    queue_counts = count_queue_items(project_path)
 
     reports_path = project_path / "reports"
     reports_path.mkdir(parents=True, exist_ok=True)
     report_path = reports_path / "project_status_report.md"
 
-    terminal_summary = format_terminal_summary(project_path, story_statuses, summary_counts)
+    terminal_summary = format_terminal_summary(
+        project_path,
+        story_statuses,
+        summary_counts,
+        queue_counts,
+    )
     report_path.write_text(
-        format_markdown_report(project_path, story_statuses, summary_counts),
+        format_markdown_report(project_path, story_statuses, summary_counts, queue_counts),
         encoding="utf-8",
     )
 
@@ -101,6 +110,7 @@ def run_project_status(project_path: Path, story: str | None = None) -> ProjectS
         report_path=report_path,
         stories=story_statuses,
         summary_counts=summary_counts,
+        queue_counts=queue_counts,
         terminal_summary=terminal_summary,
     )
 
@@ -447,6 +457,7 @@ def format_terminal_summary(
     project_path: Path,
     stories: list[StoryProjectStatus],
     summary_counts: dict[str, int],
+    queue_counts: dict[str, dict[str, int]],
 ) -> str:
     lines = [
         f"Project status for: {project_path}",
@@ -459,8 +470,20 @@ def format_terminal_summary(
         f"  Needing changes: {summary_counts['stories_needing_changes']}",
         f"  Missing evidence: {summary_counts['stories_missing_evidence']}",
         "",
-        "Stories:",
+        "Queues:",
     ]
+
+    for queue_type in QUEUE_TYPES:
+        counts = queue_counts[queue_type]
+        status_text = ", ".join(f"{status}={counts[status]}" for status in QUEUE_STATUSES)
+        lines.append(f"  {queue_type}: total={counts['total']} ({status_text})")
+
+    lines.extend(
+        [
+            "",
+            "Stories:",
+        ]
+    )
 
     if not stories:
         lines.append("  - none")
@@ -491,6 +514,7 @@ def format_markdown_report(
     project_path: Path,
     stories: list[StoryProjectStatus],
     summary_counts: dict[str, int],
+    queue_counts: dict[str, dict[str, int]],
 ) -> str:
     lines = [
         "# Project Status Report",
@@ -524,7 +548,18 @@ def format_markdown_report(
     ]:
         lines.append(f"- {category}: {summary_counts[category]}")
 
-    lines.extend(["", "## Stories", ""])
+    lines.extend(["", "## Queue Counts", ""])
+
+    for queue_type in QUEUE_TYPES:
+        counts = queue_counts[queue_type]
+        lines.append(f"### {queue_type}")
+        lines.append("")
+        lines.append(f"- Total: {counts['total']}")
+        for status in QUEUE_STATUSES:
+            lines.append(f"- {status}: {counts[status]}")
+        lines.append("")
+
+    lines.extend(["## Stories", ""])
 
     if not stories:
         lines.extend(["No story workspaces found.", ""])

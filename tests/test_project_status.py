@@ -5,6 +5,7 @@ import yaml
 
 from agentic_dev.cli import main
 from agentic_dev.project_status import collect_story_status, run_project_status
+from agentic_dev.queue_management import create_queue_item, set_queue_item_status
 
 
 def write_yaml(path: Path, data: dict) -> None:
@@ -228,3 +229,43 @@ def test_project_status_does_not_require_git_or_cloud_credentials(
     report = result.report_path.read_text(encoding="utf-8")
     assert "does not call cloud models" in report
     assert "call GitHub APIs" in report
+
+
+def test_project_status_includes_queue_counts(tmp_path: Path) -> None:
+    create_story(tmp_path, "story_with_queues", {"status": "planned"})
+    create_queue_item(
+        project_path=tmp_path,
+        queue_type="improvement",
+        title="Improve reporting",
+    )
+    maintenance = create_queue_item(
+        project_path=tmp_path,
+        queue_type="maintenance",
+        title="Clean up stale output",
+    )
+    create_queue_item(
+        project_path=tmp_path,
+        queue_type="feature",
+        title="Add a dashboard",
+    )
+    set_queue_item_status(tmp_path, maintenance.item_id, "approved", "Approved for later.")
+
+    result = run_project_status(tmp_path)
+
+    assert result.queue_counts["improvement"]["total"] == 1
+    assert result.queue_counts["improvement"]["pending"] == 1
+    assert result.queue_counts["maintenance"]["total"] == 1
+    assert result.queue_counts["maintenance"]["approved"] == 1
+    assert result.queue_counts["feature"]["total"] == 1
+    assert result.queue_counts["feature"]["pending"] == 1
+
+    assert "improvement: total=1" in result.terminal_summary
+    assert "maintenance: total=1" in result.terminal_summary
+    assert "feature: total=1" in result.terminal_summary
+
+    report = result.report_path.read_text(encoding="utf-8")
+    assert "## Queue Counts" in report
+    assert "### improvement" in report
+    assert "### maintenance" in report
+    assert "### feature" in report
+    assert "- approved: 1" in report

@@ -13,6 +13,18 @@ from agentic_dev.prepare_story import prepare_story
 from agentic_dev.project_status import run_project_status
 from agentic_dev.prompt_pack import generate_prompt_pack
 from agentic_dev.quality_gate import run_quality_gate
+from agentic_dev.queue_management import (
+    ALL_QUEUE_STATUSES,
+    ALL_QUEUE_TYPES,
+    QUEUE_STATUSES,
+    QUEUE_TYPES,
+    create_queue_item,
+    format_queue_item,
+    format_queue_list,
+    list_queue_items,
+    set_queue_item_status,
+    show_queue_item,
+)
 from agentic_dev.review_bundle import create_review_bundle
 from agentic_dev.runtime_config import show_runtime_config, validate_runtime_config
 from agentic_dev.scaffolding import init_project
@@ -422,6 +434,121 @@ def main() -> None:
         help="Target project folder. Defaults to the current directory.",
     )
 
+    queue_parser = subparsers.add_parser(
+        "queue",
+        help="Create and manage improvement, maintenance, and feature queue items.",
+    )
+    queue_subparsers = queue_parser.add_subparsers(
+        dest="queue_command",
+        required=True,
+    )
+
+    queue_create_parser = queue_subparsers.add_parser(
+        "create",
+        help="Create a queue item in the selected queue's pending folder.",
+    )
+    queue_create_parser.add_argument(
+        "--type",
+        dest="queue_type",
+        choices=QUEUE_TYPES,
+        required=True,
+        help="Queue type.",
+    )
+    queue_create_parser.add_argument("--title", required=True, help="Queue item title.")
+    queue_create_parser.add_argument(
+        "--source-story",
+        help="Optional source story folder name.",
+    )
+    queue_create_parser.add_argument(
+        "--category",
+        help="Optional category for grouping the item.",
+    )
+    queue_create_parser.add_argument(
+        "--priority",
+        default="medium",
+        help="Queue item priority. Defaults to medium.",
+    )
+    queue_create_parser.add_argument(
+        "--details",
+        help="Optional details for the queue item.",
+    )
+    queue_create_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
+    queue_list_parser = queue_subparsers.add_parser(
+        "list",
+        help="List queue items by type and status.",
+    )
+    queue_list_parser.add_argument(
+        "--type",
+        dest="queue_type",
+        choices=ALL_QUEUE_TYPES,
+        default="all",
+        help="Queue type filter. Defaults to all.",
+    )
+    queue_list_parser.add_argument(
+        "--status",
+        choices=ALL_QUEUE_STATUSES,
+        default="all",
+        help="Queue status filter. Defaults to all.",
+    )
+    queue_list_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
+    queue_show_parser = queue_subparsers.add_parser(
+        "show",
+        help="Show one queue item clearly.",
+    )
+    queue_show_parser.add_argument("--item", required=True, help="Queue item ID.")
+    queue_show_parser.add_argument(
+        "--type",
+        dest="queue_type",
+        choices=QUEUE_TYPES,
+        help="Optional queue type hint.",
+    )
+    queue_show_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
+    queue_set_status_parser = queue_subparsers.add_parser(
+        "set-status",
+        help="Move a queue item to a new status folder and record the decision.",
+    )
+    queue_set_status_parser.add_argument("--item", required=True, help="Queue item ID.")
+    queue_set_status_parser.add_argument(
+        "--status",
+        choices=QUEUE_STATUSES,
+        required=True,
+        help="New queue status.",
+    )
+    queue_set_status_parser.add_argument(
+        "--decision-note",
+        help="Optional note explaining the status decision.",
+    )
+    queue_set_status_parser.add_argument(
+        "--type",
+        dest="queue_type",
+        choices=QUEUE_TYPES,
+        help="Optional queue type hint.",
+    )
+    queue_set_status_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
     args = parser.parse_args()
 
     try:
@@ -624,5 +751,48 @@ def main() -> None:
                 print(f"Support ticket closed: {result.ticket_id}")
                 print(f"Source path: {result.source_path}")
                 print(f"Closed path: {result.destination_path}")
+
+        if args.command == "queue":
+            if args.queue_command == "create":
+                result = create_queue_item(
+                    project_path=args.project,
+                    queue_type=args.queue_type,
+                    title=args.title,
+                    source_story=args.source_story,
+                    category=args.category,
+                    priority=args.priority,
+                    details=args.details,
+                )
+                print(f"Queue item created: {result.item_id}")
+                print(f"Item path: {result.item_path}")
+
+            if args.queue_command == "list":
+                result = list_queue_items(
+                    project_path=args.project,
+                    queue_type=args.queue_type,
+                    status=args.status,
+                )
+                print(format_queue_list(result))
+
+            if args.queue_command == "show":
+                result = show_queue_item(
+                    project_path=args.project,
+                    item_id=args.item,
+                    queue_type=args.queue_type,
+                )
+                print(format_queue_item(result))
+
+            if args.queue_command == "set-status":
+                result = set_queue_item_status(
+                    project_path=args.project,
+                    item_id=args.item,
+                    status=args.status,
+                    decision_note=args.decision_note,
+                    queue_type=args.queue_type,
+                )
+                print(f"Queue item updated: {result.item_id}")
+                print(f"Status: {result.old_status} -> {result.new_status}")
+                print(f"Source path: {result.source_path}")
+                print(f"Destination path: {result.destination_path}")
     except (FileNotFoundError, ValueError) as error:
         parser.exit(status=1, message=f"Error: {error}\n")

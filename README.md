@@ -14,7 +14,8 @@ The CLI can initialize a target project, generate story workspaces from a bluepr
 - `docs/`
 
 It also creates the first setup story, basic project rules, quality gates, and starter instructions for the agent roles used by the workflow.
-Agent runtime queues live under `.agentic/`, including the support queue used when agents are blocked and need structured cloud-model review.
+Agent runtime queues live under `.agentic/`, including improvement, maintenance,
+feature, and support queues.
 Projects can also define per-agent runtime behavior in `.agentic/agent_runtime.yaml`.
 
 ## Runtime config
@@ -281,8 +282,8 @@ docker compose run --rm dev agentic project-status
 The command reads `stories/*/status.yaml` and common workflow evidence, including agent plans,
 prompt packs, test-layer results, quality-gate results, finalize-story results, cloud-review
 results, merge-readiness results, local review reports, agent reports, review bundles, cloud
-review packets, and blocking support tickets. It prints a readable terminal summary and writes
-`reports/project_status_report.md`.
+review packets, blocking support tickets, and queue counts for improvement, maintenance, and
+feature queues. It prints a readable terminal summary and writes `reports/project_status_report.md`.
 
 To inspect one story only:
 
@@ -292,6 +293,45 @@ docker compose run --rm dev agentic project-status --story story_018_project_sta
 
 Use `--project` to target another project folder. The command does not modify story statuses, call
 cloud models, call GitHub APIs, commit, push, merge, or deploy.
+
+## Use improvement, maintenance, and feature queues
+
+Use the generic queue commands to capture future work without expanding the current story scope.
+Queue items are YAML files under `.agentic/improvement_queue/`, `.agentic/maintenance_queue/`, or
+`.agentic/feature_queue/`. Each queue has `pending`, `approved`, `rejected`, `parked`, and
+`closed` folders.
+
+Create an item:
+
+```powershell
+docker compose run --rm dev agentic queue create --type improvement --title "Simplify review bundle output" --source-story story_019_queue_management --category cli --priority medium --details "Make the handoff easier to scan."
+```
+
+The command writes a structured YAML item to the selected queue's `pending` folder. Item IDs use
+the queue prefix, for example `IMP-20260601-120000`, `MAINT-20260601-120000`, or
+`FEATURE-20260601-120000`.
+
+List queue items:
+
+```powershell
+docker compose run --rm dev agentic queue list
+docker compose run --rm dev agentic queue list --type feature --status pending
+```
+
+Show one item:
+
+```powershell
+docker compose run --rm dev agentic queue show --item IMP-20260601-120000
+```
+
+Record a decision and move the item:
+
+```powershell
+docker compose run --rm dev agentic queue set-status --item IMP-20260601-120000 --status approved --decision-note "Accepted for future planning."
+```
+
+Approved queue items do not create stories automatically yet. The queues do not call cloud models,
+notify humans, run agents, commit, push, merge, or deploy.
 
 ## Use the support queue
 
