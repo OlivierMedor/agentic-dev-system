@@ -7,6 +7,7 @@ from typing import Any
 import yaml
 
 from agentic_dev.queue_management import QUEUE_STATUSES, QUEUE_TYPES, count_queue_items
+from agentic_dev.remote_dev_validation import ACCEPTED_VALIDATION_STATUSES
 
 
 NOT_STARTED = "NOT_STARTED"
@@ -52,6 +53,8 @@ class StoryProjectStatus:
     finalize_ready: bool | None
     cloud_review_exists: bool
     cloud_review_decision: str | None
+    remote_dev_validation_exists: bool
+    remote_dev_validation_status: str | None
     merge_readiness_exists: bool
     merge_readiness_status: str | None
     local_review_ready: bool
@@ -137,6 +140,7 @@ def collect_story_status(project_path: Path, story_path: Path) -> StoryProjectSt
     quality_gate_path = reports_path / "quality_gate_result.yaml"
     finalize_path = reports_path / "finalize_story_result.yaml"
     cloud_review_path = reports_path / "cloud_review_result.yaml"
+    remote_dev_validation_path = reports_path / "remote_dev_validation_result.yaml"
     merge_readiness_path = reports_path / "merge_readiness_result.yaml"
 
     status_data = load_optional_yaml_mapping(status_path, warnings)
@@ -144,6 +148,7 @@ def collect_story_status(project_path: Path, story_path: Path) -> StoryProjectSt
     quality_gate_data = load_optional_yaml_mapping(quality_gate_path, warnings)
     finalize_data = load_optional_yaml_mapping(finalize_path, warnings)
     cloud_review_data = load_optional_yaml_mapping(cloud_review_path, warnings)
+    remote_dev_validation_data = load_optional_yaml_mapping(remote_dev_validation_path, warnings)
     merge_readiness_data = load_optional_yaml_mapping(merge_readiness_path, warnings)
 
     blocked_by = optional_text(status_data.get("blocked_by"))
@@ -160,6 +165,21 @@ def collect_story_status(project_path: Path, story_path: Path) -> StoryProjectSt
     quality_gate_status = optional_text(quality_gate_data.get("status"))
     finalize_status = optional_text(finalize_data.get("status"))
     cloud_review_decision = optional_text(cloud_review_data.get("decision"))
+    remote_dev_validation_status = optional_text(remote_dev_validation_data.get("validation_status"))
+    if (
+        remote_dev_validation_path.exists()
+        and remote_dev_validation_status
+        and remote_dev_validation_status not in ACCEPTED_VALIDATION_STATUSES
+    ):
+        warnings.append(
+            "Invalid remote dev validation_status "
+            f"{remote_dev_validation_status!r} in {relative_display(remote_dev_validation_path)}."
+        )
+    elif remote_dev_validation_path.exists() and not remote_dev_validation_status:
+        warnings.append(
+            "Missing remote dev validation_status in "
+            f"{relative_display(remote_dev_validation_path)}."
+        )
     merge_readiness_status = optional_text(merge_readiness_data.get("status"))
 
     missing_evidence = collect_missing_evidence(
@@ -214,6 +234,8 @@ def collect_story_status(project_path: Path, story_path: Path) -> StoryProjectSt
         finalize_ready=optional_bool(finalize_data.get("ready_for_review")),
         cloud_review_exists=cloud_review_path.exists(),
         cloud_review_decision=cloud_review_decision,
+        remote_dev_validation_exists=remote_dev_validation_path.exists(),
+        remote_dev_validation_status=remote_dev_validation_status,
         merge_readiness_exists=merge_readiness_path.exists(),
         merge_readiness_status=merge_readiness_status,
         local_review_ready=local_review_ready,
@@ -503,6 +525,8 @@ def format_terminal_summary(
             lines.append(f"    blocked_by={story.blocked_by} ({queue_text})")
         if story.cloud_review_decision:
             lines.append(f"    cloud_review={story.cloud_review_decision}")
+        remote_dev_status = story.remote_dev_validation_status or "not recorded"
+        lines.append(f"    remote_dev_validation={remote_dev_status}")
         if story.merge_readiness_status:
             lines.append(f"    merge_readiness={story.merge_readiness_status}")
         lines.append(f"    next: {story.next_action}")
@@ -620,6 +644,11 @@ def format_story_section(story: StoryProjectStatus) -> list[str]:
             "- cloud_review_result.yaml: "
             f"{format_present(story.cloud_review_exists)}, "
             f"decision={story.cloud_review_decision or 'missing'}"
+        ),
+        (
+            "- remote_dev_validation_result.yaml: "
+            f"{format_present(story.remote_dev_validation_exists)}, "
+            f"validation_status={story.remote_dev_validation_status or 'not recorded'}"
         ),
         (
             "- merge_readiness_result.yaml: "

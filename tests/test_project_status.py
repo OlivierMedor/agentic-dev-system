@@ -145,9 +145,82 @@ def test_story_status_detects_workflow_evidence_files(tmp_path: Path) -> None:
     assert status.finalize_ready is True
     assert status.cloud_review_exists is True
     assert status.cloud_review_decision == "APPROVE_WITH_NOTES"
+    assert status.remote_dev_validation_exists is False
+    assert status.remote_dev_validation_status is None
     assert status.merge_readiness_exists is True
     assert status.merge_readiness_status == "READY_WITH_NOTES_FOR_HUMAN_MERGE_DECISION"
     assert status.local_review_ready is True
+
+
+@pytest.mark.parametrize(
+    "validation_status",
+    [
+        "DEV_VALIDATED",
+        "DEV_VALIDATED_WITH_NOTES",
+        "DEV_FAILED",
+    ],
+)
+def test_project_status_reads_and_displays_remote_dev_validation_status(
+    tmp_path: Path,
+    validation_status: str,
+) -> None:
+    story_path = create_story(tmp_path, "story_remote_dev", {"status": "planned"})
+    write_yaml(
+        story_path / "reports" / "remote_dev_validation_result.yaml",
+        {"validation_status": validation_status},
+    )
+
+    story_status = collect_story_status(tmp_path, story_path)
+    result = run_project_status(tmp_path)
+
+    assert story_status.remote_dev_validation_exists is True
+    assert story_status.remote_dev_validation_status == validation_status
+    assert f"remote_dev_validation={validation_status}" in result.terminal_summary
+
+    report = result.report_path.read_text(encoding="utf-8")
+    assert "- remote_dev_validation_result.yaml: present" in report
+    assert f"validation_status={validation_status}" in report
+
+
+def test_project_status_handles_missing_remote_dev_validation_as_not_recorded(
+    tmp_path: Path,
+) -> None:
+    story_path = create_story(tmp_path, "story_without_remote_dev", {"status": "planned"})
+
+    story_status = collect_story_status(tmp_path, story_path)
+    result = run_project_status(tmp_path)
+
+    assert story_status.remote_dev_validation_exists is False
+    assert story_status.remote_dev_validation_status is None
+    assert "remote_dev_validation=not recorded" in result.terminal_summary
+
+    report = result.report_path.read_text(encoding="utf-8")
+    assert "- remote_dev_validation_result.yaml: missing" in report
+    assert "validation_status=not recorded" in report
+
+
+def test_project_status_handles_malformed_remote_dev_validation_gracefully(
+    tmp_path: Path,
+) -> None:
+    story_path = create_story(tmp_path, "story_bad_remote_dev", {"status": "planned"})
+    reports_path = story_path / "reports"
+    reports_path.mkdir()
+    (reports_path / "remote_dev_validation_result.yaml").write_text(
+        "validation_status: [unterminated\n",
+        encoding="utf-8",
+    )
+
+    story_status = collect_story_status(tmp_path, story_path)
+    result = run_project_status(tmp_path)
+
+    assert story_status.remote_dev_validation_exists is True
+    assert story_status.remote_dev_validation_status is None
+    assert story_status.warnings
+    assert "Invalid YAML" in story_status.warnings[0]
+
+    report = result.report_path.read_text(encoding="utf-8")
+    assert "validation_status=not recorded" in report
+    assert "Invalid YAML" in report
 
 
 def test_story_status_detects_blocking_support_ticket(tmp_path: Path) -> None:

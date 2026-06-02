@@ -245,7 +245,8 @@ docker compose run --rm dev agentic merge-readiness --story story_017_merge_read
 
 The command checks local evidence from `reports/quality_gate_result.yaml`,
 `reports/finalize_story_result.yaml`, optional `reports/test_layer_result.yaml`, and
-`reports/cloud_review_result.yaml`. It writes
+`reports/cloud_review_result.yaml`. When present, it also reads
+`reports/remote_dev_validation_result.yaml`. It writes
 `stories/<story>/reports/merge_readiness_result.yaml` and
 `stories/<story>/reports/merge_readiness_report.md`, then updates `status.yaml` while preserving
 the existing `story_id`.
@@ -255,6 +256,14 @@ When local gates pass and cloud review is `APPROVE`, the result is
 `APPROVE_WITH_NOTES`, the result is `READY_WITH_NOTES_FOR_HUMAN_MERGE_DECISION`. Missing evidence,
 failed local gates, a non-passing test layer result, or `REQUEST_CHANGES` from cloud review keeps
 the result at `REQUEST_CHANGES`.
+
+Remote dev validation is optional when no result has been recorded, and merge-readiness adds an
+informational note instead of failing. If a remote dev validation result exists, it becomes part of
+the gate: `DEV_VALIDATED` passes, `DEV_VALIDATED_WITH_NOTES` passes with notes,
+`DEV_FAILED` blocks as `REQUEST_CHANGES`, and `NOT_RUN` or an unknown status also blocks as
+`REQUEST_CHANGES`. The merge-readiness result includes `remote_dev_validation_status` so the human
+owner can see whether remote/dev-like validation was missing, passed, passed with notes, failed, or
+not run.
 
 This command does not read GitHub Actions status, call cloud models, commit, push, merge, or
 deploy. The human owner must still review the PR and confirm GitHub Actions are passing before
@@ -267,9 +276,11 @@ The final merge-readiness workflow is:
 3. Paste or upload `stories/<story>/cloud_review_packet/cloud_review_export.md` to the main cloud model.
 4. Save the cloud model answer to a local Markdown file.
 5. Run `record-cloud-review --story <story> --result-file <path>`.
-6. Run `merge-readiness --story <story>`.
-7. Have the human owner review the PR and GitHub Actions.
-8. Have the human owner decide whether to merge.
+6. Optionally run remote dev validation and record the result when remote/dev-like evidence is
+   needed.
+7. Run `merge-readiness --story <story>`.
+8. Have the human owner review the PR, GitHub Actions, and any remote dev validation evidence.
+9. Have the human owner decide whether to merge.
 
 ## Run remote dev validation
 
@@ -303,6 +314,10 @@ and `NOT_RUN`. Recording the result writes `reports/remote_dev_validation_result
 `reports/remote_dev_validation_report.md`, then updates `status.yaml` with the matching
 `remote_dev_*` status while preserving `story_id`.
 
+Remote dev validation is manual evidence, not automatic deployment. The packet command only creates
+instructions and a result template, and the record command only stores the completed result. Neither
+command provisions an environment or calls external deployment services.
+
 The remote dev validation workflow is:
 
 1. Run `finalize-story`.
@@ -311,7 +326,9 @@ The remote dev validation workflow is:
 4. Run remote dev deployment and checks manually or through future CI.
 5. Save the completed result YAML.
 6. Run `record-remote-dev --story <story> --result-file <path>`.
-7. Have the human owner review the PR and remote-dev evidence before merge or release.
+7. Rerun `merge-readiness --story <story>` so the recorded remote dev status is reflected in the
+   merge-readiness result.
+8. Have the human owner review the PR and remote-dev evidence before merge or release.
 
 These commands do not deploy, commit, push, merge, call GitHub APIs, or call cloud models. Runtime
 files under `stories/<story>/remote_dev_validation/` are ignored by Git except `.gitkeep`.
@@ -450,9 +467,11 @@ docker compose run --rm dev agentic project-status
 
 The command reads `stories/*/status.yaml` and common workflow evidence, including agent plans,
 prompt packs, test-layer results, quality-gate results, finalize-story results, cloud-review
-results, merge-readiness results, local review reports, agent reports, review bundles, cloud
-review packets, blocking support tickets, and queue counts for improvement, maintenance, and
-feature queues. It prints a readable terminal summary and writes `reports/project_status_report.md`.
+results, remote dev validation results, merge-readiness results, local review reports, agent
+reports, review bundles, cloud review packets, blocking support tickets, and queue counts for
+improvement, maintenance, and feature queues. It prints a readable terminal summary and writes
+`reports/project_status_report.md`. When remote dev validation has not been recorded for a story,
+the dashboard shows it as `not recorded`.
 
 To inspect one story only:
 

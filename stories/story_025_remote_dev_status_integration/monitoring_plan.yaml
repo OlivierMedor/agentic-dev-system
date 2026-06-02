@@ -1,0 +1,6 @@
+logs_required: true
+watch_for:
+- missing_remote_dev_status
+- invalid_remote_dev_status
+- merge_readiness_remote_dev_false_positive
+- project_status_remote_dev_summary_error
