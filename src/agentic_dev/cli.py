@@ -37,6 +37,10 @@ from agentic_dev.queue_management import (
     show_queue_item,
 )
 from agentic_dev.review_bundle import create_review_bundle
+from agentic_dev.remote_dev_validation import (
+    create_remote_dev_packet,
+    record_remote_dev_validation,
+)
 from agentic_dev.runtime_config import show_runtime_config, validate_runtime_config
 from agentic_dev.scaffolding import init_project
 from agentic_dev.story_generator import generate_stories
@@ -259,6 +263,49 @@ def main() -> None:
         type=Path,
         required=True,
         help="Path to the saved cloud model review result file.",
+    )
+
+    remote_dev_packet_parser = subparsers.add_parser(
+        "remote-dev-packet",
+        help="Create a remote-dev validation packet for a story.",
+    )
+    remote_dev_packet_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    remote_dev_packet_parser.add_argument(
+        "--story",
+        required=True,
+        help="Story folder name under the project's stories folder.",
+    )
+    remote_dev_packet_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing remote dev validation packet files.",
+    )
+
+    record_remote_dev_parser = subparsers.add_parser(
+        "record-remote-dev",
+        help="Record manual remote-dev validation evidence for a story.",
+    )
+    record_remote_dev_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    record_remote_dev_parser.add_argument(
+        "--story",
+        required=True,
+        help="Story folder name under the project's stories folder.",
+    )
+    record_remote_dev_parser.add_argument(
+        "--result-file",
+        type=Path,
+        required=True,
+        help="Path to the completed remote dev validation result YAML file.",
     )
 
     improvement_scan_parser = subparsers.add_parser(
@@ -870,6 +917,34 @@ def main() -> None:
             print(f"Ready for human merge decision: {result.ready_for_human_merge_decision}")
             print(f"Result: {result.cloud_review_result_path}")
             print(f"Report: {result.cloud_review_report_path}")
+            print(f"Status: {result.status_path}")
+            print(f"Next action: {result.next_action}")
+
+        if args.command == "remote-dev-packet":
+            result = create_remote_dev_packet(args.project, args.story, args.force)
+
+            print(f"Remote dev validation packet created for: {result.story}")
+            print(f"Validation path: {result.validation_path}")
+            print(f"Packet: {result.packet_path}")
+            print(f"Template: {result.template_path}")
+            print("\nGenerated:")
+            for path in result.generated_files:
+                print(f"  - {path}")
+
+            if result.missing_optional_files:
+                print("\nMissing optional evidence:")
+                for relative_path in result.missing_optional_files:
+                    print(f"  - {relative_path}")
+
+        if args.command == "record-remote-dev":
+            result = record_remote_dev_validation(args.project, args.story, args.result_file)
+
+            print(f"Remote dev validation recorded for: {result.story}")
+            print(f"Validation status: {result.validation_status}")
+            print(f"Ready for review: {result.ready_for_review}")
+            print(f"Environment: {result.environment_name}")
+            print(f"Result: {result.result_path}")
+            print(f"Report: {result.report_path}")
             print(f"Status: {result.status_path}")
             print(f"Next action: {result.next_action}")
 

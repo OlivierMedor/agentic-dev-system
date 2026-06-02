@@ -1,0 +1,7 @@
+logs_required: true
+watch_for:
+- missing_remote_dev_packet
+- invalid_remote_dev_result
+- remote_dev_failed
+- missing_smoke_test_evidence
+- accidental_deploy_attempt

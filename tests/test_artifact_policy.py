@@ -15,6 +15,7 @@ def test_allowed_project_paths_do_not_violate_artifact_policy() -> None:
         "stories/story_011_artifact_policy_guard/story_runbook.md",
         "stories/story_011_artifact_policy_guard/review_bundle/.gitkeep",
         "stories/story_011_artifact_policy_guard/cloud_review_packet/.gitkeep",
+        "stories/story_011_artifact_policy_guard/remote_dev_validation/.gitkeep",
         ".agentic/support_queue/pending/.gitkeep",
         ".agentic/feature_scan/.gitkeep",
         ".env.example",
@@ -40,6 +41,20 @@ def test_generated_cloud_review_packet_files_are_blocked() -> None:
     ]
 
     assert violation_paths(blocked_paths) == blocked_paths
+
+
+def test_generated_remote_dev_validation_files_are_blocked_except_gitkeep() -> None:
+    blocked_paths = [
+        "stories/story_024_remote_dev_validation_bundle/remote_dev_validation/remote_dev_packet.md",
+        "stories/story_024_remote_dev_validation_bundle/remote_dev_validation/remote_dev_result_template.yaml",
+    ]
+
+    assert violation_paths(
+        [
+            *blocked_paths,
+            "stories/story_024_remote_dev_validation_bundle/remote_dev_validation/.gitkeep",
+        ],
+    ) == blocked_paths
 
 
 def test_support_queue_runtime_files_are_blocked_except_gitkeep() -> None:
@@ -78,6 +93,7 @@ def test_multiple_violations_are_all_reported() -> None:
         "src/agentic_dev/cli.py",
         "stories/story_011_artifact_policy_guard/review_bundle/handoff.md",
         "stories/story_011_artifact_policy_guard/cloud_review_packet/cloud_review_prompt.md",
+        "stories/story_011_artifact_policy_guard/remote_dev_validation/remote_dev_packet.md",
         "review_to_chatgpt/handoff.md",
         "agentic_story001_review.zip",
         ".env.local",
@@ -87,6 +103,7 @@ def test_multiple_violations_are_all_reported() -> None:
     assert violation_paths(paths) == [
         "stories/story_011_artifact_policy_guard/review_bundle/handoff.md",
         "stories/story_011_artifact_policy_guard/cloud_review_packet/cloud_review_prompt.md",
+        "stories/story_011_artifact_policy_guard/remote_dev_validation/remote_dev_packet.md",
         "review_to_chatgpt/handoff.md",
         "agentic_story001_review.zip",
         ".env.local",

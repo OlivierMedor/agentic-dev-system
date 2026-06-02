@@ -271,6 +271,51 @@ The final merge-readiness workflow is:
 7. Have the human owner review the PR and GitHub Actions.
 8. Have the human owner decide whether to merge.
 
+## Run remote dev validation
+
+Use remote dev validation when a story needs evidence from a remote or dev-like environment before
+the human owner decides whether to merge or release.
+
+First, finalize the story and complete cloud review or merge readiness when applicable. Then create
+the remote-dev packet from the repo root:
+
+```powershell
+docker compose run --rm dev agentic remote-dev-packet --story story_024_remote_dev_validation_bundle
+```
+
+The command validates `stories/<story>/`, reads the story content and available local evidence, and
+writes `stories/<story>/remote_dev_validation/remote_dev_packet.md` plus
+`stories/<story>/remote_dev_validation/remote_dev_result_template.yaml`. The packet explains which
+manual evidence to collect: deployment URL or environment name, branch or commit, Docker/build or
+deployment result, smoke checks, applicable integration or mock E2E checks, log review, environment
+variable checklist without secret values, database migration status if applicable, rollback notes,
+and known risks.
+
+After the remote/dev-like deployment and checks are performed manually or by future CI, save the
+completed YAML result and record it:
+
+```powershell
+docker compose run --rm dev agentic record-remote-dev --story story_024_remote_dev_validation_bundle --result-file docs/remote_dev_result.yaml
+```
+
+Accepted `validation_status` values are `DEV_VALIDATED`, `DEV_VALIDATED_WITH_NOTES`, `DEV_FAILED`,
+and `NOT_RUN`. Recording the result writes `reports/remote_dev_validation_result.yaml` and
+`reports/remote_dev_validation_report.md`, then updates `status.yaml` with the matching
+`remote_dev_*` status while preserving `story_id`.
+
+The remote dev validation workflow is:
+
+1. Run `finalize-story`.
+2. Run cloud review and `merge-readiness` if applicable.
+3. Run `remote-dev-packet --story <story>`.
+4. Run remote dev deployment and checks manually or through future CI.
+5. Save the completed result YAML.
+6. Run `record-remote-dev --story <story> --result-file <path>`.
+7. Have the human owner review the PR and remote-dev evidence before merge or release.
+
+These commands do not deploy, commit, push, merge, call GitHub APIs, or call cloud models. Runtime
+files under `stories/<story>/remote_dev_validation/` are ignored by Git except `.gitkeep`.
+
 ## Run a post-story improvement scan
 
 After a story is completed, create an improvement scan packet so a research agent, local agent, or
