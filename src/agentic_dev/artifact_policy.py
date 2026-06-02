@@ -53,6 +53,15 @@ def find_artifact_policy_violations(tracked_files: list[str]) -> list[ArtifactPo
             )
             continue
 
+        if is_generated_remote_dev_validation_path(parts, filename):
+            violations.append(
+                ArtifactPolicyViolation(
+                    path=normalized_path,
+                    reason="generated remote dev validation file is tracked",
+                ),
+            )
+            continue
+
         if is_support_queue_runtime_path(parts, filename):
             violations.append(
                 ArtifactPolicyViolation(
@@ -106,6 +115,10 @@ def is_generated_review_bundle_path(parts: list[str], filename: str) -> bool:
 
 def is_generated_cloud_review_packet_path(parts: list[str], filename: str) -> bool:
     return is_generated_story_artifact_path(parts, "cloud_review_packet", filename)
+
+
+def is_generated_remote_dev_validation_path(parts: list[str], filename: str) -> bool:
+    return is_generated_story_artifact_path(parts, "remote_dev_validation", filename)
 
 
 def is_generated_story_artifact_path(parts: list[str], folder_name: str, filename: str) -> bool:

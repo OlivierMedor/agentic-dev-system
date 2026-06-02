@@ -1,0 +1,9 @@
+story: story_024_remote_dev_validation_bundle
+validation_status: DEV_VALIDATED_WITH_NOTES
+ready_for_review: true
+environment_name: remote-dev-local-review-sample
+deployment_url: https://remote-dev.example.test/story-024
+branch_or_commit: local-review-rerun
+result_file: /app/.tmp/story024_remote_dev_sample.yaml
+report_path: /app/stories/story_024_remote_dev_validation_bundle/reports/remote_dev_validation_report.md
+next_action: Restore story status and continue local review finalization.
