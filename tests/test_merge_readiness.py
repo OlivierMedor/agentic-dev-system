@@ -72,6 +72,13 @@ def write_cloud_review_decision(story_path: Path, decision: str) -> None:
     )
 
 
+def write_remote_dev_validation_status(story_path: Path, validation_status: str) -> None:
+    write_yaml(
+        story_path / "reports" / "remote_dev_validation_result.yaml",
+        {"validation_status": validation_status},
+    )
+
+
 @pytest.mark.parametrize(
     ("decision", "expected_status", "expected_status_text", "expected_ready"),
     [
@@ -222,6 +229,126 @@ def test_merge_readiness_does_not_require_real_git_repo_or_cloud_credentials(
     assert not (tmp_path / ".git").exists()
     assert (story_path / "reports" / "merge_readiness_result.yaml").exists()
     assert (story_path / "reports" / "merge_readiness_report.md").exists()
+
+
+def test_merge_readiness_allows_missing_remote_dev_validation_when_other_gates_pass(
+    tmp_path: Path,
+) -> None:
+    story_path = create_story(tmp_path)
+    write_passing_local_evidence(story_path)
+    write_cloud_review_decision(story_path, "APPROVE")
+
+    result = run_merge_readiness(tmp_path, STORY)
+    result_yaml = read_yaml(story_path / "reports" / "merge_readiness_result.yaml")
+    report = (story_path / "reports" / "merge_readiness_report.md").read_text(
+        encoding="utf-8",
+    )
+
+    assert result.status == "READY_FOR_HUMAN_MERGE_DECISION"
+    assert result.ready_for_human_merge_decision is True
+    assert result.remote_dev_validation_present is False
+    assert result.remote_dev_validation_status is None
+    assert result_yaml["remote_dev_validation_present"] is False
+    assert result_yaml["remote_dev_validation_status"] is None
+    assert "Remote dev validation was not recorded." in report
+    assert "does not block merge-readiness" in report
+
+
+@pytest.mark.parametrize(
+    (
+        "validation_status",
+        "expected_status",
+        "expected_ready",
+        "expected_check",
+        "expected_report_text",
+    ),
+    [
+        (
+            "DEV_VALIDATED",
+            "READY_FOR_HUMAN_MERGE_DECISION",
+            True,
+            "Remote dev validation status is DEV_VALIDATED.",
+            "Remote dev validation was present and passed.",
+        ),
+        (
+            "DEV_VALIDATED_WITH_NOTES",
+            "READY_WITH_NOTES_FOR_HUMAN_MERGE_DECISION",
+            True,
+            "Remote dev validation status is DEV_VALIDATED_WITH_NOTES.",
+            "Remote dev validation was present and passed with notes.",
+        ),
+        (
+            "DEV_FAILED",
+            "REQUEST_CHANGES",
+            False,
+            "Remote dev validation status is DEV_FAILED.",
+            "Remote dev validation was present and failed.",
+        ),
+        (
+            "NOT_RUN",
+            "REQUEST_CHANGES",
+            False,
+            "Remote dev validation status is NOT_RUN.",
+            "Remote dev validation was present but not run.",
+        ),
+    ],
+)
+def test_merge_readiness_decides_from_remote_dev_validation_status(
+    tmp_path: Path,
+    validation_status: str,
+    expected_status: str,
+    expected_ready: bool,
+    expected_check: str,
+    expected_report_text: str,
+) -> None:
+    story_path = create_story(tmp_path)
+    write_passing_local_evidence(story_path)
+    write_cloud_review_decision(story_path, "APPROVE")
+    write_remote_dev_validation_status(story_path, validation_status)
+
+    result = run_merge_readiness(tmp_path, STORY)
+    result_yaml = read_yaml(story_path / "reports" / "merge_readiness_result.yaml")
+    report = (story_path / "reports" / "merge_readiness_report.md").read_text(
+        encoding="utf-8",
+    )
+
+    assert result.status == expected_status
+    assert result.ready_for_human_merge_decision is expected_ready
+    assert result.remote_dev_validation_present is True
+    assert result.remote_dev_validation_status == validation_status
+    assert result_yaml["status"] == expected_status
+    assert result_yaml["ready_for_human_merge_decision"] is expected_ready
+    assert result_yaml["remote_dev_validation_present"] is True
+    assert result_yaml["remote_dev_validation_status"] == validation_status
+
+    all_checks = result_yaml["passed_checks"] + result_yaml["failed_checks"]
+    assert expected_check in all_checks
+    assert expected_report_text in report
+
+
+def test_merge_readiness_requests_changes_for_invalid_remote_dev_validation_status(
+    tmp_path: Path,
+) -> None:
+    story_path = create_story(tmp_path)
+    write_passing_local_evidence(story_path)
+    write_cloud_review_decision(story_path, "APPROVE")
+    write_remote_dev_validation_status(story_path, "UNKNOWN_STATUS")
+
+    result = run_merge_readiness(tmp_path, STORY)
+    result_yaml = read_yaml(story_path / "reports" / "merge_readiness_result.yaml")
+    report = (story_path / "reports" / "merge_readiness_report.md").read_text(
+        encoding="utf-8",
+    )
+
+    assert result.status == "REQUEST_CHANGES"
+    assert result.ready_for_human_merge_decision is False
+    assert result.remote_dev_validation_status == "UNKNOWN_STATUS"
+    assert result_yaml["remote_dev_validation_status"] == "UNKNOWN_STATUS"
+    assert (
+        "Remote dev validation status must be DEV_VALIDATED, DEV_VALIDATED_WITH_NOTES, "
+        "DEV_FAILED, or NOT_RUN when reports/remote_dev_validation_result.yaml exists."
+    ) in result_yaml["failed_checks"]
+    assert "Remote dev validation was present but had an unknown or invalid status." in report
 
 
 def test_cli_merge_readiness_requires_story_argument(monkeypatch: pytest.MonkeyPatch) -> None:

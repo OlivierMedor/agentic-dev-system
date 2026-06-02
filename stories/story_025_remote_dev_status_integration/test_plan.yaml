@@ -1,0 +1,28 @@
+test_layers_version: 1
+unit_tests:
+  required: true
+  action: add_or_update
+  frequency: every_commit
+  evidence_or_reason: Add or update tests for remote dev status handling in project-status
+    and merge-readiness.
+integration_tests:
+  required: true
+  action: confirm_existing
+  frequency: every_pull_request
+  evidence_or_reason: Existing command tests cover CLI integration patterns.
+mock_e2e_tests:
+  required: true
+  action: confirm_existing
+  frequency: before_merge
+  evidence_or_reason: Existing mock E2E workflow test covers the local story workflow.
+live_read_only_checks:
+  required: false
+  action: not_applicable_with_reason
+  frequency: scheduled_or_before_release
+  evidence_or_reason: This story does not call live external APIs.
+remote_dev_smoke_tests:
+  required: false
+  action: scheduled_later_with_reason
+  frequency: after_remote_dev_deploy
+  evidence_or_reason: This story integrates remote dev validation status but does
+    not run a remote environment.

@@ -1279,3 +1279,73 @@ stories:
         - remote_dev_failed
         - missing_smoke_test_evidence
         - accidental_deploy_attempt
+
+  - id: STORY-025
+    slug: story_025_remote_dev_status_integration
+    title: Integrate remote dev validation status
+    goal: Update project-status and merge-readiness so they understand remote dev validation results.
+    why: The system can now create and record remote dev validation evidence, but the dashboard and merge-readiness gate should also surface that evidence clearly. This helps the human owner see whether code has only passed local/cloud review or has also been validated in a remote/dev-like environment.
+    acceptance_criteria:
+      - project-status reads reports/remote_dev_validation_result.yaml when present.
+      - project-status displays remote dev validation status for each story.
+      - project-status includes remote dev validation status in reports/project_status_report.md.
+      - merge-readiness reads reports/remote_dev_validation_result.yaml when present.
+      - merge-readiness does not fail when remote dev validation is missing.
+      - merge-readiness treats DEV_VALIDATED as passing remote dev validation.
+      - merge-readiness treats DEV_VALIDATED_WITH_NOTES as passing with notes.
+      - merge-readiness treats DEV_FAILED as REQUEST_CHANGES.
+      - merge-readiness treats NOT_RUN as REQUEST_CHANGES when a result file exists.
+      - merge-readiness result includes remote_dev_validation_status.
+      - merge-readiness report explains whether remote dev validation was present, missing, passed, passed with notes, failed, or not run.
+      - README documents how remote dev validation relates to project-status and merge-readiness.
+      - Tests verify project-status and merge-readiness behavior for remote dev validation results.
+    not_in_scope:
+      - No actual deployment.
+      - No remote environment provisioning.
+      - No production release bundle.
+      - No GitHub environment deployment.
+      - No cloud API calls.
+      - No automatic merge.
+      - No LangGraph yet.
+    definition_of_done:
+      - pytest passes.
+      - ruff passes.
+      - artifact-policy passes.
+      - runtime-config validate passes.
+      - project-status shows remote dev status.
+      - merge-readiness handles remote dev validation status correctly.
+      - finalize-story marks this story ready for review.
+    test_plan:
+      test_layers_version: 1
+      unit_tests:
+        required: true
+        action: add_or_update
+        frequency: every_commit
+        evidence_or_reason: Add or update tests for remote dev status handling in project-status and merge-readiness.
+      integration_tests:
+        required: true
+        action: confirm_existing
+        frequency: every_pull_request
+        evidence_or_reason: Existing command tests cover CLI integration patterns.
+      mock_e2e_tests:
+        required: true
+        action: confirm_existing
+        frequency: before_merge
+        evidence_or_reason: Existing mock E2E workflow test covers the local story workflow.
+      live_read_only_checks:
+        required: false
+        action: not_applicable_with_reason
+        frequency: scheduled_or_before_release
+        evidence_or_reason: This story does not call live external APIs.
+      remote_dev_smoke_tests:
+        required: false
+        action: scheduled_later_with_reason
+        frequency: after_remote_dev_deploy
+        evidence_or_reason: This story integrates remote dev validation status but does not run a remote environment.
+    monitoring_plan:
+      logs_required: true
+      watch_for:
+        - missing_remote_dev_status
+        - invalid_remote_dev_status
+        - merge_readiness_remote_dev_false_positive
+        - project_status_remote_dev_summary_error

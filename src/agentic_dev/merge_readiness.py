@@ -6,6 +6,13 @@ from typing import Any
 
 import yaml
 
+from agentic_dev.remote_dev_validation import (
+    DEV_FAILED,
+    DEV_VALIDATED,
+    DEV_VALIDATED_WITH_NOTES,
+    NOT_RUN,
+)
+
 
 READY_FOR_HUMAN_MERGE_DECISION = "READY_FOR_HUMAN_MERGE_DECISION"
 READY_WITH_NOTES_FOR_HUMAN_MERGE_DECISION = "READY_WITH_NOTES_FOR_HUMAN_MERGE_DECISION"
@@ -34,6 +41,8 @@ class MergeReadinessResult:
     status: str
     ready_for_human_merge_decision: bool
     cloud_review_decision: str | None
+    remote_dev_validation_present: bool
+    remote_dev_validation_status: str | None
     passed_checks: list[str]
     failed_checks: list[str]
     next_action: str
@@ -55,6 +64,7 @@ def run_merge_readiness(project_path: Path, story: str) -> MergeReadinessResult:
 
     reports_path = story_path / "reports"
     reports_path.mkdir(parents=True, exist_ok=True)
+    remote_dev_validation_path = reports_path / "remote_dev_validation_result.yaml"
 
     passed_checks: list[str] = []
     failed_checks: list[str] = []
@@ -75,6 +85,12 @@ def run_merge_readiness(project_path: Path, story: str) -> MergeReadinessResult:
         reports_path / "cloud_review_result.yaml",
         "cloud_review_result.yaml",
     )
+    remote_dev_validation_result = load_optional_remote_dev_validation_report(
+        remote_dev_validation_path,
+        "remote_dev_validation_result.yaml",
+        passed_checks,
+        failed_checks,
+    )
 
     check_quality_gate(quality_gate, passed_checks, failed_checks)
     check_finalize_result(finalize_result, passed_checks, failed_checks)
@@ -84,9 +100,14 @@ def run_merge_readiness(project_path: Path, story: str) -> MergeReadinessResult:
         passed_checks,
         failed_checks,
     )
+    remote_dev_validation_status = check_remote_dev_validation_result(
+        remote_dev_validation_result,
+        passed_checks,
+        failed_checks,
+    )
 
     local_gates_pass = not failed_checks
-    status = decide_status(local_gates_pass, cloud_review_decision)
+    status = decide_status(local_gates_pass, cloud_review_decision, remote_dev_validation_status)
     ready_for_human_merge_decision = status in {
         READY_FOR_HUMAN_MERGE_DECISION,
         READY_WITH_NOTES_FOR_HUMAN_MERGE_DECISION,
@@ -99,6 +120,8 @@ def run_merge_readiness(project_path: Path, story: str) -> MergeReadinessResult:
         status=status,
         ready_for_human_merge_decision=ready_for_human_merge_decision,
         cloud_review_decision=cloud_review_decision,
+        remote_dev_validation_present=remote_dev_validation_path.exists(),
+        remote_dev_validation_status=remote_dev_validation_status,
         passed_checks=passed_checks,
         failed_checks=failed_checks,
         next_action=next_action,
@@ -126,6 +149,36 @@ def load_optional_report(path: Path, label: str) -> dict[str, Any] | None:
 
     if not isinstance(loaded, dict):
         raise ValueError(f"{label} must be a YAML mapping: {path}")
+
+    return loaded
+
+
+def load_optional_remote_dev_validation_report(
+    path: Path,
+    label: str,
+    passed_checks: list[str],
+    failed_checks: list[str],
+) -> dict[str, Any] | None:
+    if not path.exists():
+        passed_checks.append(
+            "Remote dev validation was not recorded; optional check skipped."
+        )
+        return None
+
+    try:
+        with path.open("r", encoding="utf-8") as report_file:
+            loaded = yaml.safe_load(report_file)
+    except yaml.YAMLError as error:
+        failed_checks.append(f"Remote dev validation result has invalid YAML: {error}.")
+        return {}
+
+    if loaded is None:
+        failed_checks.append(f"{label} exists but is empty.")
+        return {}
+
+    if not isinstance(loaded, dict):
+        failed_checks.append(f"{label} must be a YAML mapping.")
+        return {}
 
     return loaded
 
@@ -204,9 +257,48 @@ def check_cloud_review_result(
     return str(decision) if decision is not None else None
 
 
-def decide_status(local_gates_pass: bool, cloud_review_decision: str | None) -> str:
+def check_remote_dev_validation_result(
+    remote_dev_validation_result: dict[str, Any] | None,
+    passed_checks: list[str],
+    failed_checks: list[str],
+) -> str | None:
+    if remote_dev_validation_result is None:
+        return None
+
+    validation_status = remote_dev_validation_result.get("validation_status")
+    if validation_status == DEV_VALIDATED:
+        passed_checks.append("Remote dev validation status is DEV_VALIDATED.")
+        return str(validation_status)
+
+    if validation_status == DEV_VALIDATED_WITH_NOTES:
+        passed_checks.append("Remote dev validation status is DEV_VALIDATED_WITH_NOTES.")
+        return str(validation_status)
+
+    if validation_status == DEV_FAILED:
+        failed_checks.append("Remote dev validation status is DEV_FAILED.")
+        return str(validation_status)
+
+    if validation_status == NOT_RUN:
+        failed_checks.append("Remote dev validation status is NOT_RUN.")
+        return str(validation_status)
+
+    failed_checks.append(
+        "Remote dev validation status must be DEV_VALIDATED, DEV_VALIDATED_WITH_NOTES, "
+        "DEV_FAILED, or NOT_RUN when reports/remote_dev_validation_result.yaml exists."
+    )
+    return str(validation_status) if validation_status is not None else None
+
+
+def decide_status(
+    local_gates_pass: bool,
+    cloud_review_decision: str | None,
+    remote_dev_validation_status: str | None,
+) -> str:
     if not local_gates_pass:
         return REQUEST_CHANGES
+
+    if remote_dev_validation_status == DEV_VALIDATED_WITH_NOTES:
+        return READY_WITH_NOTES_FOR_HUMAN_MERGE_DECISION
 
     if cloud_review_decision == CLOUD_APPROVE:
         return READY_FOR_HUMAN_MERGE_DECISION
@@ -242,6 +334,8 @@ def write_merge_readiness_result(result: MergeReadinessResult) -> None:
         "status": result.status,
         "ready_for_human_merge_decision": result.ready_for_human_merge_decision,
         "cloud_review_decision": result.cloud_review_decision,
+        "remote_dev_validation_present": result.remote_dev_validation_present,
+        "remote_dev_validation_status": result.remote_dev_validation_status,
         "passed_checks": result.passed_checks,
         "failed_checks": result.failed_checks,
         "next_action": result.next_action,
@@ -263,6 +357,7 @@ def write_merge_readiness_report(result: MergeReadinessResult) -> None:
 - reports/finalize_story_result.yaml
 - reports/test_layer_result.yaml when present
 - reports/cloud_review_result.yaml
+- reports/remote_dev_validation_result.yaml when present
 
 ## Passed checks
 
@@ -273,6 +368,10 @@ def write_merge_readiness_report(result: MergeReadinessResult) -> None:
 ## Cloud review decision
 
 {result.cloud_review_decision or "missing"}
+
+## Remote dev validation
+
+{format_remote_dev_validation_status(result.remote_dev_validation_present, result.remote_dev_validation_status)}
 
 ## Final recommendation
 
@@ -337,3 +436,31 @@ def format_check_list(checks: list[str]) -> str:
         return "- None\n"
 
     return "\n".join(f"- {check}" for check in checks) + "\n"
+
+
+def format_remote_dev_validation_status(
+    remote_dev_validation_present: bool,
+    validation_status: str | None,
+) -> str:
+    if not remote_dev_validation_present:
+        return (
+            "Remote dev validation was not recorded. Missing remote dev validation is "
+            "currently informational and does not block merge-readiness."
+        )
+
+    if validation_status is None:
+        return "Remote dev validation was present but had no valid status."
+
+    if validation_status == DEV_VALIDATED:
+        return "Remote dev validation was present and passed."
+
+    if validation_status == DEV_VALIDATED_WITH_NOTES:
+        return "Remote dev validation was present and passed with notes."
+
+    if validation_status == DEV_FAILED:
+        return "Remote dev validation was present and failed."
+
+    if validation_status == NOT_RUN:
+        return "Remote dev validation was present but not run."
+
+    return "Remote dev validation was present but had an unknown or invalid status."
