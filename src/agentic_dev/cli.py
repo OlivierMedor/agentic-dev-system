@@ -18,6 +18,7 @@ from agentic_dev.maintenance_scan import (
     record_maintenance_findings,
 )
 from agentic_dev.merge_readiness import run_merge_readiness
+from agentic_dev.next_step import run_next_step
 from agentic_dev.prepare_story import prepare_story
 from agentic_dev.project_status import run_project_status
 from agentic_dev.prompt_pack import generate_prompt_pack
@@ -199,6 +200,22 @@ def main() -> None:
         "--force",
         action="store_true",
         help="Refresh existing agent plan and prompt files.",
+    )
+
+    next_step_parser = subparsers.add_parser(
+        "next-step",
+        help="Recommend the next safe workflow action for a story.",
+    )
+    next_step_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    next_step_parser.add_argument(
+        "--story",
+        required=True,
+        help="Story folder name under the project's stories folder.",
     )
 
     finalize_story_parser = subparsers.add_parser(
@@ -882,6 +899,10 @@ def main() -> None:
             print(f"Runbook: {result.runbook_path}")
             print(f"Report: {result.report_path}")
             print(f"Status: {result.status_path}")
+
+        if args.command == "next-step":
+            result = run_next_step(args.project, args.story)
+            print(result.terminal_summary)
 
         if args.command == "finalize-story":
             result = finalize_story(args.project, args.story, args.force)

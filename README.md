@@ -121,6 +121,31 @@ Use `--force` when you intentionally want to refresh an existing `agent_plan.yam
 existing prompt files. The command does not execute agents, run cloud models, create a review
 bundle, or run the quality gate.
 
+## Ask for the next story step
+
+Run this from the repo root when you want a beginner-friendly recommendation for one story:
+
+```powershell
+docker compose run --rm dev agentic next-step --story story_026_story_next_step_advisor
+```
+
+The command validates that `stories/<story>/` exists, inspects story status, `agent_plan.yaml`,
+`prompt_pack/`, reports, review bundle files, quality gate results, finalize results, cloud review
+packets and results, merge-readiness results, and remote dev validation evidence. It writes
+`stories/<story>/reports/next_step_report.md` and prints the next recommended workflow action.
+
+Typical recommendations include `prepare-story` when planning artifacts are missing, running the
+generated prompts with the configured agent runtime when required agent reports are missing,
+`test-layers` when a versioned test plan has no test-layer result, `finalize-story`,
+`cloud-review-packet`, `record-cloud-review`, `merge-readiness`, `remote-dev-packet`, or human PR/CI
+review when the story is ready for the human owner. If a support ticket blocks the story or a result
+records `REQUEST_CHANGES`, `DEV_FAILED`, `NOT_RUN`, or `request_changes`, the advisor tells you to
+resolve that state before continuing.
+
+`next-step` only recommends a safe next action. It does not execute the recommendation, call cloud
+models, call GitHub APIs, commit, push, merge, deploy, or recommend automatic merge or deployment.
+Human final approval is always required before merge.
+
 ## Create a review bundle
 
 Run this from the repo root to collect review files for a story:

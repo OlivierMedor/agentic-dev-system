@@ -1,0 +1,46 @@
+story: story_026_story_next_step_advisor
+status: PASSED
+passed_checks:
+- unit_tests is addressed.
+- integration_tests is addressed.
+- mock_e2e_tests is addressed.
+- live_read_only_checks is addressed.
+- remote_dev_smoke_tests is addressed.
+failed_checks: []
+layers:
+  unit_tests:
+    status: PASSED
+    required: true
+    action: add_or_update
+    frequency: every_commit
+    evidence_or_reason: Add unit tests for next-step recommendation logic.
+    failed_checks: []
+  integration_tests:
+    status: PASSED
+    required: true
+    action: confirm_existing
+    frequency: every_pull_request
+    evidence_or_reason: Existing command tests cover CLI integration patterns.
+    failed_checks: []
+  mock_e2e_tests:
+    status: PASSED
+    required: true
+    action: confirm_existing
+    frequency: before_merge
+    evidence_or_reason: Existing mock E2E workflow test covers the local story workflow.
+    failed_checks: []
+  live_read_only_checks:
+    status: PASSED
+    required: false
+    action: not_applicable_with_reason
+    frequency: scheduled_or_before_release
+    evidence_or_reason: This story does not call live external APIs.
+    failed_checks: []
+  remote_dev_smoke_tests:
+    status: PASSED
+    required: false
+    action: not_applicable_with_reason
+    frequency: after_remote_dev_deploy
+    evidence_or_reason: This story does not deploy to a remote dev environment.
+    failed_checks: []
+next_action: Continue to the quality gate or finalize-story workflow.
