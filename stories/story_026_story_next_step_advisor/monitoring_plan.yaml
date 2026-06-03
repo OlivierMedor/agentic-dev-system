@@ -1,0 +1,6 @@
+logs_required: true
+watch_for:
+- missing_next_step_report
+- inaccurate_next_step_recommendation
+- unsafe_next_step_recommendation
+- next_step_recommends_auto_merge
