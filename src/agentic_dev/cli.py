@@ -54,6 +54,7 @@ from agentic_dev.support_queue import (
     list_support_tickets,
 )
 from agentic_dev.test_layers import run_test_layers
+from agentic_dev.workflow_preview import run_workflow_preview
 
 
 def main() -> None:
@@ -213,6 +214,22 @@ def main() -> None:
         help="Target project folder. Defaults to the current directory.",
     )
     next_step_parser.add_argument(
+        "--story",
+        required=True,
+        help="Story folder name under the project's stories folder.",
+    )
+
+    workflow_preview_parser = subparsers.add_parser(
+        "workflow-preview",
+        help="Preview the next story workflow route with LangGraph.",
+    )
+    workflow_preview_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    workflow_preview_parser.add_argument(
         "--story",
         required=True,
         help="Story folder name under the project's stories folder.",
@@ -902,6 +919,10 @@ def main() -> None:
 
         if args.command == "next-step":
             result = run_next_step(args.project, args.story)
+            print(result.terminal_summary)
+
+        if args.command == "workflow-preview":
+            result = run_workflow_preview(args.project, args.story)
             print(result.terminal_summary)
 
         if args.command == "finalize-story":
