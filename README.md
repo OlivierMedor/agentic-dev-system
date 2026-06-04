@@ -167,6 +167,32 @@ command never recommends automatic merge or automatic deployment.
 
 See `docs/langgraph_workflow.md` for how this preview maps to future orchestration.
 
+## Run safe local workflow steps with LangGraph
+
+Run this from the repo root when you want LangGraph to plan the safe local finalization route for a
+story:
+
+```powershell
+docker compose run --rm dev agentic workflow-run --story story_028_langgraph_safe_workflow_runner
+```
+
+By default, `workflow-run` is a dry run. It writes
+`stories/<story>/reports/workflow_run_result.yaml` and
+`stories/<story>/reports/workflow_run_report.md`, records the graph nodes visited, and explains
+which safe local steps would run.
+
+Add `--execute` only when you want to run the hardcoded `local-finalize` phase:
+
+```powershell
+docker compose run --rm dev agentic workflow-run --story story_028_langgraph_safe_workflow_runner --execute
+```
+
+For this story, `local-finalize` runs only these deterministic local steps:
+`test-layers`, `finalize-story`, `review-bundle`, and `workflow-preview`. The runner does not
+execute agents or generated agent prompts, call cloud models, call GitHub APIs, commit, push,
+merge, deploy, run destructive commands, or run arbitrary commands from user input. Human final
+approval is still required before merge.
+
 ## Create a review bundle
 
 Run this from the repo root to collect review files for a story:

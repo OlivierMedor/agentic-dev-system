@@ -55,6 +55,7 @@ from agentic_dev.support_queue import (
 )
 from agentic_dev.test_layers import run_test_layers
 from agentic_dev.workflow_preview import run_workflow_preview
+from agentic_dev.workflow_run import LOCAL_FINALIZE_PHASE, run_workflow_run
 
 
 def main() -> None:
@@ -233,6 +234,33 @@ def main() -> None:
         "--story",
         required=True,
         help="Story folder name under the project's stories folder.",
+    )
+
+    workflow_run_parser = subparsers.add_parser(
+        "workflow-run",
+        help="Plan or execute safe local story workflow steps with LangGraph.",
+    )
+    workflow_run_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    workflow_run_parser.add_argument(
+        "--story",
+        required=True,
+        help="Story folder name under the project's stories folder.",
+    )
+    workflow_run_parser.add_argument(
+        "--phase",
+        default=LOCAL_FINALIZE_PHASE,
+        choices=[LOCAL_FINALIZE_PHASE],
+        help="Workflow phase to run. Defaults to local-finalize.",
+    )
+    workflow_run_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Run the hardcoded safe local steps. Without this flag, only a plan is written.",
     )
 
     finalize_story_parser = subparsers.add_parser(
@@ -923,6 +951,15 @@ def main() -> None:
 
         if args.command == "workflow-preview":
             result = run_workflow_preview(args.project, args.story)
+            print(result.terminal_summary)
+
+        if args.command == "workflow-run":
+            result = run_workflow_run(
+                args.project,
+                args.story,
+                phase=args.phase,
+                execute=args.execute,
+            )
             print(result.terminal_summary)
 
         if args.command == "finalize-story":

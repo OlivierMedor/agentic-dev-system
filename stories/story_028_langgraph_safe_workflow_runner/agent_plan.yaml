@@ -1,0 +1,46 @@
+story: story_028_langgraph_safe_workflow_runner
+status: pending_execution
+execution_order:
+  - research_agent
+  - planner_agent
+  - developer_agent
+  - test_agent
+  - docs_agent
+  - security_quality_agent
+  - local_reviewer_agent
+assigned_agents:
+  - id: research_agent
+    display_name: Research Agent
+    responsibility: Research story scope, risks, best practices, and useful references.
+    instruction_file: instructions/research_agent.md
+    expected_output: reports/research_report.md
+  - id: planner_agent
+    display_name: Planner Agent
+    responsibility: Create a practical implementation plan for this story.
+    instruction_file: instructions/planner_agent.md
+    expected_output: reports/planner_report.md
+  - id: developer_agent
+    display_name: Developer Agent
+    responsibility: Implement only the approved story scope. Do not write tests.
+    instruction_file: instructions/developer_agent.md
+    expected_output: reports/developer_report.md
+  - id: test_agent
+    display_name: Test Agent
+    responsibility: Write independent tests based on the story acceptance criteria.
+    instruction_file: instructions/test_agent.md
+    expected_output: reports/test_report.md
+  - id: docs_agent
+    display_name: Docs Agent
+    responsibility: Update documentation related to this story.
+    instruction_file: instructions/docs_agent.md
+    expected_output: reports/docs_report.md
+  - id: security_quality_agent
+    display_name: Security/Quality Agent
+    responsibility: Check for secrets, unsafe behavior, bad patterns, and quality risks.
+    instruction_file: instructions/security_quality_agent.md
+    expected_output: reports/security_quality_report.md
+  - id: local_reviewer_agent
+    display_name: Local Reviewer Agent
+    responsibility: Review all work and decide whether it is ready for cloud/human review.
+    instruction_file: instructions/local_reviewer_agent.md
+    expected_output: reports/local_review_report.md
