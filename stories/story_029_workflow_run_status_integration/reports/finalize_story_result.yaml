@@ -1,0 +1,8 @@
+story: story_029_workflow_run_status_integration
+status: ready_for_review
+ready_for_review: true
+review_bundle_path: /app/stories/story_029_workflow_run_status_integration/review_bundle
+quality_gate_result_path: /app/stories/story_029_workflow_run_status_integration/reports/quality_gate_result.yaml
+test_layer_result_path: /app/stories/story_029_workflow_run_status_integration/reports/test_layer_result.yaml
+finalize_report_path: /app/stories/story_029_workflow_run_status_integration/reports/finalize_story_report.md
+next_action: Send the story to a human or cloud reviewer.
