@@ -21,6 +21,18 @@ UNKNOWN = "UNKNOWN"
 
 PASSED = "PASSED"
 
+WORKFLOW_RUN_SAFETY_FLAGS = (
+    "executed_agents",
+    "called_cloud_models",
+    "called_github_apis",
+    "committed_or_merged",
+    "pushed",
+    "merged",
+    "deployed",
+    "ran_destructive_commands",
+    "ran_arbitrary_commands",
+)
+
 SUPPORT_QUEUE_FOLDERS = (
     "pending",
     "answered",
@@ -51,6 +63,11 @@ class StoryProjectStatus:
     finalize_exists: bool
     finalize_status: str | None
     finalize_ready: bool | None
+    workflow_run_exists: bool
+    workflow_run_phase: str | None
+    workflow_run_status: str | None
+    workflow_run_executed: bool | None
+    workflow_run_safety_summary: str
     cloud_review_exists: bool
     cloud_review_decision: str | None
     remote_dev_validation_exists: bool
@@ -139,6 +156,7 @@ def collect_story_status(project_path: Path, story_path: Path) -> StoryProjectSt
     test_layer_path = reports_path / "test_layer_result.yaml"
     quality_gate_path = reports_path / "quality_gate_result.yaml"
     finalize_path = reports_path / "finalize_story_result.yaml"
+    workflow_run_path = reports_path / "workflow_run_result.yaml"
     cloud_review_path = reports_path / "cloud_review_result.yaml"
     remote_dev_validation_path = reports_path / "remote_dev_validation_result.yaml"
     merge_readiness_path = reports_path / "merge_readiness_result.yaml"
@@ -147,6 +165,7 @@ def collect_story_status(project_path: Path, story_path: Path) -> StoryProjectSt
     test_layer_data = load_optional_yaml_mapping(test_layer_path, warnings)
     quality_gate_data = load_optional_yaml_mapping(quality_gate_path, warnings)
     finalize_data = load_optional_yaml_mapping(finalize_path, warnings)
+    workflow_run_data = load_optional_yaml_mapping(workflow_run_path, warnings)
     cloud_review_data = load_optional_yaml_mapping(cloud_review_path, warnings)
     remote_dev_validation_data = load_optional_yaml_mapping(remote_dev_validation_path, warnings)
     merge_readiness_data = load_optional_yaml_mapping(merge_readiness_path, warnings)
@@ -164,6 +183,13 @@ def collect_story_status(project_path: Path, story_path: Path) -> StoryProjectSt
     test_layer_status = optional_text(test_layer_data.get("status"))
     quality_gate_status = optional_text(quality_gate_data.get("status"))
     finalize_status = optional_text(finalize_data.get("status"))
+    workflow_run_phase = optional_text(workflow_run_data.get("phase"))
+    workflow_run_status = optional_text(workflow_run_data.get("status"))
+    workflow_run_executed = optional_bool(workflow_run_data.get("executed"))
+    workflow_run_safety_summary = format_workflow_run_safety_summary(
+        workflow_run_path.exists(),
+        workflow_run_data,
+    )
     cloud_review_decision = optional_text(cloud_review_data.get("decision"))
     remote_dev_validation_status = optional_text(remote_dev_validation_data.get("validation_status"))
     if (
@@ -232,6 +258,11 @@ def collect_story_status(project_path: Path, story_path: Path) -> StoryProjectSt
         finalize_exists=finalize_path.exists(),
         finalize_status=finalize_status,
         finalize_ready=optional_bool(finalize_data.get("ready_for_review")),
+        workflow_run_exists=workflow_run_path.exists(),
+        workflow_run_phase=workflow_run_phase,
+        workflow_run_status=workflow_run_status,
+        workflow_run_executed=workflow_run_executed,
+        workflow_run_safety_summary=workflow_run_safety_summary,
         cloud_review_exists=cloud_review_path.exists(),
         cloud_review_decision=cloud_review_decision,
         remote_dev_validation_exists=remote_dev_validation_path.exists(),
@@ -525,6 +556,14 @@ def format_terminal_summary(
             lines.append(f"    blocked_by={story.blocked_by} ({queue_text})")
         if story.cloud_review_decision:
             lines.append(f"    cloud_review={story.cloud_review_decision}")
+        workflow_run_status = story.workflow_run_status or "not recorded"
+        workflow_run_phase = story.workflow_run_phase or "not recorded"
+        lines.append(
+            "    "
+            f"workflow_run={workflow_run_status} "
+            f"(phase={workflow_run_phase}, executed={format_optional_bool(story.workflow_run_executed)})"
+        )
+        lines.append(f"    workflow_run_safety_summary={story.workflow_run_safety_summary}")
         remote_dev_status = story.remote_dev_validation_status or "not recorded"
         lines.append(f"    remote_dev_validation={remote_dev_status}")
         if story.merge_readiness_status:
@@ -641,6 +680,14 @@ def format_story_section(story: StoryProjectStatus) -> list[str]:
             f"(ready: {format_optional_bool(story.finalize_ready)})"
         ),
         (
+            "- workflow_run_result.yaml: "
+            f"{format_present(story.workflow_run_exists)}, "
+            f"workflow_run_phase={story.workflow_run_phase or 'not recorded'}, "
+            f"workflow_run_status={story.workflow_run_status or 'not recorded'}, "
+            f"workflow_run_executed={format_optional_bool(story.workflow_run_executed)}"
+        ),
+        f"- workflow_run_safety_summary: {story.workflow_run_safety_summary}",
+        (
             "- cloud_review_result.yaml: "
             f"{format_present(story.cloud_review_exists)}, "
             f"decision={story.cloud_review_decision or 'missing'}"
@@ -677,6 +724,22 @@ def report_passed(data: dict[str, Any], key: str, expected: str) -> bool | None:
         return None
 
     return data.get(key) == expected
+
+
+def format_workflow_run_safety_summary(
+    workflow_run_exists: bool,
+    workflow_run_data: dict[str, Any],
+) -> str:
+    if not workflow_run_exists:
+        return "not recorded"
+
+    if not workflow_run_data:
+        return "unavailable; see warnings"
+
+    return ", ".join(
+        f"{flag}={format_optional_bool(optional_bool(workflow_run_data.get(flag)))}"
+        for flag in WORKFLOW_RUN_SAFETY_FLAGS
+    )
 
 
 def optional_text(value: Any) -> str | None:

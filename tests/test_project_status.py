@@ -152,6 +152,101 @@ def test_story_status_detects_workflow_evidence_files(tmp_path: Path) -> None:
     assert status.local_review_ready is True
 
 
+def test_project_status_reads_and_reports_workflow_run_result(tmp_path: Path) -> None:
+    story_path = create_story(tmp_path, "story_workflow_run", {"status": "planned"})
+    write_yaml(
+        story_path / "reports" / "workflow_run_result.yaml",
+        {
+            "phase": "local-finalize",
+            "status": "completed",
+            "executed": True,
+            "executed_agents": False,
+            "called_cloud_models": False,
+            "called_github_apis": False,
+            "committed_or_merged": False,
+            "pushed": False,
+            "merged": False,
+            "deployed": False,
+            "ran_destructive_commands": False,
+            "ran_arbitrary_commands": False,
+        },
+    )
+
+    story_status = collect_story_status(tmp_path, story_path)
+    result = run_project_status(tmp_path)
+
+    assert story_status.workflow_run_exists is True
+    assert story_status.workflow_run_phase == "local-finalize"
+    assert story_status.workflow_run_status == "completed"
+    assert story_status.workflow_run_executed is True
+    assert "called_cloud_models=no" in story_status.workflow_run_safety_summary
+    assert "deployed=no" in story_status.workflow_run_safety_summary
+    assert "workflow_run=completed (phase=local-finalize, executed=yes)" in result.terminal_summary
+    assert "workflow_run_safety_summary=" in result.terminal_summary
+
+    report = result.report_path.read_text(encoding="utf-8")
+    assert "- workflow_run_result.yaml: present" in report
+    assert "workflow_run_phase=local-finalize" in report
+    assert "workflow_run_status=completed" in report
+    assert "workflow_run_executed=yes" in report
+    assert "called_github_apis=no" in report
+    assert "ran_arbitrary_commands=no" in report
+
+
+def test_project_status_handles_missing_workflow_run_result_as_not_recorded(
+    tmp_path: Path,
+) -> None:
+    story_path = create_story(tmp_path, "story_without_workflow_run", {"status": "planned"})
+
+    story_status = collect_story_status(tmp_path, story_path)
+    result = run_project_status(tmp_path)
+
+    assert story_status.workflow_run_exists is False
+    assert story_status.workflow_run_phase is None
+    assert story_status.workflow_run_status is None
+    assert story_status.workflow_run_executed is None
+    assert story_status.workflow_run_safety_summary == "not recorded"
+    assert "workflow_run=not recorded (phase=not recorded, executed=missing)" in (
+        result.terminal_summary
+    )
+
+    report = result.report_path.read_text(encoding="utf-8")
+    assert "- workflow_run_result.yaml: missing" in report
+    assert "workflow_run_phase=not recorded" in report
+    assert "workflow_run_status=not recorded" in report
+    assert "workflow_run_executed=missing" in report
+    assert "- workflow_run_safety_summary: not recorded" in report
+
+
+def test_project_status_handles_malformed_workflow_run_result_gracefully(
+    tmp_path: Path,
+) -> None:
+    story_path = create_story(tmp_path, "story_bad_workflow_run", {"status": "planned"})
+    reports_path = story_path / "reports"
+    reports_path.mkdir()
+    (reports_path / "workflow_run_result.yaml").write_text(
+        "phase: [unterminated\n",
+        encoding="utf-8",
+    )
+
+    story_status = collect_story_status(tmp_path, story_path)
+    result = run_project_status(tmp_path)
+
+    assert story_status.workflow_run_exists is True
+    assert story_status.workflow_run_phase is None
+    assert story_status.workflow_run_status is None
+    assert story_status.workflow_run_executed is None
+    assert story_status.workflow_run_safety_summary == "unavailable; see warnings"
+    assert story_status.warnings
+    assert "Invalid YAML" in story_status.warnings[0]
+
+    report = result.report_path.read_text(encoding="utf-8")
+    assert "- workflow_run_result.yaml: present" in report
+    assert "workflow_run_status=not recorded" in report
+    assert "- workflow_run_safety_summary: unavailable; see warnings" in report
+    assert "Invalid YAML" in report
+
+
 @pytest.mark.parametrize(
     "validation_status",
     [

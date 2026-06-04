@@ -9,6 +9,19 @@ automation harder to reason about.
 `next-step` is the GPS-style guidance command. It reads story evidence and recommends the next safe
 workflow action without executing that action.
 
+## Preview, run, and future orchestration
+
+`workflow-preview` is a graph-based route explanation. It reads story evidence, reuses the
+next-step recommendation rules, writes preview artifacts, and does not execute workflow steps.
+
+`workflow-run` is graph-based safe local execution. The current runner supports only the
+`local-finalize` phase, and execution requires `--execute`. It runs a hardcoded allowlist of local
+finalization steps and records `reports/workflow_run_result.yaml` plus
+`reports/workflow_run_report.md`.
+
+Future workflow orchestration is a later capability. It may add configured agent runtime execution,
+checkpointing, and human/cloud pause points, but those capabilities are outside the current runner.
+
 `workflow-preview` is the first graph-based route preview. It uses a LangGraph `StateGraph` with
 three nodes:
 

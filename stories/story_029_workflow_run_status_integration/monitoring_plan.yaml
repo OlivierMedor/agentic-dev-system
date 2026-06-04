@@ -1,0 +1,6 @@
+logs_required: true
+watch_for:
+- missing_workflow_run_status
+- inaccurate_next_step_recommendation
+- unsafe_workflow_run_recommendation
+- workflow_run_status_parse_error

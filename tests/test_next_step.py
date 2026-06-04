@@ -91,6 +91,30 @@ def write_ready_finalize_result(story_path: Path) -> None:
     )
 
 
+def write_workflow_run_result(
+    story_path: Path,
+    status: str = "completed",
+    executed: bool = True,
+    **safety_flags: bool,
+) -> None:
+    data = {
+        "phase": "local-finalize",
+        "status": status,
+        "executed": executed,
+        "executed_agents": False,
+        "called_cloud_models": False,
+        "called_github_apis": False,
+        "committed_or_merged": False,
+        "pushed": False,
+        "merged": False,
+        "deployed": False,
+        "ran_destructive_commands": False,
+        "ran_arbitrary_commands": False,
+    }
+    data.update(safety_flags)
+    write_yaml(story_path / "reports" / "workflow_run_result.yaml", data)
+
+
 def write_cloud_review_export(story_path: Path) -> None:
     export_path = story_path / "cloud_review_packet" / "cloud_review_export.md"
     export_path.parent.mkdir()
@@ -203,7 +227,7 @@ def test_prompts_without_required_reports_recommend_configured_agent_runtime(
     assert "Codex" not in text
 
 
-def test_test_layers_version_one_without_result_recommends_test_layers(
+def test_test_layers_version_one_without_result_recommends_workflow_run_local_finalize(
     tmp_path: Path,
 ) -> None:
     story_path = create_story(tmp_path)
@@ -212,23 +236,38 @@ def test_test_layers_version_one_without_result_recommends_test_layers(
 
     result = run_next_step(tmp_path, STORY)
 
-    assert result.recommendation.title == "Run test-layers."
-    assert result.recommendation.command == f"agentic test-layers --story {STORY}"
-    assert "test_layers_version: 1" in result.recommendation.reason
+    assert result.recommendation.title == "Run workflow-run local-finalize."
+    assert result.recommendation.command == (
+        f"agentic workflow-run --story {STORY} --phase local-finalize --execute"
+    )
+    assert "local finalization evidence is missing" in result.recommendation.reason
+
+    report = result.report_path.read_text(encoding="utf-8")
+    assert "test_plan.yaml uses test_layers_version: 1: yes" in report
 
 
-def test_missing_finalize_result_recommends_finalize_story(tmp_path: Path) -> None:
+def test_missing_finalize_result_recommends_workflow_run_local_finalize(
+    tmp_path: Path,
+) -> None:
     story_path = create_story(tmp_path)
     prepare_reported_story(story_path)
 
     result = run_next_step(tmp_path, STORY)
+    text = recommendation_text(result)
 
-    assert result.recommendation.title == "Run finalize-story."
-    assert result.recommendation.command == f"agentic finalize-story --story {STORY}"
-    assert "Finalize evidence is missing" in result.recommendation.reason
+    assert result.recommendation.title == "Run workflow-run local-finalize."
+    assert result.recommendation.command == (
+        f"agentic workflow-run --story {STORY} --phase local-finalize --execute"
+    )
+    assert "local finalization evidence is missing" in result.recommendation.reason
+    assert "configured agent runtime" in text
+    assert "call cloud models" in text
+    assert "merge, or deploy" in text
 
 
-def test_stale_finalize_result_recommends_finalize_story(tmp_path: Path) -> None:
+def test_stale_finalize_result_recommends_workflow_run_local_finalize(
+    tmp_path: Path,
+) -> None:
     story_path = create_story(tmp_path)
     prepare_reported_story(story_path)
     write_ready_finalize_result(story_path)
@@ -242,7 +281,10 @@ def test_stale_finalize_result_recommends_finalize_story(tmp_path: Path) -> None
 
     result = run_next_step(tmp_path, STORY)
 
-    assert result.recommendation.title == "Run finalize-story."
+    assert result.recommendation.title == "Run workflow-run local-finalize."
+    assert result.recommendation.command == (
+        f"agentic workflow-run --story {STORY} --phase local-finalize --execute"
+    )
     assert "changed after the last finalize result" in result.recommendation.reason
 
 
@@ -257,6 +299,44 @@ def test_ready_finalize_without_cloud_review_export_recommends_cloud_review_pack
     assert result.recommendation.title == "Run cloud-review-packet."
     assert result.recommendation.command == f"agentic cloud-review-packet --story {STORY}"
     assert "cloud review export packet does not exist" in result.recommendation.reason
+    assert "workflow-run" not in result.recommendation.title
+    assert "workflow-run" not in result.recommendation.command
+
+
+def test_workflow_run_completed_with_ready_finalize_recommends_cloud_review_packet(
+    tmp_path: Path,
+) -> None:
+    story_path = create_story(tmp_path)
+    prepare_finalized_story(story_path)
+    write_workflow_run_result(story_path)
+
+    result = run_next_step(tmp_path, STORY)
+
+    assert result.recommendation.title == "Run cloud-review-packet."
+    assert result.recommendation.command == f"agentic cloud-review-packet --story {STORY}"
+    assert "workflow-run local-finalize completed" in result.recommendation.reason
+
+
+def test_unsafe_workflow_run_flags_recommend_investigation(
+    tmp_path: Path,
+) -> None:
+    story_path = create_story(tmp_path)
+    prepare_reported_story(story_path)
+    write_workflow_run_result(
+        story_path,
+        called_cloud_models=True,
+        deployed=True,
+    )
+
+    result = run_next_step(tmp_path, STORY)
+    text = recommendation_text(result)
+
+    assert result.recommendation.title == "Investigate workflow-run safety flags."
+    assert result.recommendation.command is None
+    assert "REQUEST_CHANGES" in result.recommendation.reason
+    assert "called_cloud_models: true" in text
+    assert "deployed: true" in text
+    assert "Do not continue to cloud review, merge, or deployment" in text
 
 
 def test_final_review_bundle_newer_than_finalize_result_does_not_force_refinalize(
@@ -382,6 +462,8 @@ def test_next_step_report_is_written_and_recommendation_avoids_automatic_merge(
     assert "Human PR/CI review is next." in report
     assert "Human final approval is always required before merge." in report
     assert "automatic merge" not in recommendation_text(result).lower()
+    assert "automatic deployment" not in recommendation_text(result).lower()
+    assert result.recommendation.command is None
 
 
 def test_cli_next_step_requires_story_argument(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -407,5 +489,5 @@ def test_cli_next_step_defaults_project_to_current_directory(
 
     captured = capsys.readouterr()
     assert f"Next step for {STORY}:" in captured.out
-    assert "Recommendation: Run finalize-story." in captured.out
+    assert "Recommendation: Run workflow-run local-finalize." in captured.out
     assert (story_path / "reports" / "next_step_report.md").exists()

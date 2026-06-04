@@ -13,6 +13,17 @@ READY_MERGE_STATUSES = {
     "READY_FOR_HUMAN_MERGE_DECISION",
     "READY_WITH_NOTES_FOR_HUMAN_MERGE_DECISION",
 }
+WORKFLOW_RUN_UNSAFE_FLAGS = (
+    "executed_agents",
+    "called_cloud_models",
+    "called_github_apis",
+    "committed_or_merged",
+    "pushed",
+    "merged",
+    "deployed",
+    "ran_destructive_commands",
+    "ran_arbitrary_commands",
+)
 REQUIRED_AGENT_REPORTS = (
     "developer_report.md",
     "test_report.md",
@@ -22,6 +33,7 @@ RESULT_FILES = (
     "test_layer_result.yaml",
     "quality_gate_result.yaml",
     "finalize_story_result.yaml",
+    "workflow_run_result.yaml",
     "cloud_review_result.yaml",
     "merge_readiness_result.yaml",
     "remote_dev_validation_result.yaml",
@@ -172,6 +184,21 @@ def choose_recommendation(evidence: StoryEvidence) -> NextStepRecommendation:
             ],
         )
 
+    unsafe_workflow_run_details = find_unsafe_workflow_run_flags(evidence)
+    if unsafe_workflow_run_details:
+        return NextStepRecommendation(
+            title="Investigate workflow-run safety flags.",
+            command=None,
+            reason=(
+                "workflow_run_result.yaml records unsafe local workflow evidence. "
+                "Treat this as REQUEST_CHANGES until it is investigated."
+            ),
+            details=unsafe_workflow_run_details
+            + [
+                "Do not continue to cloud review, merge, or deployment from this state.",
+            ],
+        )
+
     bad_details = find_bad_result_values(evidence)
     if bad_details:
         return NextStepRecommendation(
@@ -216,38 +243,41 @@ def choose_recommendation(evidence: StoryEvidence) -> NextStepRecommendation:
             ],
         )
 
-    if (
-        evidence.test_plan_uses_layers
-        and "test_layer_result.yaml" not in evidence.result_data
-    ):
+    workflow_run_result = evidence.result_data.get("workflow_run_result.yaml")
+    if workflow_run_failed(workflow_run_result):
         return NextStepRecommendation(
-            title="Run test-layers.",
-            command=f"agentic test-layers --story {evidence.story}",
-            reason=(
-                "test_plan.yaml uses test_layers_version: 1, but the test layer result "
-                "has not been recorded yet."
-            ),
-            details=["Expected reports/test_layer_result.yaml before finalization."],
+            title="Investigate failed workflow-run local finalization.",
+            command=None,
+            reason="workflow_run_result.yaml records a failed local-finalize run.",
+            details=[
+                "Review reports/workflow_run_report.md and the failed local step result.",
+                "Fix the failed local evidence before continuing.",
+            ],
         )
 
     finalize_result = evidence.result_data.get("finalize_story_result.yaml")
     if not finalize_result or not finalize_result_ready(finalize_result):
-        return finalize_story_recommendation(evidence, "Finalize evidence is missing or not ready.")
+        return workflow_run_local_finalize_recommendation(
+            evidence,
+            "Required local finalization evidence is missing or not ready.",
+        )
 
     if finalize_result_stale(evidence):
-        return finalize_story_recommendation(
+        return workflow_run_local_finalize_recommendation(
             evidence,
             "Required story evidence changed after the last finalize result.",
         )
 
     if not evidence.cloud_review_export_exists:
-        return NextStepRecommendation(
-            title="Run cloud-review-packet.",
-            command=f"agentic cloud-review-packet --story {evidence.story}",
-            reason=(
-                "finalize-story is ready, but the cloud review export packet does not exist."
-            ),
-            details=["Expected cloud_review_packet/cloud_review_export.md."],
+        reason = "finalize-story is ready, but the cloud review export packet does not exist."
+        if workflow_run_completed(workflow_run_result):
+            reason = (
+                "workflow-run local-finalize completed and finalize-story is ready, "
+                "but the cloud review export packet does not exist."
+            )
+        return cloud_review_packet_recommendation(
+            evidence,
+            reason,
         )
 
     if "cloud_review_result.yaml" not in evidence.result_data:
@@ -310,15 +340,34 @@ def choose_recommendation(evidence: StoryEvidence) -> NextStepRecommendation:
     )
 
 
-def finalize_story_recommendation(evidence: StoryEvidence, reason: str) -> NextStepRecommendation:
+def workflow_run_local_finalize_recommendation(
+    evidence: StoryEvidence,
+    reason: str,
+) -> NextStepRecommendation:
     return NextStepRecommendation(
-        title="Run finalize-story.",
-        command=f"agentic finalize-story --story {evidence.story}",
+        title="Run workflow-run local-finalize.",
+        command=f"agentic workflow-run --story {evidence.story} --phase local-finalize --execute",
         reason=reason,
         details=[
             "Required agent reports are present.",
-            "finalize-story refreshes the review bundle, quality gate, and finalize result.",
+            "workflow-run local-finalize runs the safe local finalization allowlist.",
+            (
+                "It does not execute agents through the configured agent runtime, call cloud "
+                "models, call GitHub APIs, commit, push, merge, or deploy."
+            ),
         ],
+    )
+
+
+def cloud_review_packet_recommendation(
+    evidence: StoryEvidence,
+    reason: str,
+) -> NextStepRecommendation:
+    return NextStepRecommendation(
+        title="Run cloud-review-packet.",
+        command=f"agentic cloud-review-packet --story {evidence.story}",
+        reason=reason,
+        details=["Expected cloud_review_packet/cloud_review_export.md."],
     )
 
 
@@ -332,6 +381,19 @@ def find_bad_result_values(evidence: StoryEvidence) -> list[str]:
         if matches:
             findings.append(f"{filename} contains: {', '.join(matches)}.")
 
+    return findings
+
+
+def find_unsafe_workflow_run_flags(evidence: StoryEvidence) -> list[str]:
+    workflow_run_result = evidence.result_data.get("workflow_run_result.yaml")
+    if not workflow_run_result:
+        return []
+
+    findings = [
+        f"workflow_run_result.yaml has {flag}: true."
+        for flag in WORKFLOW_RUN_UNSAFE_FLAGS
+        if workflow_run_result.get(flag) is True
+    ]
     return findings
 
 
@@ -359,6 +421,23 @@ def finalize_result_ready(finalize_result: dict[str, Any]) -> bool:
         finalize_result.get("ready_for_review") is True
         or finalize_result.get("status") == "ready_for_review"
     )
+
+
+def workflow_run_completed(workflow_run_result: dict[str, Any] | None) -> bool:
+    if not workflow_run_result:
+        return False
+
+    return (
+        workflow_run_result.get("status") == "completed"
+        and workflow_run_result.get("executed") is True
+    )
+
+
+def workflow_run_failed(workflow_run_result: dict[str, Any] | None) -> bool:
+    if not workflow_run_result:
+        return False
+
+    return workflow_run_result.get("status") == "failed"
 
 
 def finalize_result_stale(evidence: StoryEvidence) -> bool:

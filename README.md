@@ -131,16 +131,18 @@ docker compose run --rm dev agentic next-step --story story_026_story_next_step_
 
 The command validates that `stories/<story>/` exists, inspects story status, `agent_plan.yaml`,
 `prompt_pack/`, reports, review bundle files, quality gate results, finalize results, cloud review
-packets and results, merge-readiness results, and remote dev validation evidence. It writes
-`stories/<story>/reports/next_step_report.md` and prints the next recommended workflow action.
+packets and results, workflow-run results, merge-readiness results, and remote dev validation
+evidence. It writes `stories/<story>/reports/next_step_report.md` and prints the next recommended
+workflow action.
 
 Typical recommendations include `prepare-story` when planning artifacts are missing, running the
 generated prompts with the configured agent runtime when required agent reports are missing,
-`test-layers` when a versioned test plan has no test-layer result, `finalize-story`,
-`cloud-review-packet`, `record-cloud-review`, `merge-readiness`, `remote-dev-packet`, or human PR/CI
-review when the story is ready for the human owner. If a support ticket blocks the story or a result
-records `REQUEST_CHANGES`, `DEV_FAILED`, `NOT_RUN`, or `request_changes`, the advisor tells you to
-resolve that state before continuing.
+`workflow-run --phase local-finalize --execute` when required local finalization evidence is
+missing or stale, `cloud-review-packet`, `record-cloud-review`, `merge-readiness`,
+`remote-dev-packet`, or human PR/CI review when the story is ready for the human owner. If a support
+ticket blocks the story, workflow-run records unsafe safety flags, or a result records
+`REQUEST_CHANGES`, `DEV_FAILED`, `NOT_RUN`, or `request_changes`, the advisor tells you to resolve
+that state before continuing.
 
 `next-step` only recommends a safe next action. It does not execute the recommendation, call cloud
 models, call GitHub APIs, commit, push, merge, deploy, or recommend automatic merge or deployment.
@@ -187,11 +189,15 @@ Add `--execute` only when you want to run the hardcoded `local-finalize` phase:
 docker compose run --rm dev agentic workflow-run --story story_028_langgraph_safe_workflow_runner --execute
 ```
 
-For this story, `local-finalize` runs only these deterministic local steps:
+For normal story finalization, `workflow-run --phase local-finalize --execute` is the preferred safe
+local path after the required agent reports are present and before cloud review packet creation.
+`next-step` can recommend this command when local finalization evidence is missing or stale.
+
+`local-finalize` runs only these deterministic local steps:
 `test-layers`, `finalize-story`, `review-bundle`, and `workflow-preview`. The runner does not
-execute agents or generated agent prompts, call cloud models, call GitHub APIs, commit, push,
-merge, deploy, run destructive commands, or run arbitrary commands from user input. Human final
-approval is still required before merge.
+execute agents through the configured agent runtime or run generated agent prompts, call cloud
+models, call GitHub APIs, commit, push, merge, deploy, run destructive commands, or run arbitrary
+commands from user input. Human final approval is still required before merge.
 
 ## Create a review bundle
 
@@ -539,11 +545,11 @@ docker compose run --rm dev agentic project-status
 
 The command reads `stories/*/status.yaml` and common workflow evidence, including agent plans,
 prompt packs, test-layer results, quality-gate results, finalize-story results, cloud-review
-results, remote dev validation results, merge-readiness results, local review reports, agent
-reports, review bundles, cloud review packets, blocking support tickets, and queue counts for
-improvement, maintenance, and feature queues. It prints a readable terminal summary and writes
-`reports/project_status_report.md`. When remote dev validation has not been recorded for a story,
-the dashboard shows it as `not recorded`.
+results, workflow-run results, remote dev validation results, merge-readiness results, local review
+reports, agent reports, review bundles, cloud review packets, blocking support tickets, and queue
+counts for improvement, maintenance, and feature queues. It prints a readable terminal summary and
+writes `reports/project_status_report.md`. When workflow-run or remote dev validation has not been
+recorded for a story, the dashboard shows it as `not recorded`.
 
 To inspect one story only:
 
