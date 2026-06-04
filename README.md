@@ -146,6 +146,27 @@ resolve that state before continuing.
 models, call GitHub APIs, commit, push, merge, deploy, or recommend automatic merge or deployment.
 Human final approval is always required before merge.
 
+## Preview a workflow route with LangGraph
+
+Run this from the repo root when you want to see the next story route as a LangGraph preview:
+
+```powershell
+docker compose run --rm dev agentic workflow-preview --story story_027_langgraph_workflow_preview
+```
+
+`workflow-preview` is the first LangGraph integration in this project. It uses a small
+`StateGraph` to collect story state, determine the next action, and write preview output. The graph
+reuses next-step style recommendation logic, then writes
+`stories/<story>/reports/workflow_preview_result.yaml` and
+`stories/<story>/reports/workflow_preview_report.md`.
+
+This command is a preview graph only. LangGraph is not yet executing agents through the configured
+agent runtime, calling cloud models, running shell commands, calling GitHub APIs, committing,
+pushing, merging, or deploying. Human final approval is always required before merge, and this
+command never recommends automatic merge or automatic deployment.
+
+See `docs/langgraph_workflow.md` for how this preview maps to future orchestration.
+
 ## Create a review bundle
 
 Run this from the repo root to collect review files for a story:

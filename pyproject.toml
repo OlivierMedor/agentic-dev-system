@@ -8,6 +8,7 @@ version = "0.1.0"
 description = "A reusable agentic software development workflow system."
 requires-python = ">=3.12"
 dependencies = [
+    "langgraph",
     "pydantic>=2.0",
     "PyYAML>=6.0"
 ]

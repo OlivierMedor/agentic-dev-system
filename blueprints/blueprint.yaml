@@ -1422,3 +1422,77 @@ stories:
         - inaccurate_next_step_recommendation
         - unsafe_next_step_recommendation
         - next_step_recommends_auto_merge
+
+  - id: STORY-027
+    slug: story_027_langgraph_workflow_preview
+    title: Add LangGraph workflow preview
+    goal: Add a first LangGraph-based workflow preview that inspects a story and explains the next workflow route without executing agents automatically.
+    why: The system already has many workflow commands and a next-step advisor. LangGraph can later orchestrate these steps automatically, but first we should introduce it safely as a preview graph that reads state, routes decisions, and explains the next action without making changes beyond reports.
+    acceptance_criteria:
+      - Add langgraph as a project dependency.
+      - Add a workflow-preview command.
+      - workflow-preview requires --story.
+      - workflow-preview defaults --project to the current working directory.
+      - workflow-preview validates that the story folder exists.
+      - workflow-preview uses LangGraph StateGraph to process story workflow state.
+      - workflow-preview reuses next-step style logic where practical.
+      - workflow-preview writes reports/workflow_preview_result.yaml.
+      - workflow-preview writes reports/workflow_preview_report.md.
+      - workflow-preview prints a beginner-friendly route summary to the terminal.
+      - workflow-preview does not execute agents.
+      - workflow-preview does not call cloud models.
+      - workflow-preview does not commit, push, merge, deploy, or call GitHub APIs.
+      - The workflow graph includes nodes for collecting story state, determining next action, and writing preview output.
+      - README documents why LangGraph is being introduced.
+      - Add docs/langgraph_workflow.md explaining how this preview maps to future orchestration.
+      - Tests verify graph construction, workflow preview output, and no automatic execution behavior.
+    not_in_scope:
+      - No automatic agent execution.
+      - No LangGraph persistence/checkpointing yet.
+      - No LangGraph human-in-the-loop pause/resume yet.
+      - No cloud model calls.
+      - No LangSmith/Langfuse tracing yet.
+      - No web dashboard.
+      - No deployment.
+    definition_of_done:
+      - pytest passes.
+      - ruff passes.
+      - artifact-policy passes.
+      - runtime-config validate passes.
+      - workflow-preview creates result and report files.
+      - finalize-story marks this story ready for review.
+    test_plan:
+      test_layers_version: 1
+      unit_tests:
+        required: true
+        action: add_or_update
+        frequency: every_commit
+        evidence_or_reason: Add unit tests for LangGraph workflow preview construction and routing.
+      integration_tests:
+        required: true
+        action: confirm_existing
+        frequency: every_pull_request
+        evidence_or_reason: Existing command tests cover CLI integration patterns.
+      mock_e2e_tests:
+        required: true
+        action: confirm_existing
+        frequency: before_merge
+        evidence_or_reason: Existing mock E2E workflow test covers the local story workflow.
+      live_read_only_checks:
+        required: false
+        action: not_applicable_with_reason
+        frequency: scheduled_or_before_release
+        evidence_or_reason: This story does not call live external APIs.
+      remote_dev_smoke_tests:
+        required: false
+        action: not_applicable_with_reason
+        frequency: after_remote_dev_deploy
+        evidence_or_reason: This story does not deploy to a remote dev environment.
+    monitoring_plan:
+      logs_required: true
+      watch_for:
+        - langgraph_import_failure
+        - workflow_preview_failure
+        - inaccurate_workflow_route
+        - accidental_agent_execution
+        - accidental_cloud_call

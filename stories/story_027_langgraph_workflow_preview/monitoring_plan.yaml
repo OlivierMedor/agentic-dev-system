@@ -1,0 +1,7 @@
+logs_required: true
+watch_for:
+- langgraph_import_failure
+- workflow_preview_failure
+- inaccurate_workflow_route
+- accidental_agent_execution
+- accidental_cloud_call
