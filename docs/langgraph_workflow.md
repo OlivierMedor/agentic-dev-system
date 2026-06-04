@@ -1,4 +1,4 @@
-# LangGraph Workflow Preview
+# LangGraph Workflow
 
 LangGraph is being introduced after the project workflow rules became explicit. The current system
 already knows how to prepare stories, generate agent prompts, collect reports, run local gates,
@@ -22,8 +22,33 @@ This story does not use LangGraph persistence, checkpointing, or human-in-the-lo
 The preview graph does not execute agents through the configured agent runtime, call cloud models,
 run shell commands, call GitHub APIs, commit, push, merge, or deploy.
 
-Future LangGraph workflows can build on this shape to orchestrate `prepare-story`, configured agent
-runtime execution, `finalize-story`, cloud review packet creation, cloud review result recording,
-merge readiness, remote-dev evidence routing, and support queue pauses. Those later workflows still
-need explicit safety boundaries: human final approval is always required before merge, and automatic
-deployment should not be inferred from a route recommendation.
+`workflow-run` is the first safe execution graph. It also uses a LangGraph `StateGraph`, but it is
+not an agent runner. Without `--execute`, it behaves as a dry run: it writes
+`reports/workflow_run_result.yaml` and `reports/workflow_run_report.md`, records graph nodes
+visited, and explains which safe local steps would run.
+
+When `--execute` is provided, `workflow-run --phase local-finalize` runs only the hardcoded safe
+local sequence:
+
+- `test-layers`
+- `finalize-story`
+- `review-bundle`
+- `workflow-preview`
+
+Those steps are deterministic local checks and report-generation commands already present in the
+CLI. The runner does not read commands from story files, prompt packs, user input, or generated
+agent instructions. It records command-style results for each safe step and writes safety flags
+showing that no agents, cloud models, GitHub APIs, commits, merges, pushes, deployments, or
+destructive commands were run.
+
+The difference is:
+
+- `workflow-preview` only recommends the next route. It never executes workflow steps.
+- `workflow-run` can execute a narrow allowlist of safe local steps, but only when `--execute` is
+  provided.
+
+Future LangGraph workflows can build on this shape to orchestrate more of the lifecycle, including
+human-in-the-loop pauses, checkpointing, and possibly configured agent execution. Those capabilities
+are not part of the current runner. Later workflows still need explicit safety boundaries: human
+final approval is always required before merge, and automatic deployment should not be inferred
+from a route recommendation.

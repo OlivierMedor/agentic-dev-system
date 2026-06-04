@@ -1,0 +1,7 @@
+logs_required: true
+watch_for:
+- workflow_run_failure
+- unsafe_command_attempt
+- accidental_agent_execution
+- accidental_cloud_call
+- accidental_merge_or_deploy_attempt
