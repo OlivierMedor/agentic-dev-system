@@ -1,0 +1,62 @@
+story: story_030_workflow_run_prepare_phase
+phase: local-finalize
+executed: true
+status: completed
+graph_nodes_visited:
+- collect_story_state
+- plan_safe_steps
+- run_or_skip_safe_steps
+- write_workflow_run_report
+safe_steps_planned:
+- test-layers
+- finalize-story
+- review-bundle
+- workflow-preview
+safe_steps_executed:
+- test-layers
+- finalize-story
+- review-bundle
+- workflow-preview
+step_results:
+- step: test-layers
+  command: agentic test-layers --project /app --story story_030_workflow_run_prepare_phase
+  ran: true
+  status: PASSED
+  returncode: 0
+  summary: 'test-layers status: PASSED'
+  result_path: /app/stories/story_030_workflow_run_prepare_phase/reports/test_layer_result.yaml
+  report_path: /app/stories/story_030_workflow_run_prepare_phase/reports/test_layer_report.md
+- step: finalize-story
+  command: agentic finalize-story --project /app --story story_030_workflow_run_prepare_phase
+  ran: true
+  status: PASSED
+  returncode: 0
+  summary: 'finalize-story status: ready_for_review'
+  result_path: /app/stories/story_030_workflow_run_prepare_phase/reports/finalize_story_result.yaml
+  report_path: /app/stories/story_030_workflow_run_prepare_phase/reports/finalize_story_report.md
+- step: review-bundle
+  command: agentic review-bundle --project /app --story story_030_workflow_run_prepare_phase
+  ran: true
+  status: PASSED
+  returncode: 0
+  summary: 'review-bundle completed; pytest passed: True; ruff passed: True'
+  result_path: null
+  report_path: /app/stories/story_030_workflow_run_prepare_phase/review_bundle/handoff.md
+- step: workflow-preview
+  command: agentic workflow-preview --project /app --story story_030_workflow_run_prepare_phase
+  ran: true
+  status: PASSED
+  returncode: 0
+  summary: 'workflow-preview next action: Run cloud-review-packet.'
+  result_path: /app/stories/story_030_workflow_run_prepare_phase/reports/workflow_preview_result.yaml
+  report_path: /app/stories/story_030_workflow_run_prepare_phase/reports/workflow_preview_report.md
+executed_agents: false
+called_cloud_models: false
+called_github_apis: false
+committed_or_merged: false
+pushed: false
+merged: false
+deployed: false
+ran_destructive_commands: false
+ran_arbitrary_commands: false
+next_action: Review workflow_run_report.md and continue to manual review.

@@ -55,7 +55,11 @@ from agentic_dev.support_queue import (
 )
 from agentic_dev.test_layers import run_test_layers
 from agentic_dev.workflow_preview import run_workflow_preview
-from agentic_dev.workflow_run import LOCAL_FINALIZE_PHASE, run_workflow_run
+from agentic_dev.workflow_run import (
+    LOCAL_FINALIZE_PHASE,
+    WORKFLOW_RUN_PHASES,
+    run_workflow_run,
+)
 
 
 def main() -> None:
@@ -254,7 +258,7 @@ def main() -> None:
     workflow_run_parser.add_argument(
         "--phase",
         default=LOCAL_FINALIZE_PHASE,
-        choices=[LOCAL_FINALIZE_PHASE],
+        choices=WORKFLOW_RUN_PHASES,
         help="Workflow phase to run. Defaults to local-finalize.",
     )
     workflow_run_parser.add_argument(

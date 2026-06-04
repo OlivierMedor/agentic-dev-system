@@ -10,13 +10,16 @@ from langgraph.graph import StateGraph
 
 from agentic_dev.finalize_story import finalize_story
 from agentic_dev.next_step import format_bullet_list, validate_story_folder
+from agentic_dev.prepare_story import prepare_story
 from agentic_dev.review_bundle import create_review_bundle
 from agentic_dev.test_layers import TEST_LAYER_PASSED, run_test_layers
 from agentic_dev.workflow_preview import run_workflow_preview
 
 
+PREPARE_PHASE = "prepare"
 LOCAL_FINALIZE_PHASE = "local-finalize"
-SUPPORTED_PHASES = {LOCAL_FINALIZE_PHASE}
+SUPPORTED_PHASES = {PREPARE_PHASE, LOCAL_FINALIZE_PHASE}
+WORKFLOW_RUN_PHASES = (PREPARE_PHASE, LOCAL_FINALIZE_PHASE)
 
 WORKFLOW_RUN_NODES = (
     "collect_story_state",
@@ -189,11 +192,7 @@ def run_or_skip_safe_steps(
         step_results.append(step_runner(state["project_path"], state["story"], step))
 
     status = "completed" if all(result.returncode == 0 for result in step_results) else "failed"
-    next_action = (
-        "Review workflow_run_report.md and continue to manual review."
-        if status == "completed"
-        else "Fix the failed local step results, then rerun workflow-run with --execute."
-    )
+    next_action = determine_next_action(state["phase"], status)
 
     return {
         "safe_steps_executed": safe_steps_executed,
@@ -254,37 +253,66 @@ def write_workflow_run_report(state: WorkflowRunState) -> WorkflowRunState:
 
 
 def build_safe_steps(project_path: Path, story: str, phase: str) -> list[SafeStep]:
-    if phase != LOCAL_FINALIZE_PHASE:
-        raise ValueError(f"Unsupported workflow-run phase: {phase}")
-
     project_text = str(project_path)
-    return [
-        SafeStep(
-            name="test-layers",
-            command=("agentic", "test-layers", "--project", project_text, "--story", story),
-            description="Validate the story test layer plan.",
-        ),
-        SafeStep(
-            name="finalize-story",
-            command=("agentic", "finalize-story", "--project", project_text, "--story", story),
-            description="Refresh final local evidence and update story status.",
-        ),
-        SafeStep(
-            name="review-bundle",
-            command=("agentic", "review-bundle", "--project", project_text, "--story", story),
-            description="Refresh the local review bundle.",
-        ),
-        SafeStep(
-            name="workflow-preview",
-            command=("agentic", "workflow-preview", "--project", project_text, "--story", story),
-            description="Refresh the LangGraph route preview report.",
-        ),
-    ]
+
+    if phase == PREPARE_PHASE:
+        return [
+            SafeStep(
+                name="prepare-story",
+                command=("agentic", "prepare-story", "--project", project_text, "--story", story),
+                description="Create or refresh the story setup artifacts without running agents.",
+            ),
+            SafeStep(
+                name="workflow-preview",
+                command=("agentic", "workflow-preview", "--project", project_text, "--story", story),
+                description="Refresh the LangGraph route preview report.",
+            ),
+        ]
+
+    if phase == LOCAL_FINALIZE_PHASE:
+        return [
+            SafeStep(
+                name="test-layers",
+                command=("agentic", "test-layers", "--project", project_text, "--story", story),
+                description="Validate the story test layer plan.",
+            ),
+            SafeStep(
+                name="finalize-story",
+                command=("agentic", "finalize-story", "--project", project_text, "--story", story),
+                description="Refresh final local evidence and update story status.",
+            ),
+            SafeStep(
+                name="review-bundle",
+                command=("agentic", "review-bundle", "--project", project_text, "--story", story),
+                description="Refresh the local review bundle.",
+            ),
+            SafeStep(
+                name="workflow-preview",
+                command=("agentic", "workflow-preview", "--project", project_text, "--story", story),
+                description="Refresh the LangGraph route preview report.",
+            ),
+        ]
+
+    raise ValueError(f"Unsupported workflow-run phase: {phase}")
 
 
 def run_safe_step(project_path: Path, story: str, step: SafeStep) -> SafeStepResult:
     """Execute one hardcoded safe step directly through local Python functions."""
     try:
+        if step.name == "prepare-story":
+            result = prepare_story(project_path, story)
+            return build_step_result(
+                step,
+                True,
+                (
+                    "prepare-story completed; "
+                    f"prompt files created or updated: {len(result.prompt_files_created)}; "
+                    f"prompt files skipped: {len(result.prompt_files_skipped)}"
+                ),
+                None,
+                result.report_path,
+            )
+
         if step.name == "test-layers":
             result = run_test_layers(project_path, story)
             passed = result.status == TEST_LAYER_PASSED
@@ -425,6 +453,19 @@ def write_markdown_report(
 {state["next_action"]}
 """
     report_path.write_text(content, encoding="utf-8")
+
+
+def determine_next_action(phase: str, status: str) -> str:
+    if status != "completed":
+        return "Fix the failed local step results, then rerun workflow-run with --execute."
+
+    if phase == PREPARE_PHASE:
+        return (
+            "Review workflow_preview_report.md, then run the generated agent prompts "
+            "manually through the configured agent runtime."
+        )
+
+    return "Review workflow_run_report.md and continue to manual review."
 
 
 def format_safe_steps(steps: list[SafeStep]) -> str:

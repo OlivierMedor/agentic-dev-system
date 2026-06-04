@@ -187,25 +187,37 @@ def test_next_step_validates_story_folder_exists(tmp_path: Path) -> None:
     assert STORY in str(error.value)
 
 
-def test_missing_agent_plan_recommends_prepare_story(tmp_path: Path) -> None:
+def test_missing_agent_plan_recommends_workflow_run_prepare(tmp_path: Path) -> None:
     create_story(tmp_path)
 
     result = run_next_step(tmp_path, STORY)
+    text = recommendation_text(result)
 
-    assert result.recommendation.title == "Run prepare-story."
-    assert result.recommendation.command == f"agentic prepare-story --story {STORY}"
+    assert result.recommendation.title == "Run workflow-run prepare."
+    assert result.recommendation.command == (
+        f"agentic workflow-run --story {STORY} --phase prepare --execute"
+    )
     assert "agent_plan.yaml present: no" in result.recommendation.details
+    assert "workflow-run prepare wraps prepare-story and workflow-preview safely." in text
+    assert "automatic merge" not in text.lower()
+    assert "automatic deployment" not in text.lower()
 
 
-def test_missing_prompt_pack_recommends_prepare_story(tmp_path: Path) -> None:
+def test_missing_prompt_pack_recommends_workflow_run_prepare(tmp_path: Path) -> None:
     story_path = create_story(tmp_path)
     create_agent_plan(story_path)
 
     result = run_next_step(tmp_path, STORY)
+    text = recommendation_text(result)
 
-    assert result.recommendation.title == "Run prepare-story."
-    assert result.recommendation.command == f"agentic prepare-story --story {STORY}"
+    assert result.recommendation.title == "Run workflow-run prepare."
+    assert result.recommendation.command == (
+        f"agentic workflow-run --story {STORY} --phase prepare --execute"
+    )
     assert "prompt_pack present: no" in result.recommendation.details
+    assert "call cloud models" in text
+    assert "call GitHub APIs" in text
+    assert "commit, push, merge, or deploy" in text
 
 
 def test_prompts_without_required_reports_recommend_configured_agent_runtime(
@@ -464,6 +476,25 @@ def test_next_step_report_is_written_and_recommendation_avoids_automatic_merge(
     assert "automatic merge" not in recommendation_text(result).lower()
     assert "automatic deployment" not in recommendation_text(result).lower()
     assert result.recommendation.command is None
+
+
+def test_next_step_prepare_recommendation_avoids_automatic_merge_and_deployment(
+    tmp_path: Path,
+) -> None:
+    story_path = create_story(tmp_path)
+    create_agent_plan(story_path)
+
+    result = run_next_step(tmp_path, STORY)
+    report = result.report_path.read_text(encoding="utf-8")
+    text = f"{recommendation_text(result)}\n{report}".lower()
+
+    assert result.recommendation.command == (
+        f"agentic workflow-run --story {STORY} --phase prepare --execute"
+    )
+    assert "automatic merge" not in recommendation_text(result).lower()
+    assert "automatic deployment" not in recommendation_text(result).lower()
+    assert "did not commit, push, merge, deploy" in report
+    assert "human final approval is always required before merge" in text
 
 
 def test_cli_next_step_requires_story_argument(monkeypatch: pytest.MonkeyPatch) -> None:
