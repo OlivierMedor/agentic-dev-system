@@ -135,10 +135,10 @@ packets and results, workflow-run results, merge-readiness results, and remote d
 evidence. It writes `stories/<story>/reports/next_step_report.md` and prints the next recommended
 workflow action.
 
-Typical recommendations include `prepare-story` when planning artifacts are missing, running the
-generated prompts with the configured agent runtime when required agent reports are missing,
-`workflow-run --phase local-finalize --execute` when required local finalization evidence is
-missing or stale, `cloud-review-packet`, `record-cloud-review`, `merge-readiness`,
+Typical recommendations include `workflow-run --phase prepare --execute` when planning artifacts
+are missing, running the generated prompts with the configured agent runtime when required agent
+reports are missing, `workflow-run --phase local-finalize --execute` when required local
+finalization evidence is missing or stale, `cloud-review-packet`, `record-cloud-review`, `merge-readiness`,
 `remote-dev-packet`, or human PR/CI review when the story is ready for the human owner. If a support
 ticket blocks the story, workflow-run records unsafe safety flags, or a result records
 `REQUEST_CHANGES`, `DEV_FAILED`, `NOT_RUN`, or `request_changes`, the advisor tells you to resolve
@@ -171,8 +171,7 @@ See `docs/langgraph_workflow.md` for how this preview maps to future orchestrati
 
 ## Run safe local workflow steps with LangGraph
 
-Run this from the repo root when you want LangGraph to plan the safe local finalization route for a
-story:
+Run this from the repo root when you want LangGraph to plan safe local workflow steps for a story:
 
 ```powershell
 docker compose run --rm dev agentic workflow-run --story story_028_langgraph_safe_workflow_runner
@@ -189,15 +188,25 @@ Add `--execute` only when you want to run the hardcoded `local-finalize` phase:
 docker compose run --rm dev agentic workflow-run --story story_028_langgraph_safe_workflow_runner --execute
 ```
 
+Use the `prepare` phase to set up a story workspace through the safe runner:
+
+```powershell
+docker compose run --rm dev agentic workflow-run --story story_030_workflow_run_prepare_phase --phase prepare --execute
+```
+
+Without `--execute`, the prepare phase writes only the workflow-run plan. With `--execute`, it runs
+only `prepare-story` and `workflow-preview`. This creates or refreshes the agent plan, prompt pack,
+runbook, prepare report, status, and route preview without executing agents or generated prompts.
+
 For normal story finalization, `workflow-run --phase local-finalize --execute` is the preferred safe
 local path after the required agent reports are present and before cloud review packet creation.
 `next-step` can recommend this command when local finalization evidence is missing or stale.
 
-`local-finalize` runs only these deterministic local steps:
-`test-layers`, `finalize-story`, `review-bundle`, and `workflow-preview`. The runner does not
-execute agents through the configured agent runtime or run generated agent prompts, call cloud
-models, call GitHub APIs, commit, push, merge, deploy, run destructive commands, or run arbitrary
-commands from user input. Human final approval is still required before merge.
+`local-finalize` runs only these deterministic local steps: `test-layers`, `finalize-story`,
+`review-bundle`, and `workflow-preview`. The runner does not execute agents through the configured
+agent runtime or run generated agent prompts, call cloud models, call GitHub APIs, commit, push,
+merge, deploy, run destructive commands, or run arbitrary commands from user input. Human final
+approval is still required before merge.
 
 ## Create a review bundle
 

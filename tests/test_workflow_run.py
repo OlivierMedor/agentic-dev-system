@@ -7,6 +7,7 @@ import yaml
 from agentic_dev.cli import main
 from agentic_dev.workflow_run import (
     LOCAL_FINALIZE_PHASE,
+    PREPARE_PHASE,
     WORKFLOW_RUN_NODES,
     SafeStep,
     SafeStepResult,
@@ -21,6 +22,10 @@ LOCAL_FINALIZE_STEPS = [
     "test-layers",
     "finalize-story",
     "review-bundle",
+    "workflow-preview",
+]
+PREPARE_STEPS = [
+    "prepare-story",
     "workflow-preview",
 ]
 
@@ -96,8 +101,10 @@ def test_workflow_run_supports_local_finalize_phase_and_rejects_unsupported_phas
     create_story(tmp_path)
 
     result = run_workflow_run(tmp_path, STORY, phase=LOCAL_FINALIZE_PHASE)
+    prepare_result = run_workflow_run(tmp_path, STORY, phase=PREPARE_PHASE)
 
     assert result.phase == LOCAL_FINALIZE_PHASE
+    assert prepare_result.phase == PREPARE_PHASE
     with pytest.raises(ValueError, match="Unsupported workflow-run phase: deploy"):
         run_workflow_run(tmp_path, STORY, phase="deploy")
 
@@ -178,6 +185,98 @@ def test_workflow_run_execute_runs_safe_local_finalize_steps_with_fake_runner(
     assert "workflow-preview: PASSED" in report
 
 
+def test_workflow_run_prepare_dry_run_writes_plan_without_running_safe_steps(
+    tmp_path: Path,
+) -> None:
+    story_path = create_story(tmp_path)
+    calls: list[str] = []
+
+    result = run_workflow_run(
+        tmp_path,
+        STORY,
+        phase=PREPARE_PHASE,
+        execute=False,
+        step_runner=fake_step_runner(calls),
+    )
+
+    assert calls == []
+    assert result.phase == PREPARE_PHASE
+    assert result.executed is False
+    assert result.status == "planned"
+    assert result.safe_steps_planned == PREPARE_STEPS
+    assert result.safe_steps_executed == []
+    assert result.step_results == []
+    assert result.graph_nodes_visited == list(WORKFLOW_RUN_NODES)
+    assert result.result_path == story_path / "reports" / "workflow_run_result.yaml"
+    assert result.report_path == story_path / "reports" / "workflow_run_report.md"
+
+    result_data = read_yaml(result.result_path)
+    report = result.report_path.read_text(encoding="utf-8")
+    assert result_data["phase"] == PREPARE_PHASE
+    assert result_data["executed"] is False
+    assert result_data["status"] == "planned"
+    assert result_data["graph_nodes_visited"] == list(WORKFLOW_RUN_NODES)
+    assert result_data["safe_steps_planned"] == PREPARE_STEPS
+    assert result_data["safe_steps_executed"] == []
+    assert result_data["step_results"] == []
+    assert_workflow_run_safety_flags(result_data)
+    assert "Dry run only. No workflow steps ran" in report
+    assert "prepare-story" in report
+    assert "workflow-preview" in report
+
+
+def test_workflow_run_prepare_execute_runs_only_safe_prepare_steps_with_fake_runner(
+    tmp_path: Path,
+) -> None:
+    create_story(tmp_path)
+    calls: list[str] = []
+
+    result = run_workflow_run(
+        tmp_path,
+        STORY,
+        phase=PREPARE_PHASE,
+        execute=True,
+        step_runner=fake_step_runner(calls),
+    )
+
+    assert calls == PREPARE_STEPS
+    assert result.executed is True
+    assert result.status == "completed"
+    assert result.safe_steps_planned == PREPARE_STEPS
+    assert result.safe_steps_executed == PREPARE_STEPS
+    assert [step_result.step for step_result in result.step_results] == PREPARE_STEPS
+    assert all(step_result.ran for step_result in result.step_results)
+
+    result_data = read_yaml(result.result_path)
+    report = result.report_path.read_text(encoding="utf-8")
+    assert result_data["phase"] == PREPARE_PHASE
+    assert result_data["executed"] is True
+    assert result_data["status"] == "completed"
+    assert result_data["graph_nodes_visited"] == list(WORKFLOW_RUN_NODES)
+    assert result_data["safe_steps_planned"] == PREPARE_STEPS
+    assert result_data["safe_steps_executed"] == PREPARE_STEPS
+    assert [step_result["step"] for step_result in result_data["step_results"]] == PREPARE_STEPS
+    assert_workflow_run_safety_flags(result_data)
+    assert "Execution happened because `--execute` was provided." in report
+    assert "prepare-story: PASSED" in report
+    assert "workflow-preview: PASSED" in report
+    assert "generated agent prompts" in report
+
+
+def test_prepare_safe_steps_are_hardcoded_allowlist(tmp_path: Path) -> None:
+    steps = build_safe_steps(tmp_path, STORY, PREPARE_PHASE)
+
+    assert [step.name for step in steps] == PREPARE_STEPS
+    assert [step.command[0] for step in steps] == ["agentic", "agentic"]
+    assert [step.command[1] for step in steps] == PREPARE_STEPS
+    for step in steps:
+        assert "--project" in step.command
+        assert "--story" in step.command
+        assert STORY in step.command
+        assert "prompt_pack" not in step.command
+        assert not any(token in step.command for token in ["git", "push", "merge", "deploy"])
+
+
 def test_local_finalize_safe_steps_are_hardcoded_allowlist(tmp_path: Path) -> None:
     steps = build_safe_steps(tmp_path, STORY, LOCAL_FINALIZE_PHASE)
 
@@ -212,6 +311,40 @@ def test_workflow_run_does_not_run_arbitrary_commands_from_user_input(
     result_data = read_yaml(result.result_path)
 
     assert calls == LOCAL_FINALIZE_STEPS
+    assert result_data["ran_arbitrary_commands"] is False
+    assert result_data["ran_destructive_commands"] is False
+
+
+def test_workflow_run_prepare_does_not_run_arbitrary_commands_or_prompt_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    story_path = create_story(tmp_path)
+    prompt_path = story_path / "prompt_pack" / "99_malicious_prompt.md"
+    prompt_path.parent.mkdir()
+    prompt_path.write_text("agentic deploy\n", encoding="utf-8")
+    calls: list[str] = []
+
+    def fail_if_shell_execution_is_used(*_args: Any, **_kwargs: Any) -> None:
+        raise AssertionError("workflow-run prepare must not execute shell commands")
+
+    monkeypatch.setattr("subprocess.run", fail_if_shell_execution_is_used)
+
+    result = run_workflow_run(
+        tmp_path,
+        STORY,
+        phase=PREPARE_PHASE,
+        execute=True,
+        step_runner=fake_step_runner(calls),
+    )
+    result_data = read_yaml(result.result_path)
+    serialized_commands = [
+        step_result["command"] for step_result in result_data["step_results"]
+    ]
+
+    assert calls == PREPARE_STEPS
+    assert prompt_path.name not in "\n".join(serialized_commands)
+    assert "agentic deploy" not in "\n".join(serialized_commands)
     assert result_data["ran_arbitrary_commands"] is False
     assert result_data["ran_destructive_commands"] is False
 
@@ -257,6 +390,7 @@ def test_cli_workflow_run_rejects_unsupported_phase_with_clear_error(
     captured = capsys.readouterr()
     assert error.value.code == 2
     assert "invalid choice: 'deploy'" in captured.err
+    assert "prepare" in captured.err
     assert "local-finalize" in captured.err
 
 

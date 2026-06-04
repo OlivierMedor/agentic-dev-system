@@ -199,7 +199,7 @@ def test_workflow_preview_creates_result_report_and_records_preview_safety(
     assert "It did not execute agents through the configured agent runtime." in report
 
 
-def test_workflow_preview_recommends_prepare_story_when_agent_plan_is_missing(
+def test_workflow_preview_recommends_workflow_run_prepare_when_agent_plan_is_missing(
     tmp_path: Path,
 ) -> None:
     create_story(tmp_path)
@@ -207,12 +207,14 @@ def test_workflow_preview_recommends_prepare_story_when_agent_plan_is_missing(
     result = run_workflow_preview(tmp_path, STORY)
     result_data = read_yaml(result.result_path)
 
-    assert result_data["recommended_next_action"] == "Run prepare-story."
-    assert result_data["suggested_command"] == f"agentic prepare-story --story {STORY}"
+    assert result_data["recommended_next_action"] == "Run workflow-run prepare."
+    assert result_data["suggested_command"] == (
+        f"agentic workflow-run --story {STORY} --phase prepare --execute"
+    )
     assert result_data["current_state"]["agent_plan_exists"] is False
 
 
-def test_workflow_preview_recommends_prepare_story_when_prompt_pack_is_missing(
+def test_workflow_preview_recommends_workflow_run_prepare_when_prompt_pack_is_missing(
     tmp_path: Path,
 ) -> None:
     story_path = create_story(tmp_path)
@@ -221,8 +223,10 @@ def test_workflow_preview_recommends_prepare_story_when_prompt_pack_is_missing(
     result = run_workflow_preview(tmp_path, STORY)
     result_data = read_yaml(result.result_path)
 
-    assert result_data["recommended_next_action"] == "Run prepare-story."
-    assert result_data["suggested_command"] == f"agentic prepare-story --story {STORY}"
+    assert result_data["recommended_next_action"] == "Run workflow-run prepare."
+    assert result_data["suggested_command"] == (
+        f"agentic workflow-run --story {STORY} --phase prepare --execute"
+    )
     assert result_data["current_state"]["agent_plan_exists"] is True
     assert result_data["current_state"]["prompt_pack_exists"] is False
 
@@ -305,7 +309,7 @@ def test_cli_workflow_preview_defaults_project_to_current_directory_without_git_
 
     output = capsys.readouterr().out
     assert f"Workflow preview for {STORY}:" in output
-    assert "Recommended next action: Run prepare-story." in output
+    assert "Recommended next action: Run workflow-run prepare." in output
     assert not (tmp_path / ".git").exists()
     assert (story_path / "reports" / "workflow_preview_result.yaml").exists()
     assert (story_path / "reports" / "workflow_preview_report.md").exists()

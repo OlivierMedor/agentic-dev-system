@@ -14,9 +14,9 @@ workflow action without executing that action.
 `workflow-preview` is a graph-based route explanation. It reads story evidence, reuses the
 next-step recommendation rules, writes preview artifacts, and does not execute workflow steps.
 
-`workflow-run` is graph-based safe local execution. The current runner supports only the
-`local-finalize` phase, and execution requires `--execute`. It runs a hardcoded allowlist of local
-finalization steps and records `reports/workflow_run_result.yaml` plus
+`workflow-run` is graph-based safe local execution. The current runner supports the `prepare` and
+`local-finalize` phases, and execution requires `--execute`. It runs a hardcoded allowlist of local
+steps for the selected phase and records `reports/workflow_run_result.yaml` plus
 `reports/workflow_run_report.md`.
 
 Future workflow orchestration is a later capability. It may add configured agent runtime execution,
@@ -40,19 +40,34 @@ not an agent runner. Without `--execute`, it behaves as a dry run: it writes
 `reports/workflow_run_result.yaml` and `reports/workflow_run_report.md`, records graph nodes
 visited, and explains which safe local steps would run.
 
-When `--execute` is provided, `workflow-run --phase local-finalize` runs only the hardcoded safe
-local sequence:
+## Workflow-run phases
+
+`workflow-run --phase prepare` sets up the story workspace. Without `--execute`, it writes only the
+plan and safety report. With `--execute`, it runs only:
+
+- `prepare-story`
+- `workflow-preview`
+
+The prepare phase creates or refreshes the local setup artifacts: `agent_plan.yaml`, prompt files
+under `prompt_pack/`, `story_runbook.md`, `reports/prepare_story_report.md`, `status.yaml`, and the
+route preview report. It does not execute agents, run generated prompts, call cloud models, call
+GitHub APIs, commit, push, merge, deploy, run destructive commands, or run arbitrary commands from
+user input.
+
+`workflow-run --phase local-finalize` validates final local evidence after the required agent
+reports are present. Without `--execute`, it writes only the plan and safety report. With
+`--execute`, it runs only:
 
 - `test-layers`
 - `finalize-story`
 - `review-bundle`
 - `workflow-preview`
 
-Those steps are deterministic local checks and report-generation commands already present in the
-CLI. The runner does not read commands from story files, prompt packs, user input, or generated
-agent instructions. It records command-style results for each safe step and writes safety flags
-showing that no agents, cloud models, GitHub APIs, commits, merges, pushes, deployments, or
-destructive commands were run.
+Those local-finalize steps are deterministic local checks and report-generation commands already
+present in the CLI. The runner does not read commands from story files, prompt packs, user input,
+or generated agent instructions. It records command-style results for each safe step and writes
+safety flags showing that no agents, cloud models, GitHub APIs, commits, merges, pushes,
+deployments, or destructive commands were run.
 
 The difference is:
 
@@ -60,8 +75,8 @@ The difference is:
 - `workflow-run` can execute a narrow allowlist of safe local steps, but only when `--execute` is
   provided.
 
-Future LangGraph workflows can build on this shape to orchestrate more of the lifecycle, including
-human-in-the-loop pauses, checkpointing, and possibly configured agent execution. Those capabilities
-are not part of the current runner. Later workflows still need explicit safety boundaries: human
-final approval is always required before merge, and automatic deployment should not be inferred
-from a route recommendation.
+Future LangGraph workflows can build on this shape to orchestrate more of the lifecycle. Later
+phases may add human/cloud pause points, checkpointing, and possibly configured agent execution.
+Those capabilities are not part of the current runner. Later workflows still need explicit safety
+boundaries: human final approval is always required before merge, and automatic deployment should
+not be inferred from a route recommendation.

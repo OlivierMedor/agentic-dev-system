@@ -1643,3 +1643,84 @@ stories:
         - inaccurate_next_step_recommendation
         - unsafe_workflow_run_recommendation
         - workflow_run_status_parse_error
+
+  - id: STORY-030
+    slug: story_030_workflow_run_prepare_phase
+    title: Add workflow-run prepare phase
+    goal: Extend the LangGraph safe workflow runner with a prepare phase that runs safe story setup steps.
+    why: >
+      The system already has workflow-run local-finalize. The next safe phase is
+      preparation: assigning agents, generating prompt packs, and previewing the
+      workflow route. This reduces manual setup while still avoiding agent execution,
+      cloud model calls, GitHub APIs, merge, push, or deployment.
+    acceptance_criteria:
+      - Extend workflow-run to support --phase prepare.
+      - workflow-run prepare requires --story.
+      - workflow-run prepare defaults --project to the current working directory.
+      - workflow-run prepare requires --execute before running safe steps.
+      - Without --execute, workflow-run prepare writes a plan but does not run steps.
+      - With --execute, workflow-run prepare runs prepare-story and workflow-preview.
+      - workflow-run prepare records graph nodes visited.
+      - workflow-run prepare writes reports/workflow_run_result.yaml.
+      - workflow-run prepare writes reports/workflow_run_report.md.
+      - workflow-run prepare records planned steps and executed steps.
+      - workflow-run prepare does not execute agents.
+      - workflow-run prepare does not run generated prompts.
+      - workflow-run prepare does not call cloud models.
+      - workflow-run prepare does not call GitHub APIs.
+      - workflow-run prepare does not commit, push, merge, deploy, or run destructive commands.
+      - next-step recommends workflow-run prepare when agent_plan.yaml or prompt_pack is missing.
+      - README documents the prepare phase.
+      - docs/langgraph_workflow.md explains prepare phase versus local-finalize phase.
+      - Tests verify dry-run behavior, execute behavior, safe step sequence, and next-step integration.
+    not_in_scope:
+      - No automatic agent execution.
+      - No cloud model calls.
+      - No GitHub API calls.
+      - No automatic merge.
+      - No deployment.
+      - No LangGraph checkpointing or persistence yet.
+      - No human-in-the-loop pause/resume yet.
+    definition_of_done:
+      - pytest passes.
+      - ruff passes.
+      - artifact-policy passes.
+      - runtime-config validate passes.
+      - workflow-run prepare dry-run works.
+      - workflow-run prepare execute mode works.
+      - finalize-story marks this story ready for review.
+    test_plan:
+      test_layers_version: 1
+      unit_tests:
+        required: true
+        action: add_or_update
+        frequency: every_commit
+        evidence_or_reason: Add or update tests for workflow-run prepare phase and next-step integration.
+      integration_tests:
+        required: true
+        action: confirm_existing
+        frequency: every_pull_request
+        evidence_or_reason: Existing command tests cover CLI integration patterns.
+      mock_e2e_tests:
+        required: true
+        action: confirm_existing
+        frequency: before_merge
+        evidence_or_reason: Existing mock E2E workflow test covers the local story workflow.
+      live_read_only_checks:
+        required: false
+        action: not_applicable_with_reason
+        frequency: scheduled_or_before_release
+        evidence_or_reason: This story does not call live external APIs.
+      remote_dev_smoke_tests:
+        required: false
+        action: not_applicable_with_reason
+        frequency: after_remote_dev_deploy
+        evidence_or_reason: This story does not deploy to a remote dev environment.
+    monitoring_plan:
+      logs_required: true
+      watch_for:
+        - workflow_run_prepare_failure
+        - unsafe_command_attempt
+        - accidental_agent_execution
+        - accidental_cloud_call
+        - missing_prompt_pack_after_prepare

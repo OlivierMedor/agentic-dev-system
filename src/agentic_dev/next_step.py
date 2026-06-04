@@ -216,13 +216,18 @@ def choose_recommendation(evidence: StoryEvidence) -> NextStepRecommendation:
 
     if not evidence.agent_plan_exists or not evidence.prompt_pack_exists or not evidence.prompt_files:
         return NextStepRecommendation(
-            title="Run prepare-story.",
-            command=f"agentic prepare-story --story {evidence.story}",
+            title="Run workflow-run prepare.",
+            command=f"agentic workflow-run --story {evidence.story} --phase prepare --execute",
             reason="The story is missing its agent plan or generated prompt files.",
             details=[
                 f"agent_plan.yaml present: {format_bool(evidence.agent_plan_exists)}",
                 f"prompt_pack present: {format_bool(evidence.prompt_pack_exists)}",
                 f"prompt files found: {len(evidence.prompt_files)}",
+                "workflow-run prepare wraps prepare-story and workflow-preview safely.",
+                (
+                    "It does not execute agents, run generated prompts, call cloud models, "
+                    "call GitHub APIs, commit, push, merge, or deploy."
+                ),
             ],
         )
 
@@ -245,10 +250,11 @@ def choose_recommendation(evidence: StoryEvidence) -> NextStepRecommendation:
 
     workflow_run_result = evidence.result_data.get("workflow_run_result.yaml")
     if workflow_run_failed(workflow_run_result):
+        workflow_run_phase = text_value(workflow_run_result.get("phase")) or "unknown"
         return NextStepRecommendation(
-            title="Investigate failed workflow-run local finalization.",
+            title=f"Investigate failed workflow-run {workflow_run_phase}.",
             command=None,
-            reason="workflow_run_result.yaml records a failed local-finalize run.",
+            reason=f"workflow_run_result.yaml records a failed {workflow_run_phase} run.",
             details=[
                 "Review reports/workflow_run_report.md and the failed local step result.",
                 "Fix the failed local evidence before continuing.",
@@ -270,7 +276,7 @@ def choose_recommendation(evidence: StoryEvidence) -> NextStepRecommendation:
 
     if not evidence.cloud_review_export_exists:
         reason = "finalize-story is ready, but the cloud review export packet does not exist."
-        if workflow_run_completed(workflow_run_result):
+        if workflow_run_phase_completed(workflow_run_result, "local-finalize"):
             reason = (
                 "workflow-run local-finalize completed and finalize-story is ready, "
                 "but the cloud review export packet does not exist."
@@ -431,6 +437,13 @@ def workflow_run_completed(workflow_run_result: dict[str, Any] | None) -> bool:
         workflow_run_result.get("status") == "completed"
         and workflow_run_result.get("executed") is True
     )
+
+
+def workflow_run_phase_completed(
+    workflow_run_result: dict[str, Any] | None,
+    phase: str,
+) -> bool:
+    return workflow_run_completed(workflow_run_result) and workflow_run_result.get("phase") == phase
 
 
 def workflow_run_failed(workflow_run_result: dict[str, Any] | None) -> bool:
