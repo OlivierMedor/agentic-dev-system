@@ -1,0 +1,6 @@
+logs_required: false
+watch_for:
+  - missing_operator_command
+  - stale_workflow_description
+  - committed_generated_artifact
+  - unclear_human_approval_boundary
