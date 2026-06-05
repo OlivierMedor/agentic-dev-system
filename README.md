@@ -18,6 +18,9 @@ Agent runtime queues live under `.agentic/`, including improvement, maintenance,
 feature, and support queues.
 Projects can also define per-agent runtime behavior in `.agentic/agent_runtime.yaml`.
 
+For the beginner-friendly end-to-end path from blueprint to human PR merge decision, see
+`docs/golden_path.md`.
+
 ## Runtime config
 
 The runtime config is a project-level YAML file at `.agentic/agent_runtime.yaml`.

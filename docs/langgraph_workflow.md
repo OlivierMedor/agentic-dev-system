@@ -9,6 +9,9 @@ automation harder to reason about.
 `next-step` is the GPS-style guidance command. It reads story evidence and recommends the next safe
 workflow action without executing that action.
 
+For the full operator path from blueprint to human PR merge decision, see
+`docs/golden_path.md`.
+
 ## Preview, run, and future orchestration
 
 `workflow-preview` is a graph-based route explanation. It reads story evidence, reuses the
