@@ -249,7 +249,7 @@ def test_workflow_preview_recommends_configured_agent_runtime_when_reports_are_m
     assert "local_review_report.md" in report
 
 
-def test_workflow_preview_recommends_cloud_review_packet_after_finalize_is_ready(
+def test_workflow_preview_recommends_workflow_run_cloud_review_prep_after_finalize_is_ready(
     tmp_path: Path,
 ) -> None:
     story_path = create_story(tmp_path)
@@ -259,8 +259,10 @@ def test_workflow_preview_recommends_cloud_review_packet_after_finalize_is_ready
     result = run_workflow_preview(tmp_path, STORY)
     result_data = read_yaml(result.result_path)
 
-    assert result_data["recommended_next_action"] == "Run cloud-review-packet."
-    assert result_data["suggested_command"] == f"agentic cloud-review-packet --story {STORY}"
+    assert result_data["recommended_next_action"] == "Run workflow-run cloud-review-prep."
+    assert result_data["suggested_command"] == (
+        f"agentic workflow-run --story {STORY} --phase cloud-review-prep --execute"
+    )
     assert result_data["current_state"]["cloud_review_export_exists"] is False
 
 

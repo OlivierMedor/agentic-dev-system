@@ -1724,3 +1724,85 @@ stories:
         - accidental_agent_execution
         - accidental_cloud_call
         - missing_prompt_pack_after_prepare
+
+  - id: STORY-031
+    slug: story_031_workflow_run_cloud_review_prep
+    title: Add workflow-run cloud review prep phase
+    goal: Extend the LangGraph safe workflow runner with a cloud-review-prep phase that prepares cloud review evidence without calling cloud models.
+    why: >
+      The system already has safe prepare and local-finalize phases. The next safe phase
+      is cloud review preparation: creating a cloud review packet and refreshing workflow
+      preview evidence. This reduces manual steps while still avoiding automatic cloud
+      model calls, GitHub API calls, merge, push, or deployment.
+    acceptance_criteria:
+      - Extend workflow-run to support --phase cloud-review-prep.
+      - workflow-run cloud-review-prep requires --story.
+      - workflow-run cloud-review-prep defaults --project to the current working directory.
+      - workflow-run cloud-review-prep requires --execute before running safe steps.
+      - Without --execute, workflow-run cloud-review-prep writes a plan but does not run steps.
+      - With --execute, workflow-run cloud-review-prep runs cloud-review-packet and workflow-preview.
+      - cloud-review-prep should check whether finalize-story result is ready_for_review true before execution.
+      - If finalize-story is missing or not ready, cloud-review-prep should return REQUEST_CHANGES or a clear failed status instead of creating misleading cloud review evidence.
+      - workflow-run cloud-review-prep records graph nodes visited.
+      - workflow-run cloud-review-prep writes reports/workflow_run_result.yaml.
+      - workflow-run cloud-review-prep writes reports/workflow_run_report.md.
+      - workflow-run cloud-review-prep records planned steps and executed steps.
+      - workflow-run cloud-review-prep does not execute agents.
+      - workflow-run cloud-review-prep does not call cloud models.
+      - workflow-run cloud-review-prep does not call GitHub APIs.
+      - workflow-run cloud-review-prep does not commit, push, merge, deploy, or run destructive commands.
+      - next-step recommends workflow-run cloud-review-prep when finalize-story is ready and cloud_review_export.md is missing.
+      - README documents the cloud-review-prep phase.
+      - docs/langgraph_workflow.md explains prepare, local-finalize, and cloud-review-prep phases.
+      - Tests verify dry-run behavior, execute behavior, safe step sequence, readiness guard, and next-step integration.
+    not_in_scope:
+      - No automatic cloud model calls.
+      - No record-cloud-review automation.
+      - No GitHub API calls.
+      - No automatic merge.
+      - No deployment.
+      - No LangGraph checkpointing or persistence yet.
+      - No human-in-the-loop pause/resume yet.
+    definition_of_done:
+      - pytest passes.
+      - ruff passes.
+      - artifact-policy passes.
+      - runtime-config validate passes.
+      - workflow-run cloud-review-prep dry-run works.
+      - workflow-run cloud-review-prep execute mode works after local-finalize is ready.
+      - finalize-story marks this story ready for review.
+    test_plan:
+      test_layers_version: 1
+      unit_tests:
+        required: true
+        action: add_or_update
+        frequency: every_commit
+        evidence_or_reason: Add or update tests for workflow-run cloud-review-prep phase and next-step integration.
+      integration_tests:
+        required: true
+        action: confirm_existing
+        frequency: every_pull_request
+        evidence_or_reason: Existing command tests cover CLI integration patterns.
+      mock_e2e_tests:
+        required: true
+        action: confirm_existing
+        frequency: before_merge
+        evidence_or_reason: Existing mock E2E workflow test covers the local story workflow.
+      live_read_only_checks:
+        required: false
+        action: not_applicable_with_reason
+        frequency: scheduled_or_before_release
+        evidence_or_reason: This story does not call live external APIs.
+      remote_dev_smoke_tests:
+        required: false
+        action: not_applicable_with_reason
+        frequency: after_remote_dev_deploy
+        evidence_or_reason: This story does not deploy to a remote dev environment.
+    monitoring_plan:
+      logs_required: true
+      watch_for:
+        - workflow_run_cloud_review_prep_failure
+        - missing_finalize_ready_state
+        - accidental_cloud_call
+        - unsafe_command_attempt
+        - missing_cloud_review_export

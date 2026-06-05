@@ -300,22 +300,27 @@ def test_stale_finalize_result_recommends_workflow_run_local_finalize(
     assert "changed after the last finalize result" in result.recommendation.reason
 
 
-def test_ready_finalize_without_cloud_review_export_recommends_cloud_review_packet(
+def test_ready_finalize_without_cloud_review_export_recommends_workflow_run_cloud_review_prep(
     tmp_path: Path,
 ) -> None:
     story_path = create_story(tmp_path)
     prepare_finalized_story(story_path)
 
     result = run_next_step(tmp_path, STORY)
+    text = recommendation_text(result).lower()
 
-    assert result.recommendation.title == "Run cloud-review-packet."
-    assert result.recommendation.command == f"agentic cloud-review-packet --story {STORY}"
+    assert result.recommendation.title == "Run workflow-run cloud-review-prep."
+    assert result.recommendation.command == (
+        f"agentic workflow-run --story {STORY} --phase cloud-review-prep --execute"
+    )
     assert "cloud review export packet does not exist" in result.recommendation.reason
-    assert "workflow-run" not in result.recommendation.title
-    assert "workflow-run" not in result.recommendation.command
+    assert "workflow-run cloud-review-prep wraps cloud-review-packet" in text
+    assert "automatic merge" not in text
+    assert "automatic deployment" not in text
+    assert "deploy." in text
 
 
-def test_workflow_run_completed_with_ready_finalize_recommends_cloud_review_packet(
+def test_workflow_run_completed_with_ready_finalize_recommends_cloud_review_prep(
     tmp_path: Path,
 ) -> None:
     story_path = create_story(tmp_path)
@@ -324,8 +329,10 @@ def test_workflow_run_completed_with_ready_finalize_recommends_cloud_review_pack
 
     result = run_next_step(tmp_path, STORY)
 
-    assert result.recommendation.title == "Run cloud-review-packet."
-    assert result.recommendation.command == f"agentic cloud-review-packet --story {STORY}"
+    assert result.recommendation.title == "Run workflow-run cloud-review-prep."
+    assert result.recommendation.command == (
+        f"agentic workflow-run --story {STORY} --phase cloud-review-prep --execute"
+    )
     assert "workflow-run local-finalize completed" in result.recommendation.reason
 
 
@@ -367,8 +374,10 @@ def test_final_review_bundle_newer_than_finalize_result_does_not_force_refinaliz
 
     result = run_next_step(tmp_path, STORY)
 
-    assert result.recommendation.title == "Run cloud-review-packet."
-    assert result.recommendation.command == f"agentic cloud-review-packet --story {STORY}"
+    assert result.recommendation.title == "Run workflow-run cloud-review-prep."
+    assert result.recommendation.command == (
+        f"agentic workflow-run --story {STORY} --phase cloud-review-prep --execute"
+    )
 
 
 def test_cloud_review_export_without_result_recommends_record_cloud_review(

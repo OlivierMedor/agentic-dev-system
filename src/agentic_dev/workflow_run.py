@@ -8,6 +8,7 @@ from typing import Any, TypedDict
 import yaml
 from langgraph.graph import StateGraph
 
+from agentic_dev.cloud_review_packet import create_cloud_review_packet
 from agentic_dev.finalize_story import finalize_story
 from agentic_dev.next_step import format_bullet_list, validate_story_folder
 from agentic_dev.prepare_story import prepare_story
@@ -18,8 +19,9 @@ from agentic_dev.workflow_preview import run_workflow_preview
 
 PREPARE_PHASE = "prepare"
 LOCAL_FINALIZE_PHASE = "local-finalize"
-SUPPORTED_PHASES = {PREPARE_PHASE, LOCAL_FINALIZE_PHASE}
-WORKFLOW_RUN_PHASES = (PREPARE_PHASE, LOCAL_FINALIZE_PHASE)
+CLOUD_REVIEW_PREP_PHASE = "cloud-review-prep"
+SUPPORTED_PHASES = {PREPARE_PHASE, LOCAL_FINALIZE_PHASE, CLOUD_REVIEW_PREP_PHASE}
+WORKFLOW_RUN_PHASES = (PREPARE_PHASE, LOCAL_FINALIZE_PHASE, CLOUD_REVIEW_PREP_PHASE)
 
 WORKFLOW_RUN_NODES = (
     "collect_story_state",
@@ -185,6 +187,27 @@ def run_or_skip_safe_steps(
             "graph_nodes_visited": graph_nodes_visited,
         }
 
+    if state["phase"] == CLOUD_REVIEW_PREP_PHASE:
+        readiness_error = validate_cloud_review_prep_readiness(state["reports_path"])
+        if readiness_error is not None:
+            return {
+                "safe_steps_executed": [],
+                "step_results": [
+                    SafeStepResult(
+                        step="finalize-story-readiness",
+                        command="read reports/finalize_story_result.yaml",
+                        ran=False,
+                        status="REQUEST_CHANGES",
+                        returncode=1,
+                        summary=readiness_error,
+                        result_path=state["reports_path"] / "finalize_story_result.yaml",
+                    )
+                ],
+                "status": "REQUEST_CHANGES",
+                "next_action": readiness_error,
+                "graph_nodes_visited": graph_nodes_visited,
+            }
+
     step_results: list[SafeStepResult] = []
     safe_steps_executed: list[str] = []
     for step in state["safe_steps_planned"]:
@@ -192,7 +215,7 @@ def run_or_skip_safe_steps(
         step_results.append(step_runner(state["project_path"], state["story"], step))
 
     status = "completed" if all(result.returncode == 0 for result in step_results) else "failed"
-    next_action = determine_next_action(state["phase"], status)
+    next_action = determine_next_action(state["phase"], status, step_results)
 
     return {
         "safe_steps_executed": safe_steps_executed,
@@ -293,6 +316,30 @@ def build_safe_steps(project_path: Path, story: str, phase: str) -> list[SafeSte
             ),
         ]
 
+    if phase == CLOUD_REVIEW_PREP_PHASE:
+        return [
+            SafeStep(
+                name="cloud-review-packet",
+                command=(
+                    "agentic",
+                    "cloud-review-packet",
+                    "--project",
+                    project_text,
+                    "--story",
+                    story,
+                    "--force",
+                ),
+                description=(
+                    "Create or refresh local cloud review packet files without calling a cloud model."
+                ),
+            ),
+            SafeStep(
+                name="workflow-preview",
+                command=("agentic", "workflow-preview", "--project", project_text, "--story", story),
+                description="Refresh the LangGraph route preview report.",
+            ),
+        ]
+
     raise ValueError(f"Unsupported workflow-run phase: {phase}")
 
 
@@ -346,6 +393,20 @@ def run_safe_step(project_path: Path, story: str, step: SafeStep) -> SafeStepRes
                 ),
                 None,
                 result.review_bundle_path / "handoff.md",
+            )
+
+        if step.name == "cloud-review-packet":
+            result = create_cloud_review_packet(project_path, story, force=True)
+            return build_step_result(
+                step,
+                True,
+                (
+                    "cloud-review-packet completed; "
+                    f"generated files: {len(result.generated_files)}; "
+                    f"missing optional evidence files: {len(result.missing_optional_files)}"
+                ),
+                None,
+                result.packet_path / "cloud_review_export.md",
             )
 
         if step.name == "workflow-preview":
@@ -404,7 +465,10 @@ def write_markdown_report(
     planned_steps = state["safe_steps_planned"]
     step_results = state["step_results"]
     execution_text = (
-        "Execution happened because `--execute` was provided."
+        (
+            "Execution happened because `--execute` was provided. "
+            "Only unblocked allowlisted steps ran."
+        )
         if state["execute"]
         else "Dry run only. No workflow steps ran because `--execute` was not provided."
     )
@@ -455,8 +519,28 @@ def write_markdown_report(
     report_path.write_text(content, encoding="utf-8")
 
 
-def determine_next_action(phase: str, status: str) -> str:
+def determine_next_action(
+    phase: str,
+    status: str,
+    step_results: list[SafeStepResult] | None = None,
+) -> str:
     if status != "completed":
+        failed_step = first_failed_step(step_results or [])
+        if phase == CLOUD_REVIEW_PREP_PHASE:
+            if failed_step is not None:
+                return (
+                    f"Fix the failed cloud-review-prep step `{failed_step.step}`, "
+                    "then rerun workflow-run --phase cloud-review-prep --execute."
+                )
+            return (
+                "Fix the failed cloud-review-prep step results, then rerun workflow-run "
+                "--phase cloud-review-prep --execute."
+            )
+        if failed_step is not None:
+            return (
+                f"Fix the failed local step `{failed_step.step}`, "
+                "then rerun workflow-run with --execute."
+            )
         return "Fix the failed local step results, then rerun workflow-run with --execute."
 
     if phase == PREPARE_PHASE:
@@ -465,7 +549,45 @@ def determine_next_action(phase: str, status: str) -> str:
             "manually through the configured agent runtime."
         )
 
+    if phase == CLOUD_REVIEW_PREP_PHASE:
+        return (
+            "Send cloud_review_packet/cloud_review_export.md to the main cloud model manually, "
+            "then record the returned decision with record-cloud-review."
+        )
+
     return "Review workflow_run_report.md and continue to manual review."
+
+
+def first_failed_step(step_results: list[SafeStepResult]) -> SafeStepResult | None:
+    for result in step_results:
+        if result.returncode != 0:
+            return result
+    return None
+
+
+def validate_cloud_review_prep_readiness(reports_path: Path) -> str | None:
+    finalize_path = reports_path / "finalize_story_result.yaml"
+    if not finalize_path.exists():
+        return (
+            "reports/finalize_story_result.yaml is missing. Run workflow-run "
+            "--phase local-finalize --execute before preparing cloud review evidence."
+        )
+
+    try:
+        loaded = yaml.safe_load(finalize_path.read_text(encoding="utf-8"))
+    except yaml.YAMLError as error:
+        return f"reports/finalize_story_result.yaml has invalid YAML: {error}."
+
+    if not isinstance(loaded, dict):
+        return "reports/finalize_story_result.yaml must be a YAML mapping."
+
+    if loaded.get("ready_for_review") is not True:
+        return (
+            "finalize-story is not ready_for_review: true. Fix local finalization evidence "
+            "before preparing cloud review evidence."
+        )
+
+    return None
 
 
 def format_safe_steps(steps: list[SafeStep]) -> str:
@@ -515,7 +637,11 @@ def format_terminal_summary(
     report_path: Path,
     graph_nodes_visited: list[str],
 ) -> str:
-    execution = "executed safe local steps" if executed else "planned safe local steps only"
+    execution = (
+        "requested safe local execution"
+        if executed
+        else "planned safe local steps only"
+    )
     return "\n".join(
         [
             f"Workflow run for {story}:",

@@ -259,7 +259,10 @@ def main() -> None:
         "--phase",
         default=LOCAL_FINALIZE_PHASE,
         choices=WORKFLOW_RUN_PHASES,
-        help="Workflow phase to run. Defaults to local-finalize.",
+        help=(
+            "Workflow phase to run: prepare, local-finalize, or cloud-review-prep. "
+            "Defaults to local-finalize."
+        ),
     )
     workflow_run_parser.add_argument(
         "--execute",
