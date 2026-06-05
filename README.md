@@ -138,9 +138,11 @@ workflow action.
 Typical recommendations include `workflow-run --phase prepare --execute` when planning artifacts
 are missing, running the generated prompts with the configured agent runtime when required agent
 reports are missing, `workflow-run --phase local-finalize --execute` when required local
-finalization evidence is missing or stale, `cloud-review-packet`, `record-cloud-review`, `merge-readiness`,
-`remote-dev-packet`, or human PR/CI review when the story is ready for the human owner. If a support
-ticket blocks the story, workflow-run records unsafe safety flags, or a result records
+finalization evidence is missing or stale, `workflow-run --phase cloud-review-prep --execute`
+when finalize-story is ready and the cloud review export is missing, `record-cloud-review`,
+`merge-readiness`, `remote-dev-packet`, or human PR/CI review when the story is ready for the
+human owner. If a support ticket blocks the story, workflow-run records unsafe safety flags, or a
+result records
 `REQUEST_CHANGES`, `DEV_FAILED`, `NOT_RUN`, or `request_changes`, the advisor tells you to resolve
 that state before continuing.
 
@@ -182,7 +184,7 @@ By default, `workflow-run` is a dry run. It writes
 `stories/<story>/reports/workflow_run_report.md`, records the graph nodes visited, and explains
 which safe local steps would run.
 
-Add `--execute` only when you want to run the hardcoded `local-finalize` phase:
+Add `--execute` only when you want to run the hardcoded safe steps for the selected phase:
 
 ```powershell
 docker compose run --rm dev agentic workflow-run --story story_028_langgraph_safe_workflow_runner --execute
@@ -207,6 +209,21 @@ local path after the required agent reports are present and before cloud review 
 agent runtime or run generated agent prompts, call cloud models, call GitHub APIs, commit, push,
 merge, deploy, run destructive commands, or run arbitrary commands from user input. Human final
 approval is still required before merge.
+
+Use the `cloud-review-prep` phase after `finalize-story` is ready and before manual cloud review:
+
+```powershell
+docker compose run --rm dev agentic workflow-run --story story_031_workflow_run_cloud_review_prep --phase cloud-review-prep --execute
+```
+
+Without `--execute`, the cloud-review-prep phase writes only the workflow-run plan. With
+`--execute`, it first verifies that `reports/finalize_story_result.yaml` exists and records
+`ready_for_review: true`. If that readiness guard fails, it records `REQUEST_CHANGES` and does not
+create misleading cloud review evidence. When ready, it runs only `cloud-review-packet` and
+`workflow-preview`. This creates or refreshes `cloud_review_packet/cloud_review_export.md` and route
+preview evidence, but it does not call the cloud model. A human still sends
+`cloud_review_export.md` to the main cloud model manually and records the returned decision with
+`record-cloud-review`.
 
 ## Create a review bundle
 
@@ -291,6 +308,10 @@ Run this from the repo root to prepare a cloud-model-ready packet for a complete
 docker compose run --rm dev agentic cloud-review-packet --story story_010_cloud_review_packet
 ```
 
+For the normal story workflow, prefer
+`agentic workflow-run --story <story> --phase cloud-review-prep --execute`; it wraps this packet
+command with the finalize readiness guard and refreshes the workflow preview.
+
 The command validates that `stories/<story>/` and `story.md` exist, then writes
 `cloud_review_prompt.md`, `cloud_review_context.md`, `cloud_review_checklist.md`,
 `cloud_review_result_template.md`, and `cloud_review_export.md` into
@@ -359,7 +380,7 @@ merging.
 The final merge-readiness workflow is:
 
 1. Run `finalize-story`.
-2. Run `cloud-review-packet`.
+2. Run `workflow-run --phase cloud-review-prep --execute`.
 3. Paste or upload `stories/<story>/cloud_review_packet/cloud_review_export.md` to the main cloud model.
 4. Save the cloud model answer to a local Markdown file.
 5. Run `record-cloud-review --story <story> --result-file <path>`.

@@ -281,7 +281,7 @@ def choose_recommendation(evidence: StoryEvidence) -> NextStepRecommendation:
                 "workflow-run local-finalize completed and finalize-story is ready, "
                 "but the cloud review export packet does not exist."
             )
-        return cloud_review_packet_recommendation(
+        return workflow_run_cloud_review_prep_recommendation(
             evidence,
             reason,
         )
@@ -365,15 +365,22 @@ def workflow_run_local_finalize_recommendation(
     )
 
 
-def cloud_review_packet_recommendation(
+def workflow_run_cloud_review_prep_recommendation(
     evidence: StoryEvidence,
     reason: str,
 ) -> NextStepRecommendation:
     return NextStepRecommendation(
-        title="Run cloud-review-packet.",
-        command=f"agentic cloud-review-packet --story {evidence.story}",
+        title="Run workflow-run cloud-review-prep.",
+        command=f"agentic workflow-run --story {evidence.story} --phase cloud-review-prep --execute",
         reason=reason,
-        details=["Expected cloud_review_packet/cloud_review_export.md."],
+        details=[
+            "Expected cloud_review_packet/cloud_review_export.md.",
+            "workflow-run cloud-review-prep wraps cloud-review-packet and workflow-preview safely.",
+            (
+                "It creates local cloud review evidence only; it does not call cloud models, "
+                "call GitHub APIs, commit, push, merge, or deploy."
+            ),
+        ],
     )
 
 

@@ -14,9 +14,10 @@ workflow action without executing that action.
 `workflow-preview` is a graph-based route explanation. It reads story evidence, reuses the
 next-step recommendation rules, writes preview artifacts, and does not execute workflow steps.
 
-`workflow-run` is graph-based safe local execution. The current runner supports the `prepare` and
-`local-finalize` phases, and execution requires `--execute`. It runs a hardcoded allowlist of local
-steps for the selected phase and records `reports/workflow_run_result.yaml` plus
+`workflow-run` is graph-based safe local execution. The current runner supports the `prepare`,
+`local-finalize`, and `cloud-review-prep` phases, and execution requires `--execute`. It runs a
+hardcoded allowlist of local steps for the selected phase and records
+`reports/workflow_run_result.yaml` plus
 `reports/workflow_run_report.md`.
 
 Future workflow orchestration is a later capability. It may add configured agent runtime execution,
@@ -68,6 +69,20 @@ present in the CLI. The runner does not read commands from story files, prompt p
 or generated agent instructions. It records command-style results for each safe step and writes
 safety flags showing that no agents, cloud models, GitHub APIs, commits, merges, pushes,
 deployments, or destructive commands were run.
+
+`workflow-run --phase cloud-review-prep` prepares cloud review evidence after local finalization is
+ready. Without `--execute`, it writes only the plan and safety report. With `--execute`, it first
+checks `reports/finalize_story_result.yaml` and requires `ready_for_review: true`. If the finalize
+result is missing, invalid, or not ready, the phase records `REQUEST_CHANGES` and does not create a
+cloud review packet. When the readiness guard passes, it runs only:
+
+- `cloud-review-packet`
+- `workflow-preview`
+
+The cloud-review-prep phase creates or refreshes `cloud_review_packet/cloud_review_export.md` and
+the route preview. It prepares evidence only; it does not send that export to a cloud model. The
+human owner still gives `cloud_review_export.md` to the main cloud model manually, saves the answer,
+and records it with `record-cloud-review`.
 
 The difference is:
 

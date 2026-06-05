@@ -1,0 +1,7 @@
+logs_required: true
+watch_for:
+- workflow_run_cloud_review_prep_failure
+- missing_finalize_ready_state
+- accidental_cloud_call
+- unsafe_command_attempt
+- missing_cloud_review_export
