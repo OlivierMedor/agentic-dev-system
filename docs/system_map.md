@@ -8,6 +8,9 @@ At a high level, the system turns blueprint entries into story workspaces, uses
 safe local workflow phases to prepare and finalize evidence, then leaves cloud
 review and merge decisions under human control.
 
+For a beginner-friendly repository tour, see `docs/code_tour.md`. For a
+command-to-code lookup table, see `docs/command_map.md`.
+
 ## Blueprint To Story Flow
 
 ```text

@@ -109,6 +109,12 @@ docker compose run --rm dev agentic public-readiness
 docker compose run --rm dev agentic runtime-config validate
 ```
 
+## Learn The Codebase
+
+Start with `docs/code_tour.md` for a beginner-friendly tour of the repository.
+Use `docs/command_map.md` to connect each `agentic` command to its CLI entry,
+core module, tests, and related story workspace.
+
 ## Current Status
 
 This project is preparing for a future public launch. The core local workflow is
@@ -148,6 +154,9 @@ That file is ignored and blocked by policy. The public-safe example is
 
 - `docs/system_map.md` explains the system with ASCII diagrams.
 - `docs/golden_path.md` walks through the normal blueprint-to-PR-review path.
+- `docs/code_tour.md` explains the repository structure in beginner-friendly
+  language.
+- `docs/command_map.md` maps commands to code, tests, and related stories.
 - `docs/public_readiness.md` explains what must stay out of Git before a public
   release.
 - `docs/public_launch_checklist.md` is the final manual checklist before making

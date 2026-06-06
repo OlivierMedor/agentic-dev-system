@@ -1,0 +1,7 @@
+logs_required: false
+watch_for:
+- missing_code_tour_doc
+- stale_command_mapping
+- stale_readme_link
+- private_guidance_tracked
+- committed_generated_artifact
