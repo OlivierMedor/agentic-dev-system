@@ -35,6 +35,15 @@ def find_artifact_policy_violations(tracked_files: list[str]) -> list[ArtifactPo
         filename = parts[-1] if parts else normalized_path
         lowercase_filename = filename.lower()
 
+        if normalized_path == "blueprints/agentic-architecture.md":
+            violations.append(
+                ArtifactPolicyViolation(
+                    path=normalized_path,
+                    reason="private operator guidance file is tracked",
+                ),
+            )
+            continue
+
         if is_generated_review_bundle_path(parts, filename):
             violations.append(
                 ArtifactPolicyViolation(
@@ -76,6 +85,15 @@ def find_artifact_policy_violations(tracked_files: list[str]) -> list[ArtifactPo
                 ArtifactPolicyViolation(
                     path=normalized_path,
                     reason="feature scan runtime file is tracked",
+                ),
+            )
+            continue
+
+        if is_runtime_queue_item_path(parts, filename):
+            violations.append(
+                ArtifactPolicyViolation(
+                    path=normalized_path,
+                    reason="runtime queue item file is tracked",
                 ),
             )
             continue
@@ -148,6 +166,26 @@ def is_feature_scan_runtime_path(parts: list[str], filename: str) -> bool:
     return Path(filename).suffix.lower() in {".yaml", ".md"}
 
 
+def is_runtime_queue_item_path(parts: list[str], filename: str) -> bool:
+    if filename == ".gitkeep":
+        return False
+
+    if len(parts) < 4 or parts[0] != ".agentic":
+        return False
+
+    queue_prefixes = {
+        "improvement_queue": "IMP-",
+        "maintenance_queue": "MAINT-",
+        "feature_queue": "FEATURE-",
+    }
+    expected_prefix = queue_prefixes.get(parts[1])
+
+    if expected_prefix is None:
+        return False
+
+    return filename.startswith(expected_prefix) and Path(filename).suffix.lower() == ".yaml"
+
+
 def is_env_file(filename: str) -> bool:
     if filename == ".env.example":
         return False
@@ -195,7 +233,8 @@ def format_artifact_policy_report(result: ArtifactPolicyResult) -> str:
         "Artifact policy failed: forbidden tracked files were found.",
         "",
         "Tracked files must not include generated review artifacts, support queue runtime files, "
-        "feature scan runtime files, zip files, or environment files.",
+        "queue runtime files, feature scan runtime files, zip files, environment files, or "
+        "private operator guidance.",
         "",
         "Violations:",
     ]

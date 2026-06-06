@@ -1,0 +1,7 @@
+logs_required: true
+watch_for:
+- private_guidance_tracked
+- committed_env_file
+- committed_generated_review_artifact
+- committed_runtime_queue_file
+- missing_public_readiness_report

@@ -18,10 +18,20 @@ def test_allowed_project_paths_do_not_violate_artifact_policy() -> None:
         "stories/story_011_artifact_policy_guard/remote_dev_validation/.gitkeep",
         ".agentic/support_queue/pending/.gitkeep",
         ".agentic/feature_scan/.gitkeep",
+        ".agentic/improvement_queue/pending/.gitkeep",
+        ".agentic/maintenance_queue/pending/.gitkeep",
+        ".agentic/feature_queue/pending/.gitkeep",
         ".env.example",
+        "blueprints/agentic-architecture.example.md",
     ]
 
     assert find_artifact_policy_violations(allowed_paths) == []
+
+
+def test_private_operator_guidance_is_blocked() -> None:
+    assert violation_paths(["blueprints/agentic-architecture.md"]) == [
+        "blueprints/agentic-architecture.md",
+    ]
 
 
 def test_generated_review_bundle_files_are_blocked() -> None:
@@ -74,6 +84,23 @@ def test_feature_scan_runtime_files_are_blocked_except_gitkeep() -> None:
     ]
 
     assert violation_paths([*blocked_paths, ".agentic/feature_scan/.gitkeep"]) == blocked_paths
+
+
+def test_runtime_queue_item_files_are_blocked_except_gitkeep() -> None:
+    blocked_paths = [
+        ".agentic/improvement_queue/pending/IMP-20260605-120000.yaml",
+        ".agentic/maintenance_queue/approved/MAINT-20260605-120000.yaml",
+        ".agentic/feature_queue/closed/FEATURE-20260605-120000.yaml",
+    ]
+
+    assert violation_paths(
+        [
+            *blocked_paths,
+            ".agentic/improvement_queue/pending/.gitkeep",
+            ".agentic/maintenance_queue/approved/.gitkeep",
+            ".agentic/feature_queue/closed/.gitkeep",
+        ],
+    ) == blocked_paths
 
 
 def test_review_to_chatgpt_artifacts_are_blocked() -> None:
