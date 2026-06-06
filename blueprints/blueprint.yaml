@@ -2094,3 +2094,73 @@ stories:
         - missing_repo_settings
         - private_guidance_tracked
         - committed_generated_artifact
+
+  - id: STORY-036
+    slug: story_036_code_tour_feature_map
+    title: Code Tour and Feature Map
+    goal: Create beginner-friendly documentation that maps each major system feature to the code files, tests, docs, and story workspace that implement it.
+    why: New contributors and reviewers need a plain-language map from repository structure and commands to the code, tests, docs, and stories that support them.
+    acceptance_criteria:
+      - Add Story 036 to blueprints/blueprint.yaml.
+      - Add docs/code_tour.md.
+      - Add docs/command_map.md.
+      - Update README.md to link to both docs.
+      - Update docs/system_map.md if a link or short reference helps.
+      - Add or update tests that verify the new docs exist and README links to them.
+      - docs/code_tour.md explains .agentic/, .github/workflows/, blueprints/, docs/, src/agentic_dev/, stories/, tests/, Dockerfile / compose.yml, README.md, and pyproject.toml.
+      - docs/code_tour.md uses simple analogies for blueprints, stories, src/agentic_dev, tests, docs, and .agentic.
+      - docs/code_tour.md includes an ASCII visual from user command to tests.
+      - docs/command_map.md maps commands to CLI entry, core module, tests, and related story where obvious.
+      - If a mapping is uncertain, docs/command_map.md says best-known mapping.
+      - Do not add new CLI behavior unless absolutely necessary.
+      - Do not expose private prompts, private strategies, secrets, or generated runtime artifacts.
+    not_in_scope:
+      - No new CLI behavior.
+      - No cloud model calls.
+      - No automatic merge, deployment, repository visibility change, or approval.
+      - No private prompts, private strategy guidance, secrets, or generated runtime artifacts.
+    definition_of_done:
+      - docker compose build passes.
+      - pytest passes.
+      - ruff passes.
+      - artifact-policy passes.
+      - public-readiness passes.
+      - runtime-config validate passes.
+      - project-status runs.
+      - Story reports are written for development, testing, and local review.
+      - Review bundle is generated for Story 036 but generated bundle files are not committed.
+    test_plan:
+      test_layers_version: 1
+      unit_tests:
+        required: true
+        action: add_or_update
+        frequency: every_commit
+        evidence_or_reason: Add docs tests confirming the code tour and command map exist, README links to them, command_map mentions key commands, and code_tour mentions required repository areas.
+      integration_tests:
+        required: true
+        action: confirm_existing
+        frequency: every_pull_request
+        evidence_or_reason: Existing CLI and workflow tests cover command behavior; this story changes documentation only.
+      mock_e2e_tests:
+        required: true
+        action: confirm_existing
+        frequency: before_merge
+        evidence_or_reason: Existing mock E2E workflow coverage exercises the local story workflow.
+      live_read_only_checks:
+        required: false
+        action: not_applicable_with_reason
+        frequency: scheduled_or_before_release
+        evidence_or_reason: This documentation story does not call live external APIs.
+      remote_dev_smoke_tests:
+        required: false
+        action: not_applicable_with_reason
+        frequency: after_remote_dev_deploy
+        evidence_or_reason: This story does not deploy to a remote dev environment.
+    monitoring_plan:
+      logs_required: false
+      watch_for:
+        - missing_code_tour_doc
+        - stale_command_mapping
+        - stale_readme_link
+        - private_guidance_tracked
+        - committed_generated_artifact
