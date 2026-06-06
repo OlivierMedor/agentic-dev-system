@@ -1,0 +1,31 @@
+test_layers_version: 1
+unit_tests:
+  required: true
+  action: add_or_update
+  frequency: every_commit
+  evidence_or_reason: Add docs and repository hygiene tests confirming demo files
+    exist, README links the walkthrough, the demo blueprint has a stories list, no
+    .env files exist in the demo, and the walkthrough states that no cloud models,
+    secrets, or deployment are required.
+integration_tests:
+  required: true
+  action: confirm_existing
+  frequency: every_pull_request
+  evidence_or_reason: Existing CLI and workflow tests cover command behavior; this
+    story adds documentation and a minimal sample project.
+mock_e2e_tests:
+  required: true
+  action: confirm_existing
+  frequency: before_merge
+  evidence_or_reason: Existing mock E2E workflow coverage exercises the local story
+    workflow.
+live_read_only_checks:
+  required: false
+  action: not_applicable_with_reason
+  frequency: scheduled_or_before_release
+  evidence_or_reason: This demo is local-only and does not call live external APIs.
+remote_dev_smoke_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: after_remote_dev_deploy
+  evidence_or_reason: This story does not deploy to a remote dev environment.

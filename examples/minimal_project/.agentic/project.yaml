@@ -1,0 +1,3 @@
+project_name: minimal-task-tracker-demo
+project_type: toy_cli_project
+description: Public-safe demo project for learning the agentic-dev-system workflow.

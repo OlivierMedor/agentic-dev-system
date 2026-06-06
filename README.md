@@ -59,6 +59,13 @@ docker compose run --rm dev agentic next-step --story story_034_public_launch_pr
 The demo builds the local development container, runs tests and linting, prints
 project status, and asks the CLI what should happen next for an existing story.
 
+## Try The Minimal Demo
+
+For a small public-safe toy project, follow `docs/demo_walkthrough.md`. It shows
+how `examples/minimal_project/` moves from demo blueprint to generated story
+workspace, prepare phase, prompt pack, and review evidence without cloud models,
+secrets, or deployment.
+
 ## Why This Project Matters
 
 Agent-assisted development is easiest to trust when plans, prompts, checks, and

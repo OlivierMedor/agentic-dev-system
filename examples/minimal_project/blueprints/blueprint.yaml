@@ -1,0 +1,70 @@
+project:
+  name: minimal-task-tracker-demo
+  type: toy_cli_project
+  description: Public-safe demo project for agentic-dev-system walkthroughs.
+
+story_sizing_rule: >
+  Keep demo stories small enough to inspect quickly, with no external services,
+  no secrets, no deployment, and no production data.
+
+stories:
+  - id: STORY-001
+    slug: story_001_task_tracker_cli
+    title: Build A Mock Task Tracker CLI
+    goal: Build a simple task tracker CLI using mock data.
+    why: >
+      The demo needs a tiny fake project that exercises story generation and
+      preparation without external dependencies.
+    acceptance_criteria:
+      - The CLI can list mock tasks.
+      - The CLI can show a mock task by ID.
+      - The CLI can print a short help message.
+      - The implementation uses in-memory mock data only.
+      - >
+        No real APIs, cloud models, secrets, deployment, database, wallets, or
+        private strategy logic are required.
+    not_in_scope:
+      - No persistence.
+      - No database.
+      - No web UI.
+      - No deployment.
+      - No external API calls.
+      - No cloud model calls.
+    definition_of_done:
+      - Demo story workspace can be generated.
+      - Prepare phase can generate a prompt pack.
+      - Any local-finalize result is based on real reports, not fake completion.
+    test_plan:
+      test_layers_version: 1
+      unit_tests:
+        required: true
+        action: add_or_update
+        frequency: every_commit
+        evidence_or_reason: Add simple CLI behavior tests if the toy CLI is implemented.
+      integration_tests:
+        required: false
+        action: not_applicable_with_reason
+        frequency: every_pull_request
+        evidence_or_reason: The demo story is local-only and intentionally tiny.
+      mock_e2e_tests:
+        required: false
+        action: not_applicable_with_reason
+        frequency: before_merge
+        evidence_or_reason: The demo walkthrough focuses on story generation and preparation.
+      live_read_only_checks:
+        required: false
+        action: not_applicable_with_reason
+        frequency: scheduled_or_before_release
+        evidence_or_reason: The toy project does not call live services.
+      remote_dev_smoke_tests:
+        required: false
+        action: not_applicable_with_reason
+        frequency: after_remote_dev_deploy
+        evidence_or_reason: The toy project does not deploy anywhere.
+    monitoring_plan:
+      logs_required: false
+      watch_for:
+        - missing_demo_story_workspace
+        - missing_prompt_pack
+        - accidental_secret_or_env_file
+        - accidental_external_service_requirement

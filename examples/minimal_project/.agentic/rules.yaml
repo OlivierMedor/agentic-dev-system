@@ -1,0 +1,6 @@
+rules:
+  - Use mock data only.
+  - Do not add secrets, API keys, private keys, or .env files.
+  - Do not call cloud models automatically.
+  - Do not deploy the demo.
+  - Human review is required before treating generated evidence as complete.

@@ -1,0 +1,7 @@
+logs_required: false
+watch_for:
+- missing_demo_walkthrough
+- missing_demo_blueprint
+- stale_readme_link
+- committed_env_file
+- committed_generated_artifact
