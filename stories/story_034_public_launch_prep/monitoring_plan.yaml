@@ -1,0 +1,7 @@
+logs_required: true
+watch_for:
+- missing_public_doc
+- stale_readme_link
+- private_guidance_tracked
+- committed_generated_artifact
+- unclear_public_launch_instruction

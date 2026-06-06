@@ -69,3 +69,14 @@ Run these checks before any public-release decision:
 Also manually review the current branch and any open PR for credentials, private customer or
 operator context, generated review packets, local support tickets, feature scan runtime files, and
 queue item runtime files. Public readiness is a guardrail, not a full secret scanner.
+
+For the final public-launch sequence, use `docs/public_launch_checklist.md`.
+
+## License Decision
+
+Choose a license before making the repository public. This project does not select a license
+automatically unless the owner has already committed one.
+
+MIT is a common permissive option, but the human owner must decide which license fits the project
+goals and any legal requirements. Without a license, public visitors may not know what reuse rights
+they have.
