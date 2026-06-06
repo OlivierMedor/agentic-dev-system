@@ -1,0 +1,30 @@
+test_layers_version: 1
+unit_tests:
+  required: true
+  action: add_or_update
+  frequency: every_commit
+  evidence_or_reason: Add unit tests for public-readiness path matching, report writing,
+    CLI behavior, artifact-policy coverage, and README documentation links.
+integration_tests:
+  required: true
+  action: confirm_existing
+  frequency: every_pull_request
+  evidence_or_reason: Existing CLI tests cover command entry patterns; public-readiness
+    adds command-level coverage with mocked Git tracked files.
+mock_e2e_tests:
+  required: true
+  action: confirm_existing
+  frequency: before_merge
+  evidence_or_reason: Existing mock E2E workflow coverage exercises the local story
+    workflow.
+live_read_only_checks:
+  required: false
+  action: not_applicable_with_reason
+  frequency: scheduled_or_before_release
+  evidence_or_reason: This story reads local Git tracking only and does not call live
+    external APIs.
+remote_dev_smoke_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: after_remote_dev_deploy
+  evidence_or_reason: This story does not deploy to a remote dev environment.

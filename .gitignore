@@ -10,6 +10,9 @@ __pycache__/
 .env.*
 !.env.example
 
+# Private local operator guidance
+blueprints/agentic-architecture.md
+
 # Local/editor
 .vscode/
 .idea/
@@ -31,7 +34,11 @@ stories/**/remote_dev_validation/*
 .agentic/feature_scan/*.md
 .agentic/feature_scan/*.yaml
 !.agentic/feature_scan/.gitkeep
+.agentic/improvement_queue/**/IMP-*.yaml
+.agentic/maintenance_queue/**/MAINT-*.yaml
+.agentic/feature_queue/**/FEATURE-*.yaml
 reports/project_status_report.md
+reports/public_readiness_report.md
 # OS
 .DS_Store
 Thumbs.db

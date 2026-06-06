@@ -21,6 +21,10 @@ Projects can also define per-agent runtime behavior in `.agentic/agent_runtime.y
 For the beginner-friendly end-to-end path from blueprint to human PR merge decision, see
 `docs/golden_path.md`.
 
+Before making any public-release decision, run the public-readiness guard and read
+`docs/public_readiness.md`. The private local file `blueprints/agentic-architecture.md` must remain
+untracked; use `blueprints/agentic-architecture.example.md` as the safe public example.
+
 ## Runtime config
 
 The runtime config is a project-level YAML file at `.agentic/agent_runtime.yaml`.
@@ -706,11 +710,28 @@ tracked by Git:
 docker compose run --rm dev agentic artifact-policy
 ```
 
-The command uses `git ls-files` and fails if tracked files include generated review bundle files,
-generated cloud review packet files, support queue runtime YAML or Markdown files, feature scan
-runtime YAML or Markdown files,
+The command uses `git ls-files` and fails if tracked files include private operator guidance,
+generated review bundle files, generated cloud review packet files, support queue runtime YAML or
+Markdown files, feature scan runtime YAML or Markdown files, runtime queue item YAML files,
 `review_to_chatgpt/`, zip files, `.env`, or `.env.*` files. It allows `.gitkeep` inside generated
 artifact folders and `.env.example`.
+
+## Check public readiness
+
+Run this from the repo root before any decision to make the repository public:
+
+```powershell
+docker compose run --rm dev agentic public-readiness
+```
+
+The command checks Git-tracked files for private operator guidance, environment files, generated
+review artifacts, runtime queue files, feature scan runtime files, zip archives, and other files
+that must stay local. It writes `reports/public_readiness_report.md` and does not delete files,
+call cloud models, commit, push, merge, or deploy.
+
+See `docs/public_readiness.md` for the full checklist and the relationship between the private
+`blueprints/agentic-architecture.md` file and the public
+`blueprints/agentic-architecture.example.md` template.
 
 ## Local checks
 

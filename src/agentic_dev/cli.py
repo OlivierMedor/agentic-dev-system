@@ -22,6 +22,10 @@ from agentic_dev.next_step import run_next_step
 from agentic_dev.prepare_story import prepare_story
 from agentic_dev.project_status import run_project_status
 from agentic_dev.prompt_pack import generate_prompt_pack
+from agentic_dev.public_readiness import (
+    format_public_readiness_terminal_report,
+    run_public_readiness,
+)
 from agentic_dev.quality_gate import run_quality_gate
 from agentic_dev.queue_management import (
     ALL_QUEUE_STATUSES,
@@ -568,6 +572,17 @@ def main() -> None:
         help="Fail when forbidden generated artifacts or environment files are tracked.",
     )
     artifact_policy_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
+    public_readiness_parser = subparsers.add_parser(
+        "public-readiness",
+        help="Check whether tracked files are safe for eventual public release.",
+    )
+    public_readiness_parser.add_argument(
         "--project",
         type=Path,
         default=Path.cwd(),
@@ -1157,6 +1172,13 @@ def main() -> None:
         if args.command == "artifact-policy":
             result = check_artifact_policy(args.project)
             print(format_artifact_policy_report(result))
+
+            if not result.passed:
+                parser.exit(status=1)
+
+        if args.command == "public-readiness":
+            result = run_public_readiness(args.project)
+            print(format_public_readiness_terminal_report(result))
 
             if not result.passed:
                 parser.exit(status=1)

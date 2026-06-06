@@ -37,10 +37,11 @@ Story workspaces are generated from the blueprint. CI runs `agentic generate-sto
 
 ## Why generated artifacts are blocked
 
-Review bundles, cloud review packets, `review_to_chatgpt/`, zip files, and local environment files
-are generated or machine-specific artifacts. CI runs `agentic artifact-policy` so pull requests fail
-when any of those files are tracked by Git. The policy allows `.gitkeep` files inside generated
-artifact folders and `.env.example` as a safe template.
+Review bundles, cloud review packets, runtime queue item files, private operator guidance,
+`review_to_chatgpt/`, zip files, and local environment files are generated, private, or
+machine-specific artifacts. CI runs `agentic artifact-policy` so pull requests fail when any of
+those files are tracked by Git. The policy allows `.gitkeep` files inside generated artifact folders
+and `.env.example` as a safe template.
 
 ## When CI fails
 
@@ -55,4 +56,7 @@ docker compose run --rm dev agentic artifact-policy
 git status --short
 ```
 
-Commit any intended generated story files or source changes before pushing again. Remove generated review artifacts, zip files, and environment-specific files from Git tracking before pushing. Do not commit secrets, `.env` files, private keys, or environment-specific credentials.
+Commit any intended generated story files or source changes before pushing again. Remove generated
+review artifacts, runtime queue item files, private operator guidance, zip files, and
+environment-specific files from Git tracking before pushing. Do not commit secrets, `.env` files,
+private keys, or environment-specific credentials.
