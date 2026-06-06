@@ -12,13 +12,17 @@ stories:
     slug: story_001_task_tracker_cli
     title: Build A Mock Task Tracker CLI
     goal: Build a simple task tracker CLI using mock data.
-    why: The demo needs a tiny fake project that exercises story generation and preparation without external dependencies.
+    why: >
+      The demo needs a tiny fake project that exercises story generation and
+      preparation without external dependencies.
     acceptance_criteria:
       - The CLI can list mock tasks.
       - The CLI can show a mock task by ID.
       - The CLI can print a short help message.
       - The implementation uses in-memory mock data only.
-      - No real APIs, cloud models, secrets, deployment, database, wallets, or private strategy logic are required.
+      - >
+        No real APIs, cloud models, secrets, deployment, database, wallets, or
+        private strategy logic are required.
     not_in_scope:
       - No persistence.
       - No database.

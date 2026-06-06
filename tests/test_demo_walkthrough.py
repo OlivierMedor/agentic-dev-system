@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import yaml
@@ -25,9 +26,17 @@ def test_readme_links_to_demo_walkthrough() -> None:
 def test_demo_blueprint_contains_stories_list() -> None:
     blueprint = yaml.safe_load(DEMO_BLUEPRINT_PATH.read_text(encoding="utf-8"))
 
+    assert isinstance(blueprint, dict)
     assert isinstance(blueprint["stories"], list)
     assert blueprint["stories"]
     assert "Build a simple task tracker CLI using mock data." in str(blueprint)
+
+
+def test_demo_blueprint_yaml_parses() -> None:
+    blueprint = yaml.safe_load(DEMO_BLUEPRINT_PATH.read_text(encoding="utf-8"))
+
+    assert isinstance(blueprint, dict)
+    assert "stories" in blueprint
 
 
 def test_demo_contains_no_env_files() -> None:
@@ -46,3 +55,10 @@ def test_demo_docs_state_no_cloud_secrets_or_deployment_required() -> None:
     assert "does not require cloud models" in walkthrough
     assert "secrets" in walkthrough
     assert "deployment" in walkthrough
+
+
+def test_demo_walkthrough_uses_visible_story_name() -> None:
+    walkthrough = DEMO_DOC_PATH.read_text(encoding="utf-8")
+
+    assert "story_001_task_tracker_cli" in walkthrough
+    assert re.search(r"<[^>\n]+>", walkthrough) is None
