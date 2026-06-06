@@ -124,17 +124,18 @@ core module, tests, and related story workspace.
 
 ## Current Status
 
-This project is preparing for a future public launch. The core local workflow is
-implemented for story generation, agent assignment, prompt packs, prepare,
-test-layer checks, review bundles, quality gates, local finalization, manual
-cloud review packet preparation, cloud review result recording, merge readiness,
-runtime config validation, queue handling, public-readiness checks, and project
-status reporting.
+This repository is public and under active development. It is a
+portfolio-ready v0.1 / early public version of the local workflow, with story
+generation, agent assignment, prompt packs, prepare, test-layer checks, review
+bundles, quality gates, local finalization, manual cloud review packet
+preparation, cloud review result recording, merge readiness, runtime config
+validation, queue handling, public-readiness checks, and project status
+reporting.
 
 LangGraph is currently used for safe local `workflow-preview` and
 `workflow-run` phases. It is not an autonomous agent executor.
 
-Before changing repository visibility, use `docs/public_launch_checklist.md`.
+For release and repository hygiene, use `docs/public_launch_checklist.md`.
 
 ## Safety Model
 
@@ -166,16 +167,17 @@ That file is ignored and blocked by policy. The public-safe example is
 - `docs/command_map.md` maps commands to code, tests, and related stories.
 - `docs/public_readiness.md` explains what must stay out of Git before a public
   release.
-- `docs/public_launch_checklist.md` is the final manual checklist before making
-  the repository public.
-- `docs/repo_settings.md` suggests GitHub description, topics, and public repo
-  settings.
+- `docs/public_launch_checklist.md` is the manual checklist for public repo and
+  release hygiene.
+- `docs/github_metadata.md` suggests GitHub description, topics, website field,
+  and manual setup steps.
+- `docs/repo_settings.md` suggests public repo settings and links to metadata
+  guidance.
 - `docs/langgraph_workflow.md` explains the current LangGraph preview and safe
   workflow-run phases.
 - `docs/ci_cd.md` explains CI behavior.
 
 ## License
 
-Choose a license before making the repository public. MIT is a common
-permissive option, but the repository owner must decide which license fits the
-project.
+The repository owner still controls the license decision. No `LICENSE` file is
+added automatically unless the owner explicitly requests it.

@@ -1,8 +1,9 @@
 # Public Launch Checklist
 
-Use this checklist before changing the GitHub repository visibility to public.
-The final visibility change is manual and should happen only after the human
-owner reviews the repository, license, CI, and local checks.
+Use this checklist before public release-readiness updates, repository metadata
+changes, or any future repository visibility changes. The final visibility,
+license, release, and metadata decisions are manual and should happen only after
+the human owner reviews the repository, CI, and local checks.
 
 ## Required Local Checks
 
@@ -41,14 +42,15 @@ no license is chosen, public visitors may not know what reuse rights they have.
 
 ## GitHub And Release Readiness
 
-- Confirm CI passes on the public-launch PR.
-- Review `docs/repo_settings.md` for suggested GitHub description, topics,
-  website field, and public repository settings.
+- Confirm CI passes on the release-readiness PR.
+- Review `docs/github_metadata.md` for suggested GitHub description, topics,
+  website field guidance, and manual setup steps.
+- Review `docs/repo_settings.md` for public repository settings.
 - Confirm branch protection and review expectations are acceptable.
 - Confirm open issues, PR text, and story reports are public-safe.
 - Confirm generated local reports under ignored paths are not staged.
 - Confirm the human owner has reviewed the final diff.
-- Then change GitHub repository visibility manually.
+- If any repository visibility change is needed later, change GitHub repository visibility manually in the GitHub UI.
 
 Do not merge, deploy, publish packages, or change repository visibility from the
 CLI workflow.

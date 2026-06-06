@@ -1,0 +1,8 @@
+logs_required: false
+watch_for:
+- stale_public_launch_wording
+- missing_github_metadata_doc
+- missing_release_notes
+- missing_metadata_topic
+- committed_generated_artifact
+- private_guidance_tracked

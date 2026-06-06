@@ -1,34 +1,17 @@
 # Repository Settings
 
-These are suggested public GitHub settings for the repository owner to apply
+These are suggested public GitHub settings for the repository owner to review
 manually in the GitHub UI. The CLI does not configure repository metadata,
 visibility, topics, branch protection, or licenses.
 
-## Suggested Description
-
-A local-first agentic development workflow system with story workspaces, prompt packs, review bundles, quality gates, CI/CD, and LangGraph-safe workflow phases.
-
-## Suggested Topics
-
-- `agentic-ai`
-- `ai-engineering`
-- `developer-tools`
-- `langgraph`
-- `python`
-- `docker`
-- `ci-cd`
-- `code-review`
-- `software-automation`
-
-## Suggested Website Field
-
-Use a portfolio site URL later, if available.
+For the suggested repository description, topics, website field guidance, and
+manual metadata setup steps, see `docs/github_metadata.md`.
 
 ## Public Repository Settings
 
-Before making the repository public:
+For the public repository:
 
-- Confirm CI passes on the public-readiness PR.
+- Confirm CI passes on the release-readiness PR.
 - Confirm branch protection and review expectations are set manually.
 - Confirm generated artifacts, runtime queue files, `.env` files, and private
   local guidance are untracked.
@@ -37,6 +20,7 @@ Before making the repository public:
 - Confirm the human owner has reviewed the final repository visibility decision.
 
 Topics and the repository description are configured manually in the GitHub UI.
+Do not use local workflow commands to change repository metadata.
 
 ## License Note
 

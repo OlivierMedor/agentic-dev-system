@@ -2238,3 +2238,82 @@ stories:
         - stale_readme_link
         - committed_env_file
         - committed_generated_artifact
+
+  - id: STORY-038
+    slug: story_038_public_metadata_release_readiness
+    title: Public Metadata and Release Readiness
+    goal: Clean up the public repo status, GitHub metadata guidance, and first release-readiness docs.
+    why: The repository is public and needs current README wording, manual GitHub metadata guidance, v0.1 release notes, and tests that catch stale public-launch language.
+    acceptance_criteria:
+      - Add Story 038 to blueprints/blueprint.yaml.
+      - Update README.md so it says the repo is public and under active development.
+      - Update README.md so it says the system is portfolio-ready v0.1 / early public version.
+      - Ensure README.md no longer says the repo is preparing for a future public launch.
+      - Keep the human-approval safety model clear.
+      - Keep README.md concise.
+      - Add docs/github_metadata.md with suggested GitHub description, topics, website field guidance, and manual setup steps.
+      - docs/github_metadata.md explains that GitHub description and topics are set manually in the GitHub UI.
+      - docs/github_metadata.md mentions that a portfolio website URL can be added later.
+      - Add docs/release_notes_v0_1.md summarizing v0.1 features and what is not included yet.
+      - docs/release_notes_v0_1.md mentions blueprint-to-story workflow, story workspaces, agent prompt packs, review bundles, quality gates, test layers, support/improvement/maintenance/feature queues, public-readiness guard, minimal demo project, code tour and command map, and LangGraph workflow-preview and workflow-run phases.
+      - Update docs/public_launch_checklist.md if needed.
+      - Update docs/repo_settings.md if needed.
+      - Add or update tests verifying README/public docs are current.
+      - Do not add new CLI features.
+      - Do not expose private prompts, secrets, generated runtime artifacts, or private strategy logic.
+      - Do not add a LICENSE file unless the owner explicitly requested it.
+      - Keep license guidance as a decision the owner still controls.
+    not_in_scope:
+      - No new CLI features.
+      - No cloud model calls.
+      - No automatic merge, deployment, repository visibility change, GitHub metadata change, or approval.
+      - No automatic license selection or LICENSE file creation.
+      - No private prompts, private strategy guidance, secrets, generated runtime artifacts, or local-only operator details.
+    definition_of_done:
+      - docker compose build passes.
+      - pytest passes.
+      - ruff passes.
+      - artifact-policy passes.
+      - public-readiness passes.
+      - runtime-config validate passes.
+      - project-status runs.
+      - Story 038 prepare workflow-run passes.
+      - Story 038 local-finalize workflow-run passes.
+      - Story 038 cloud-review-prep workflow-run passes.
+      - Review bundle is generated for Story 038 but generated bundle files are not committed.
+    test_plan:
+      test_layers_version: 1
+      unit_tests:
+        required: true
+        action: add_or_update
+        frequency: every_commit
+        evidence_or_reason: Add public-doc tests verifying README says public and under active development, does not contain stale future-launch wording, docs/github_metadata.md and docs/release_notes_v0_1.md exist, metadata contains the suggested description and topics, and release notes mention LangGraph, review bundles, quality gates, and minimal demo.
+      integration_tests:
+        required: true
+        action: confirm_existing
+        frequency: every_pull_request
+        evidence_or_reason: Existing CLI and workflow tests cover command behavior; this story changes documentation and repository metadata guidance only.
+      mock_e2e_tests:
+        required: true
+        action: confirm_existing
+        frequency: before_merge
+        evidence_or_reason: Existing mock E2E workflow coverage exercises the local story workflow.
+      live_read_only_checks:
+        required: false
+        action: not_applicable_with_reason
+        frequency: scheduled_or_before_release
+        evidence_or_reason: This story reads and updates local documentation only and does not call live external APIs.
+      remote_dev_smoke_tests:
+        required: false
+        action: not_applicable_with_reason
+        frequency: after_remote_dev_deploy
+        evidence_or_reason: This story does not deploy to a remote dev environment.
+    monitoring_plan:
+      logs_required: false
+      watch_for:
+        - stale_public_launch_wording
+        - missing_github_metadata_doc
+        - missing_release_notes
+        - missing_metadata_topic
+        - committed_generated_artifact
+        - private_guidance_tracked
