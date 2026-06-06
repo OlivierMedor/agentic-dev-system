@@ -4,7 +4,9 @@ This guide explains the normal way to use `agentic-dev-system` from blueprint to
 human PR merge decision. It is written for operators who are new to the project.
 
 For a diagram-first map of the same system, see `docs/system_map.md`. Before
-making the repository public, use `docs/public_launch_checklist.md`.
+making the repository public, use `docs/public_launch_checklist.md`. Suggested
+GitHub description, topics, and repository settings live in
+`docs/repo_settings.md`.
 
 The CLI examples show the command after `agentic`. In Docker, run them from the
 repo root as:
@@ -15,10 +17,10 @@ docker compose run --rm dev agentic <command>
 
 ## What the system is
 
-`agentic-dev-system` is a local workflow tool for agent-assisted development. It
-turns a product blueprint into story workspaces, prepares agent prompts, records
-local evidence, prepares review packets, and tells the human owner when a story
-has enough evidence for a merge decision.
+`agentic-dev-system` is a local-first workflow tool for agent-assisted
+development. It turns a product blueprint into story workspaces, prepares agent
+prompts, records local evidence, prepares review packets, and tells the human
+owner when a story has enough evidence for a merge decision.
 
 It does not replace the human owner. It does not merge PRs, deploy, call cloud
 models automatically, or approve its own work.

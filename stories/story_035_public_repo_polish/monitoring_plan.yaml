@@ -1,0 +1,7 @@
+logs_required: true
+watch_for:
+- missing_readme_badge
+- stale_readme_link
+- missing_repo_settings
+- private_guidance_tracked
+- committed_generated_artifact

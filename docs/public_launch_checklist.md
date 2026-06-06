@@ -42,6 +42,8 @@ no license is chosen, public visitors may not know what reuse rights they have.
 ## GitHub And Release Readiness
 
 - Confirm CI passes on the public-launch PR.
+- Review `docs/repo_settings.md` for suggested GitHub description, topics,
+  website field, and public repository settings.
 - Confirm branch protection and review expectations are acceptable.
 - Confirm open issues, PR text, and story reports are public-safe.
 - Confirm generated local reports under ignored paths are not staged.

@@ -1,29 +1,18 @@
 # Agentic Development System
 
-`agentic-dev-system` is a local CLI and repo pattern for repeatable
-agent-assisted software development. It turns an approved blueprint into story
-workspaces, prepares agent prompt packs, records local evidence, creates review
-handoffs, and shows when a story is ready for a human merge decision.
+[![CI](https://github.com/OlivierMedor/agentic-dev-system/actions/workflows/ci.yml/badge.svg)](https://github.com/OlivierMedor/agentic-dev-system/actions/workflows/ci.yml)
 
-The system is intentionally conservative: it does not call cloud models
-automatically, does not deploy, does not merge pull requests, and does not
-approve its own work.
+`agentic-dev-system` is a local-first agentic development workflow system. It
+turns approved blueprints into story workspaces, separates planning,
+development, testing, review, cloud review preparation, and human approval, and
+keeps every step visible in files a reviewer can inspect.
 
-## Why It Exists
+The system is intentionally conservative: it does not call cloud models automatically,
+does not merge, does not deploy, and does not approve its own work. Human approval remains required.
 
-Agent-assisted development can become hard to review when plans, prompts,
-checks, and handoffs are scattered. This repo keeps those pieces in predictable
-places:
-
-- `blueprints/` holds planned stories.
-- `stories/` holds one workspace per story.
-- `src/agentic_dev/` holds the CLI implementation.
-- `tests/` holds automated checks.
-- `docs/` holds public workflow documentation.
-- `.agentic/` holds local runtime config and ignored queue state.
-
-The goal is not to remove the human owner. The goal is to make every story
-traceable from plan to tests to review evidence.
+It uses Docker, Python, pytest, Ruff, GitHub Actions, and LangGraph-safe
+workflow phases. LangGraph is used for deterministic local workflow phases, not
+for autonomous agent execution.
 
 ## Workflow At A Glance
 
@@ -32,9 +21,6 @@ Blueprint
   |
   v
 agentic generate-stories
-  |
-  v
-stories/story_x/
   |
   v
 agentic workflow-run --phase prepare --execute
@@ -57,6 +43,39 @@ human merge decision
 
 For diagrams of the full system, see `docs/system_map.md`. For the
 beginner-friendly operator flow, see `docs/golden_path.md`.
+
+## Quick Demo
+
+Run these commands from the repository root:
+
+```powershell
+docker compose build
+docker compose run --rm dev pytest
+docker compose run --rm dev ruff check .
+docker compose run --rm dev agentic project-status
+docker compose run --rm dev agentic next-step --story story_034_public_launch_prep
+```
+
+The demo builds the local development container, runs tests and linting, prints
+project status, and asks the CLI what should happen next for an existing story.
+
+## Why This Project Matters
+
+Agent-assisted development is easiest to trust when plans, prompts, checks, and
+handoffs are not scattered across chat history. This repo keeps those pieces in
+predictable places:
+
+- `blueprints/` holds planned stories.
+- `stories/` holds one workspace per story.
+- `src/agentic_dev/` holds the CLI implementation.
+- `tests/` holds automated checks.
+- `docs/` holds public workflow documentation.
+- `.agentic/` holds local runtime config and ignored queue state.
+
+The goal is not to remove the human owner. The goal is to make every story
+traceable from plan to tests to review evidence, so reviewers can see what was
+requested, what changed, what passed, what still needs human judgment, and what
+must stay local.
 
 ## Core Commands
 
@@ -106,7 +125,8 @@ Before changing repository visibility, use `docs/public_launch_checklist.md`.
 
 ## Safety Model
 
-The CLI prepares and records evidence. It does not:
+The safety model is deliberately boring: the CLI prepares local artifacts,
+records evidence, and reports status. It does not:
 
 - Call cloud models automatically.
 - Run generated prompts automatically.
@@ -115,6 +135,10 @@ The CLI prepares and records evidence. It does not:
 - Approve pull requests or merge readiness on behalf of the human owner.
 - Track secrets, `.env` files, generated review artifacts, or local queue
   runtime files.
+
+Cloud review is a manual handoff. The system can prepare
+`cloud_review_export.md`, but a human decides whether to send it to a model,
+records the result, reviews the PR, and decides whether to merge.
 
 Private local operator guidance belongs in `blueprints/agentic-architecture.md`.
 That file is ignored and blocked by policy. The public-safe example is
@@ -128,6 +152,8 @@ That file is ignored and blocked by policy. The public-safe example is
   release.
 - `docs/public_launch_checklist.md` is the final manual checklist before making
   the repository public.
+- `docs/repo_settings.md` suggests GitHub description, topics, and public repo
+  settings.
 - `docs/langgraph_workflow.md` explains the current LangGraph preview and safe
   workflow-run phases.
 - `docs/ci_cd.md` explains CI behavior.
