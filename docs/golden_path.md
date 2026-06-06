@@ -3,6 +3,9 @@
 This guide explains the normal way to use `agentic-dev-system` from blueprint to
 human PR merge decision. It is written for operators who are new to the project.
 
+For a diagram-first map of the same system, see `docs/system_map.md`. Before
+making the repository public, use `docs/public_launch_checklist.md`.
+
 The CLI examples show the command after `agentic`. In Docker, run them from the
 repo root as:
 
