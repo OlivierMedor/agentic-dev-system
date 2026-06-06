@@ -9,13 +9,20 @@ SYSTEM_MAP_PATH = Path("docs/system_map.md")
 PUBLIC_LAUNCH_CHECKLIST_PATH = Path("docs/public_launch_checklist.md")
 PUBLIC_READINESS_PATH = Path("docs/public_readiness.md")
 GOLDEN_PATH_PATH = Path("docs/golden_path.md")
+REPO_SETTINGS_PATH = Path("docs/repo_settings.md")
 ARCHITECTURE_EXAMPLE_PATH = Path("blueprints/agentic-architecture.example.md")
 PRIVATE_ARCHITECTURE_PATH = "blueprints/agentic-architecture.md"
+SUGGESTED_REPO_DESCRIPTION = (
+    "A local-first agentic development workflow system with story workspaces, "
+    "prompt packs, review bundles, quality gates, CI/CD, and LangGraph-safe "
+    "workflow phases."
+)
 
 
 def test_public_launch_docs_exist() -> None:
     assert SYSTEM_MAP_PATH.exists()
     assert PUBLIC_LAUNCH_CHECKLIST_PATH.exists()
+    assert REPO_SETTINGS_PATH.exists()
 
 
 def test_readme_links_to_public_docs() -> None:
@@ -25,6 +32,19 @@ def test_readme_links_to_public_docs() -> None:
     assert "docs/public_launch_checklist.md" in readme
     assert "docs/public_readiness.md" in readme
     assert "docs/golden_path.md" in readme
+    assert "docs/repo_settings.md" in readme
+
+
+def test_readme_public_repo_polish_content() -> None:
+    readme = README_PATH.read_text(encoding="utf-8")
+
+    assert "actions/workflows/ci.yml/badge.svg" in readme
+    assert "## Quick Demo" in readme
+    assert "## Why This Project Matters" in readme
+    assert "## Safety Model" in readme
+    assert "local-first agentic development workflow system" in readme
+    assert "does not call cloud models automatically" in readme
+    assert "Human approval remains required" in readme
 
 
 def test_public_architecture_example_exists() -> None:
@@ -80,8 +100,36 @@ def test_public_launch_checklist_mentions_required_checks() -> None:
         "Confirm no support queue runtime tickets",
         "Confirm `blueprints/agentic-architecture.md` is not tracked",
         "MIT is a common permissive option",
+        "docs/repo_settings.md",
         "change GitHub repository visibility manually",
     ]
 
     for phrase in required_phrases:
         assert phrase in checklist
+
+
+def test_repo_settings_doc_contains_suggested_metadata() -> None:
+    settings = REPO_SETTINGS_PATH.read_text(encoding="utf-8")
+
+    required_phrases = [
+        SUGGESTED_REPO_DESCRIPTION,
+        "portfolio site URL later, if available",
+        "configured manually in the GitHub UI",
+        "The owner should choose a license before inviting outside reuse",
+        "Do not choose",
+        "LICENSE",
+    ]
+    required_topics = [
+        "agentic-ai",
+        "ai-engineering",
+        "developer-tools",
+        "langgraph",
+        "python",
+        "docker",
+        "ci-cd",
+        "code-review",
+        "software-automation",
+    ]
+
+    for phrase in [*required_phrases, *required_topics]:
+        assert phrase in settings

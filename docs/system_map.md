@@ -4,6 +4,10 @@ This map shows how the local workflow fits together. It is public-facing and
 omits private operator instructions, private prompts, secrets, and generated
 runtime artifacts.
 
+At a high level, the system turns blueprint entries into story workspaces, uses
+safe local workflow phases to prepare and finalize evidence, then leaves cloud
+review and merge decisions under human control.
+
 ## Blueprint To Story Flow
 
 ```text
@@ -32,11 +36,14 @@ agentic workflow-run --phase cloud-review-prep --execute
   |
   v
 human/cloud review
+  |
+  v
+human merge decision
 ```
 
 The blueprint is the planning source. `generate-stories` turns approved entries
 into story folders. `workflow-run` then handles deterministic local setup and
-finalization steps. Agent execution and cloud review remain manual or
+finalization steps. Agent execution, cloud review, and merge remain manual or
 operator-controlled; the CLI prepares evidence and records results.
 
 ## Story Workspace Structure
