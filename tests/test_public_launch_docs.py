@@ -10,6 +10,8 @@ PUBLIC_LAUNCH_CHECKLIST_PATH = Path("docs/public_launch_checklist.md")
 PUBLIC_READINESS_PATH = Path("docs/public_readiness.md")
 GOLDEN_PATH_PATH = Path("docs/golden_path.md")
 REPO_SETTINGS_PATH = Path("docs/repo_settings.md")
+GITHUB_METADATA_PATH = Path("docs/github_metadata.md")
+RELEASE_NOTES_V0_1_PATH = Path("docs/release_notes_v0_1.md")
 ARCHITECTURE_EXAMPLE_PATH = Path("blueprints/agentic-architecture.example.md")
 PRIVATE_ARCHITECTURE_PATH = "blueprints/agentic-architecture.md"
 SUGGESTED_REPO_DESCRIPTION = (
@@ -23,6 +25,8 @@ def test_public_launch_docs_exist() -> None:
     assert SYSTEM_MAP_PATH.exists()
     assert PUBLIC_LAUNCH_CHECKLIST_PATH.exists()
     assert REPO_SETTINGS_PATH.exists()
+    assert GITHUB_METADATA_PATH.exists()
+    assert RELEASE_NOTES_V0_1_PATH.exists()
 
 
 def test_readme_links_to_public_docs() -> None:
@@ -33,6 +37,7 @@ def test_readme_links_to_public_docs() -> None:
     assert "docs/public_readiness.md" in readme
     assert "docs/golden_path.md" in readme
     assert "docs/repo_settings.md" in readme
+    assert "docs/github_metadata.md" in readme
 
 
 def test_readme_public_repo_polish_content() -> None:
@@ -45,6 +50,14 @@ def test_readme_public_repo_polish_content() -> None:
     assert "local-first agentic development workflow system" in readme
     assert "does not call cloud models automatically" in readme
     assert "Human approval remains required" in readme
+
+
+def test_readme_public_release_readiness_content_is_current() -> None:
+    readme = README_PATH.read_text(encoding="utf-8")
+
+    assert "public and under active development" in readme
+    assert "portfolio-ready v0.1 / early public version" in readme
+    assert "preparing for a future public launch" not in readme
 
 
 def test_public_architecture_example_exists() -> None:
@@ -108,16 +121,13 @@ def test_public_launch_checklist_mentions_required_checks() -> None:
         assert phrase in checklist
 
 
-def test_repo_settings_doc_contains_suggested_metadata() -> None:
-    settings = REPO_SETTINGS_PATH.read_text(encoding="utf-8")
+def test_github_metadata_doc_contains_suggested_metadata() -> None:
+    metadata = GITHUB_METADATA_PATH.read_text(encoding="utf-8")
 
     required_phrases = [
         SUGGESTED_REPO_DESCRIPTION,
-        "portfolio site URL later, if available",
-        "configured manually in the GitHub UI",
-        "The owner should choose a license before inviting outside reuse",
-        "Do not choose",
-        "LICENSE",
+        "GitHub UI",
+        "portfolio website URL can be added later",
     ]
     required_topics = [
         "agentic-ai",
@@ -132,4 +142,33 @@ def test_repo_settings_doc_contains_suggested_metadata() -> None:
     ]
 
     for phrase in [*required_phrases, *required_topics]:
+        assert phrase in metadata
+
+
+def test_release_notes_v0_1_mentions_required_features() -> None:
+    release_notes = RELEASE_NOTES_V0_1_PATH.read_text(encoding="utf-8")
+
+    required_phrases = [
+        "LangGraph",
+        "review bundles",
+        "quality gates",
+        "Minimal demo project",
+    ]
+
+    for phrase in required_phrases:
+        assert phrase in release_notes
+
+
+def test_repo_settings_doc_links_to_github_metadata_and_keeps_license_manual() -> None:
+    settings = REPO_SETTINGS_PATH.read_text(encoding="utf-8")
+
+    required_phrases = [
+        "docs/github_metadata.md",
+        "configured manually in the GitHub UI",
+        "The owner should choose a license before inviting outside reuse",
+        "Do not choose",
+        "LICENSE",
+    ]
+
+    for phrase in required_phrases:
         assert phrase in settings
