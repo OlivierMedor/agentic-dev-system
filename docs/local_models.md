@@ -91,6 +91,18 @@ docker compose run --rm dev agentic local-agent run-prompt --prompt-file prompt.
 execute model output, commit, push, merge, deploy, call GitHub APIs, expose
 secret values, or call cloud models.
 
+Create repeatable local-agent scorecard prompts, run them against a configured
+local model, and create a manual report:
+
+```powershell
+docker compose run --rm dev agentic local-model scorecard-create --force
+docker compose run --rm dev agentic local-model scorecard-run --model-label qwen3-coder-30b
+docker compose run --rm dev agentic local-model scorecard-report
+```
+
+See `docs/local_model_scorecard.md` for the scorecard workflow and manual
+comparison process.
+
 ## Recommended Model Roles
 
 - Qwen3-Coder-30B-A3B-Instruct: developer drafts and test drafts.

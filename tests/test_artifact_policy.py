@@ -18,6 +18,9 @@ def test_allowed_project_paths_do_not_violate_artifact_policy() -> None:
         "stories/story_011_artifact_policy_guard/remote_dev_validation/.gitkeep",
         ".agentic/support_queue/pending/.gitkeep",
         ".agentic/feature_scan/.gitkeep",
+        ".agentic/local_model_scorecard/prompts/developer_agent_prompt.md",
+        ".agentic/local_model_scorecard/scorecard_template.yaml",
+        ".agentic/local_model_scorecard/results/.gitkeep",
         ".agentic/improvement_queue/pending/.gitkeep",
         ".agentic/maintenance_queue/pending/.gitkeep",
         ".agentic/feature_queue/pending/.gitkeep",
@@ -86,6 +89,19 @@ def test_feature_scan_runtime_files_are_blocked_except_gitkeep() -> None:
     assert violation_paths([*blocked_paths, ".agentic/feature_scan/.gitkeep"]) == blocked_paths
 
 
+def test_local_model_scorecard_results_are_blocked_except_gitkeep() -> None:
+    blocked_paths = [
+        ".agentic/local_model_scorecard/results/qwen3/run_summary.md",
+        ".agentic/local_model_scorecard/results/qwen3/developer_agent_prompt_response.md",
+        ".agentic/local_model_scorecard/results/qwen3/developer_agent_prompt_raw_response.json",
+        "reports/local_model_scorecard_report.md",
+    ]
+
+    assert violation_paths(
+        [*blocked_paths, ".agentic/local_model_scorecard/results/.gitkeep"],
+    ) == blocked_paths
+
+
 def test_runtime_queue_item_files_are_blocked_except_gitkeep() -> None:
     blocked_paths = [
         ".agentic/improvement_queue/pending/IMP-20260605-120000.yaml",
@@ -121,6 +137,8 @@ def test_multiple_violations_are_all_reported() -> None:
         "stories/story_011_artifact_policy_guard/review_bundle/handoff.md",
         "stories/story_011_artifact_policy_guard/cloud_review_packet/cloud_review_prompt.md",
         "stories/story_011_artifact_policy_guard/remote_dev_validation/remote_dev_packet.md",
+        ".agentic/local_model_scorecard/results/qwen3/run_summary.md",
+        "reports/local_model_scorecard_report.md",
         "review_to_chatgpt/handoff.md",
         "agentic_story001_review.zip",
         ".env.local",
@@ -131,6 +149,8 @@ def test_multiple_violations_are_all_reported() -> None:
         "stories/story_011_artifact_policy_guard/review_bundle/handoff.md",
         "stories/story_011_artifact_policy_guard/cloud_review_packet/cloud_review_prompt.md",
         "stories/story_011_artifact_policy_guard/remote_dev_validation/remote_dev_packet.md",
+        ".agentic/local_model_scorecard/results/qwen3/run_summary.md",
+        "reports/local_model_scorecard_report.md",
         "review_to_chatgpt/handoff.md",
         "agentic_story001_review.zip",
         ".env.local",

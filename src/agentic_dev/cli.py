@@ -20,6 +20,11 @@ from agentic_dev.local_model_runtime import (
     run_local_model_dry_run,
     validate_local_model_runtime_config,
 )
+from agentic_dev.local_model_scorecard import (
+    create_local_model_scorecard,
+    create_local_model_scorecard_report,
+    run_local_model_scorecard,
+)
 from agentic_dev.maintenance_scan import (
     create_maintenance_scan_packet,
     record_maintenance_findings,
@@ -663,6 +668,57 @@ def main() -> None:
         help="Prompt to send to the local model. Defaults to a LOCAL_MODEL_OK check.",
     )
 
+    local_model_scorecard_create_parser = local_model_subparsers.add_parser(
+        "scorecard-create",
+        help="Create public-safe local model scorecard prompts and scoring template.",
+    )
+    local_model_scorecard_create_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    local_model_scorecard_create_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing scorecard prompt and template files.",
+    )
+
+    local_model_scorecard_run_parser = local_model_subparsers.add_parser(
+        "scorecard-run",
+        help="Run scorecard prompts against the configured local model and save responses.",
+    )
+    local_model_scorecard_run_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    local_model_scorecard_run_parser.add_argument(
+        "--model-label",
+        required=True,
+        help="Local label for this model run, such as qwen3-coder-30b.",
+    )
+    local_model_scorecard_run_parser.add_argument(
+        "--prompt-dir",
+        type=Path,
+        help=(
+            "Folder containing scorecard prompt markdown files. Defaults to "
+            ".agentic/local_model_scorecard/prompts."
+        ),
+    )
+
+    local_model_scorecard_report_parser = local_model_subparsers.add_parser(
+        "scorecard-report",
+        help="Create a manual local model scorecard report from saved results.",
+    )
+    local_model_scorecard_report_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
     local_agent_parser = subparsers.add_parser(
         "local-agent",
         help="Run bounded local-agent actions using the local model runtime.",
@@ -1277,6 +1333,40 @@ def main() -> None:
             if args.local_model_command == "dry-run":
                 result = run_local_model_dry_run(args.project, args.prompt)
                 print("Local model dry run succeeded.")
+                print(f"Report written to: {result.report_path}")
+
+            if args.local_model_command == "scorecard-create":
+                result = create_local_model_scorecard(args.project, args.force)
+                print(f"Local model scorecard created at: {result.scorecard_path}")
+
+                if result.created_files:
+                    print("\nCreated or updated:")
+                    for path in result.created_files:
+                        print(f"  - {path}")
+
+                if result.skipped_files:
+                    print("\nSkipped existing files:")
+                    for path in result.skipped_files:
+                        print(f"  - {path}")
+                    print("\nUse --force to overwrite existing scorecard files.")
+
+            if args.local_model_command == "scorecard-run":
+                result = run_local_model_scorecard(
+                    args.project,
+                    args.model_label,
+                    args.prompt_dir,
+                )
+                print("Local model scorecard run succeeded.")
+                print(f"Results written to: {result.result_path}")
+                print(f"Run summary written to: {result.run_summary_path}")
+                print(
+                    "Safety: output was saved only; no files were applied, no commands were "
+                    "executed, and no Git/GitHub/deploy actions were taken."
+                )
+
+            if args.local_model_command == "scorecard-report":
+                result = create_local_model_scorecard_report(args.project)
+                print("Local model scorecard report created.")
                 print(f"Report written to: {result.report_path}")
 
         if args.command == "local-agent":

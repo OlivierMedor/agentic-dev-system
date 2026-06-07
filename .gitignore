@@ -34,12 +34,14 @@ stories/**/remote_dev_validation/*
 .agentic/feature_scan/*.md
 .agentic/feature_scan/*.yaml
 !.agentic/feature_scan/.gitkeep
+.agentic/local_model_scorecard/results/
 .agentic/improvement_queue/**/IMP-*.yaml
 .agentic/maintenance_queue/**/MAINT-*.yaml
 .agentic/feature_queue/**/FEATURE-*.yaml
 reports/project_status_report.md
 reports/public_readiness_report.md
 reports/local_model_dry_run_report.md
+reports/local_model_scorecard_report.md
 # OS
 .DS_Store
 Thumbs.db
