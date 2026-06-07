@@ -1,9 +1,9 @@
 # Public Launch Checklist
 
 Use this checklist before public release-readiness updates, repository metadata
-changes, or any future repository visibility changes. The final visibility,
-license, release, and metadata decisions are manual and should happen only after
-the human owner reviews the repository, CI, and local checks.
+changes, or public release milestones. The final visibility, license, release,
+and metadata decisions are manual and should happen only after the human owner
+reviews the repository, CI, and local checks.
 
 ## Required Local Checks
 
@@ -33,16 +33,21 @@ the human owner reviews the repository, CI, and local checks.
 
 ## License Decision
 
-Choose a license before making the repository public. This project should not
-assume a license automatically unless the owner has already committed one.
+Choose a license before inviting outside reuse. This project should not assume a
+license automatically unless the owner has already committed one.
 
 MIT is a common permissive option for open source projects, but the human owner
 must decide which license fits the project goals and any legal requirements. If
-no license is chosen, public visitors may not know what reuse rights they have.
+no license is chosen, default copyright applies and outside reuse is not granted
+automatically.
 
 ## GitHub And Release Readiness
 
 - Confirm CI passes on the release-readiness PR.
+- Review `docs/release_process.md` for release approval rules and required
+  checks.
+- Review `docs/v0_1_release_checklist.md` for the v0.1 milestone checklist.
+- Review `docs/release_notes_v0_1.md` and `CHANGELOG.md`.
 - Review `docs/github_metadata.md` for suggested GitHub description, topics,
   website field guidance, and manual setup steps.
 - Review `docs/repo_settings.md` for public repository settings.
@@ -52,5 +57,5 @@ no license is chosen, public visitors may not know what reuse rights they have.
 - Confirm the human owner has reviewed the final diff.
 - If any repository visibility change is needed later, change GitHub repository visibility manually in the GitHub UI.
 
-Do not merge, deploy, publish packages, or change repository visibility from the
-CLI workflow.
+Do not merge, deploy, publish packages, create GitHub releases, call cloud
+models, or change repository visibility from the CLI workflow.

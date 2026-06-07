@@ -39,3 +39,9 @@ deployments.
 - A committed license decision or `LICENSE` file.
 - Full remote development deployment automation.
 - Real external service integrations for the minimal demo.
+
+## License Status
+
+No `LICENSE` file is included unless the human owner explicitly chooses one. In
+the absence of a license, default copyright applies and outside reuse is not
+granted automatically.

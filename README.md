@@ -147,7 +147,9 @@ reporting.
 LangGraph is currently used for safe local `workflow-preview` and
 `workflow-run` phases. It is not an autonomous agent executor.
 
-For release and repository hygiene, use `docs/public_launch_checklist.md`.
+For release and repository hygiene, use `docs/public_launch_checklist.md`,
+`docs/release_process.md`, `docs/v0_1_release_checklist.md`,
+`docs/release_notes_v0_1.md`, and `CHANGELOG.md`.
 
 ## Safety Model
 
@@ -181,6 +183,12 @@ That file is ignored and blocked by policy. The public-safe example is
   release.
 - `docs/public_launch_checklist.md` is the manual checklist for public repo and
   release hygiene.
+- `docs/release_process.md` explains how PR merges differ from GitHub releases
+  and what checks are required before a release.
+- `docs/v0_1_release_checklist.md` is the manual checklist for the v0.1
+  milestone.
+- `docs/release_notes_v0_1.md` summarizes the v0.1 release scope.
+- `CHANGELOG.md` summarizes public release changes.
 - `docs/github_metadata.md` suggests GitHub description, topics, website field,
   and manual setup steps.
 - `docs/repo_settings.md` suggests public repo settings and links to metadata
@@ -198,4 +206,5 @@ That file is ignored and blocked by policy. The public-safe example is
 ## License
 
 The repository owner still controls the license decision. No `LICENSE` file is
-added automatically unless the owner explicitly requests it.
+added automatically unless the owner explicitly requests it. Until a license is
+added, default copyright applies and outside reuse is not granted automatically.
