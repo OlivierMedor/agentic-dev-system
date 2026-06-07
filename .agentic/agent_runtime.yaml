@@ -78,3 +78,21 @@ support_policy:
     - business_decision_required
     - security_sensitive_decision
     - real_money_or_deployment_risk
+
+local_model_runtime:
+  enabled: false
+  provider: local_openai_compatible
+  base_url: http://host.docker.internal:1234/v1
+  model: qwen3-coder-30b-a3b-instruct
+  api_key_env: LOCAL_MODEL_API_KEY
+  timeout_seconds: 120
+  max_output_tokens: 4096
+  temperature: 0.2
+
+local_model_profiles:
+  lm_studio:
+    base_url: http://host.docker.internal:1234/v1
+    api_key_hint: lm-studio
+  ollama:
+    base_url: http://host.docker.internal:11434/v1
+    api_key_hint: ollama

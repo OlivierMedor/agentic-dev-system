@@ -13,6 +13,13 @@ from agentic_dev.improvement_scan import (
     create_improvement_scan_packet,
     record_improvement_suggestions,
 )
+from agentic_dev.local_model_runtime import (
+    DEFAULT_DRY_RUN_PROMPT,
+    format_local_model_validation_result,
+    run_local_agent_prompt,
+    run_local_model_dry_run,
+    validate_local_model_runtime_config,
+)
 from agentic_dev.maintenance_scan import (
     create_maintenance_scan_packet,
     record_maintenance_findings,
@@ -620,6 +627,74 @@ def main() -> None:
         help="Target project folder. Defaults to the current directory.",
     )
 
+    local_model_parser = subparsers.add_parser(
+        "local-model",
+        help="Validate and test a local OpenAI-compatible model runtime.",
+    )
+    local_model_subparsers = local_model_parser.add_subparsers(
+        dest="local_model_command",
+        required=True,
+    )
+
+    local_model_validate_parser = local_model_subparsers.add_parser(
+        "validate",
+        help="Validate the local model runtime config.",
+    )
+    local_model_validate_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
+    local_model_dry_run_parser = local_model_subparsers.add_parser(
+        "dry-run",
+        help="Send a simple prompt to the configured local model and save a report.",
+    )
+    local_model_dry_run_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    local_model_dry_run_parser.add_argument(
+        "--prompt",
+        default=DEFAULT_DRY_RUN_PROMPT,
+        help="Prompt to send to the local model. Defaults to a LOCAL_MODEL_OK check.",
+    )
+
+    local_agent_parser = subparsers.add_parser(
+        "local-agent",
+        help="Run bounded local-agent actions using the local model runtime.",
+    )
+    local_agent_subparsers = local_agent_parser.add_subparsers(
+        dest="local_agent_command",
+        required=True,
+    )
+
+    local_agent_run_prompt_parser = local_agent_subparsers.add_parser(
+        "run-prompt",
+        help="Send a prompt file to the local model and save the raw response.",
+    )
+    local_agent_run_prompt_parser.add_argument(
+        "--prompt-file",
+        type=Path,
+        required=True,
+        help="Prompt file to send to the local model.",
+    )
+    local_agent_run_prompt_parser.add_argument(
+        "--output-file",
+        type=Path,
+        required=True,
+        help="File where the raw local model response should be saved.",
+    )
+    local_agent_run_prompt_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
     support_ticket_parser = subparsers.add_parser(
         "support-ticket",
         help="Create and manage structured support tickets for blocked agents.",
@@ -1190,6 +1265,33 @@ def main() -> None:
             if args.runtime_config_command == "validate":
                 result = validate_runtime_config(args.project)
                 print(f"Runtime config is valid: {result.config_path}")
+
+        if args.command == "local-model":
+            if args.local_model_command == "validate":
+                result = validate_local_model_runtime_config(args.project)
+                print(format_local_model_validation_result(result))
+
+                if not result.passed:
+                    parser.exit(status=1)
+
+            if args.local_model_command == "dry-run":
+                result = run_local_model_dry_run(args.project, args.prompt)
+                print("Local model dry run succeeded.")
+                print(f"Report written to: {result.report_path}")
+
+        if args.command == "local-agent":
+            if args.local_agent_command == "run-prompt":
+                result = run_local_agent_prompt(
+                    args.project,
+                    args.prompt_file,
+                    args.output_file,
+                )
+                print("Local agent prompt run succeeded.")
+                print(f"Output written to: {result.report_path}")
+                print(
+                    "Safety: output was saved only; no files were applied, no commands were "
+                    "executed, and no Git/GitHub/deploy actions were taken."
+                )
 
         if args.command == "support-ticket":
             if args.support_ticket_command == "create":

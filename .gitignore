@@ -39,6 +39,7 @@ stories/**/remote_dev_validation/*
 .agentic/feature_queue/**/FEATURE-*.yaml
 reports/project_status_report.md
 reports/public_readiness_report.md
+reports/local_model_dry_run_report.md
 # OS
 .DS_Store
 Thumbs.db
