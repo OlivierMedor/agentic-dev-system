@@ -1,0 +1,33 @@
+scorecard_version: 1
+scoring_scale: Use 1-5 for score fields where 1 is poor and 5 is excellent.
+dimensions:
+- instruction_following
+- correctness
+- hallucination_control
+- code_quality
+- test_quality
+- safety_compliance
+- clarity
+- speed_notes
+- overall_fit_for_role
+recommended_role_mapping:
+- Developer Agent
+- Test Agent
+- Docs Agent
+- Reviewer Agent
+- Maintenance Agent
+scores:
+- model_label: ''
+  role: ''
+  prompt_file: ''
+  instruction_following: null
+  correctness: null
+  hallucination_control: null
+  code_quality: null
+  test_quality: null
+  safety_compliance: null
+  clarity: null
+  speed_notes: ''
+  overall_fit_for_role: ''
+  human_notes: ''
+winner: Leave blank until the human owner has scored comparable model runs.

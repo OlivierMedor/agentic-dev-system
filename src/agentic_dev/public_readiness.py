@@ -9,6 +9,7 @@ from agentic_dev.artifact_policy import (
     is_generated_cloud_review_packet_path,
     is_generated_remote_dev_validation_path,
     is_generated_review_bundle_path,
+    is_local_model_scorecard_result_path,
     is_runtime_queue_item_path,
     is_support_queue_runtime_path,
     normalize_git_path,
@@ -85,6 +86,12 @@ def public_readiness_violation_reason(
 
     if is_feature_scan_runtime_path(parts, filename):
         return "feature scan runtime files must remain untracked"
+
+    if is_local_model_scorecard_result_path(parts, filename):
+        return "local model scorecard result files must remain untracked"
+
+    if normalized_path == "reports/local_model_scorecard_report.md":
+        return "local model scorecard reports must remain untracked"
 
     if is_runtime_queue_item_path(parts, filename):
         return "queue runtime item files must remain untracked"
@@ -166,6 +173,8 @@ def format_public_readiness_report(result: PublicReadinessResult) -> str:
             "- `stories/**/remote_dev_validation/*` except `.gitkeep`",
             "- `.agentic/support_queue/**/*.yaml` and `*.md` runtime files",
             "- `.agentic/feature_scan/*.md` and `*.yaml` runtime files",
+            "- `.agentic/local_model_scorecard/results/**`",
+            "- `reports/local_model_scorecard_report.md`",
             "- `.agentic/improvement_queue/**/IMP-*.yaml`",
             "- `.agentic/maintenance_queue/**/MAINT-*.yaml`",
             "- `.agentic/feature_queue/**/FEATURE-*.yaml`",

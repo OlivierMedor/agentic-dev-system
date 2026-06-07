@@ -89,6 +89,24 @@ def find_artifact_policy_violations(tracked_files: list[str]) -> list[ArtifactPo
             )
             continue
 
+        if is_local_model_scorecard_result_path(parts, filename):
+            violations.append(
+                ArtifactPolicyViolation(
+                    path=normalized_path,
+                    reason="local model scorecard result file is tracked",
+                ),
+            )
+            continue
+
+        if normalized_path == "reports/local_model_scorecard_report.md":
+            violations.append(
+                ArtifactPolicyViolation(
+                    path=normalized_path,
+                    reason="local model scorecard report is tracked",
+                ),
+            )
+            continue
+
         if is_runtime_queue_item_path(parts, filename):
             violations.append(
                 ArtifactPolicyViolation(
@@ -166,6 +184,18 @@ def is_feature_scan_runtime_path(parts: list[str], filename: str) -> bool:
     return Path(filename).suffix.lower() in {".yaml", ".md"}
 
 
+def is_local_model_scorecard_result_path(parts: list[str], filename: str) -> bool:
+    if filename == ".gitkeep":
+        return False
+
+    return (
+        len(parts) >= 4
+        and parts[0] == ".agentic"
+        and parts[1] == "local_model_scorecard"
+        and parts[2] == "results"
+    )
+
+
 def is_runtime_queue_item_path(parts: list[str], filename: str) -> bool:
     if filename == ".gitkeep":
         return False
@@ -233,8 +263,8 @@ def format_artifact_policy_report(result: ArtifactPolicyResult) -> str:
         "Artifact policy failed: forbidden tracked files were found.",
         "",
         "Tracked files must not include generated review artifacts, support queue runtime files, "
-        "queue runtime files, feature scan runtime files, zip files, environment files, or "
-        "private operator guidance.",
+        "queue runtime files, feature scan runtime files, local model scorecard results, "
+        "zip files, environment files, or private operator guidance.",
         "",
         "Violations:",
     ]
