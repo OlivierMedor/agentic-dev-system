@@ -1,0 +1,7 @@
+logs_required: false
+watch_for:
+- missing_portfolio_case_study
+- stale_readme_link
+- private_guidance_tracked
+- committed_generated_artifact
+- unclear_interview_narrative
