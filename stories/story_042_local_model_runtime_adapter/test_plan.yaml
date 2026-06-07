@@ -1,0 +1,31 @@
+test_layers_version: 1
+unit_tests:
+  required: true
+  action: add_or_update
+  frequency: every_commit
+  evidence_or_reason: Add local model runtime tests for config validation, missing
+    base_url, invalid provider, missing model, fake HTTP dry run, run-prompt output
+    saving, source files not being applied, README link, and docs safety wording.
+integration_tests:
+  required: true
+  action: add_or_update
+  frequency: every_pull_request
+  evidence_or_reason: CLI tests cover local-model validate output and local-agent
+    run-prompt behavior without real model calls.
+mock_e2e_tests:
+  required: true
+  action: confirm_existing
+  frequency: before_merge
+  evidence_or_reason: Existing mock E2E workflow coverage exercises story workflow;
+    local model calls are unit-tested with fake HTTP clients.
+live_read_only_checks:
+  required: false
+  action: not_applicable_with_reason
+  frequency: manual_only
+  evidence_or_reason: Live local model calls depend on optional host-side LM Studio
+    or Ollama setup and are not required in automated tests.
+remote_dev_smoke_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: after_remote_dev_deploy
+  evidence_or_reason: This story does not deploy to a remote dev environment.

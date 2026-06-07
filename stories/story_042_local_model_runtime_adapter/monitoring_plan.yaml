@@ -1,0 +1,8 @@
+logs_required: true
+watch_for:
+- invalid_local_model_runtime_config
+- local_model_server_unavailable
+- local_model_not_loaded
+- accidental_source_edit_from_model_output
+- secret_exposure
+- cloud_model_call

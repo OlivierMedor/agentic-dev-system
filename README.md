@@ -116,6 +116,14 @@ docker compose run --rm dev agentic public-readiness
 docker compose run --rm dev agentic runtime-config validate
 ```
 
+Local model runtime checks:
+
+```powershell
+docker compose run --rm dev agentic local-model validate
+docker compose run --rm dev agentic local-model dry-run
+docker compose run --rm dev agentic local-agent run-prompt --prompt-file prompt.md --output-file reports/local_agent_output.md
+```
+
 ## Learn The Codebase
 
 Start with `docs/code_tour.md` for a beginner-friendly tour of the repository.
@@ -146,6 +154,9 @@ reporting.
 
 LangGraph is currently used for safe local `workflow-preview` and
 `workflow-run` phases. It is not an autonomous agent executor.
+
+Local OpenAI-compatible models can be configured for bounded draft and dry-run
+work through LM Studio or Ollama. See `docs/local_models.md`.
 
 For release and repository hygiene, use `docs/public_launch_checklist.md`,
 `docs/release_process.md`, `docs/v0_1_release_checklist.md`,
@@ -183,6 +194,8 @@ That file is ignored and blocked by policy. The public-safe example is
   release.
 - `docs/public_launch_checklist.md` is the manual checklist for public repo and
   release hygiene.
+- `docs/local_models.md` explains local OpenAI-compatible runtime setup with LM
+  Studio, Ollama, and safety boundaries.
 - `docs/release_process.md` explains how PR merges differ from GitHub releases
   and what checks are required before a release.
 - `docs/v0_1_release_checklist.md` is the manual checklist for the v0.1
