@@ -122,6 +122,12 @@ Start with `docs/code_tour.md` for a beginner-friendly tour of the repository.
 Use `docs/command_map.md` to connect each `agentic` command to its CLI entry,
 core module, tests, and related story workspace.
 
+## Portfolio / Interview Guide
+
+For a public-facing explanation of the project, use
+`docs/portfolio_case_study.md`. For interview preparation, use
+`docs/interview_talking_points.md` and `docs/skills_matrix.md`.
+
 ## Current Status
 
 This repository is public and under active development. It is a
@@ -176,6 +182,12 @@ That file is ignored and blocked by policy. The public-safe example is
 - `docs/langgraph_workflow.md` explains the current LangGraph preview and safe
   workflow-run phases.
 - `docs/ci_cd.md` explains CI behavior.
+- `docs/portfolio_case_study.md` explains the project as a professional
+  engineering case study.
+- `docs/interview_talking_points.md` provides interview-ready project
+  narratives and suggested answers.
+- `docs/skills_matrix.md` maps project skills to repo evidence and interview
+  talking points.
 
 ## License
 
