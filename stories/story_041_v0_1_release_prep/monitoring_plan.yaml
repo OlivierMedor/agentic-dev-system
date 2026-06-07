@@ -1,0 +1,9 @@
+logs_required: false
+watch_for:
+- missing_release_process_doc
+- missing_v0_1_release_checklist
+- missing_changelog
+- stale_readme_link
+- accidental_license_file
+- private_guidance_tracked
+- committed_generated_artifact
