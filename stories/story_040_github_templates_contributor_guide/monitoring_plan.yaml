@@ -1,0 +1,9 @@
+logs_required: false
+watch_for:
+- missing_contributing_doc
+- missing_security_doc
+- missing_pull_request_template
+- missing_issue_template
+- stale_readme_link
+- private_guidance_tracked
+- committed_generated_artifact

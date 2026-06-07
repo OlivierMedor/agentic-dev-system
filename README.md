@@ -122,6 +122,12 @@ Start with `docs/code_tour.md` for a beginner-friendly tour of the repository.
 Use `docs/command_map.md` to connect each `agentic` command to its CLI entry,
 core module, tests, and related story workspace.
 
+## Contributing And Security
+
+Before proposing changes, read `CONTRIBUTING.md`. For secrets, credentials,
+private prompts, or vulnerability reports, read `SECURITY.md` and do not open a
+public issue.
+
 ## Portfolio / Interview Guide
 
 For a public-facing explanation of the project, use
