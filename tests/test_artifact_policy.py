@@ -95,6 +95,9 @@ def test_local_model_scorecard_results_are_blocked_except_gitkeep() -> None:
         ".agentic/local_model_scorecard/results/qwen3/developer_agent_prompt_response.md",
         ".agentic/local_model_scorecard/results/qwen3/developer_agent_prompt_raw_response.json",
         "reports/local_model_scorecard_report.md",
+        ".agentic/local_model_scorecard/scorecard_scores.yaml",
+        "reports/local_model_role_recommendations.md",
+        "reports/local_model_role_recommendations.yaml",
     ]
 
     assert violation_paths(
@@ -139,6 +142,9 @@ def test_multiple_violations_are_all_reported() -> None:
         "stories/story_011_artifact_policy_guard/remote_dev_validation/remote_dev_packet.md",
         ".agentic/local_model_scorecard/results/qwen3/run_summary.md",
         "reports/local_model_scorecard_report.md",
+        ".agentic/local_model_scorecard/scorecard_scores.yaml",
+        "reports/local_model_role_recommendations.md",
+        "reports/local_model_role_recommendations.yaml",
         "review_to_chatgpt/handoff.md",
         "agentic_story001_review.zip",
         ".env.local",
@@ -151,6 +157,9 @@ def test_multiple_violations_are_all_reported() -> None:
         "stories/story_011_artifact_policy_guard/remote_dev_validation/remote_dev_packet.md",
         ".agentic/local_model_scorecard/results/qwen3/run_summary.md",
         "reports/local_model_scorecard_report.md",
+        ".agentic/local_model_scorecard/scorecard_scores.yaml",
+        "reports/local_model_role_recommendations.md",
+        "reports/local_model_role_recommendations.yaml",
         "review_to_chatgpt/handoff.md",
         "agentic_story001_review.zip",
         ".env.local",

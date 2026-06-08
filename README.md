@@ -124,6 +124,8 @@ docker compose run --rm dev agentic local-model dry-run
 docker compose run --rm dev agentic local-agent run-prompt --prompt-file prompt.md --output-file reports/local_agent_output.md
 docker compose run --rm dev agentic local-model scorecard-create
 docker compose run --rm dev agentic local-model scorecard-report
+docker compose run --rm dev agentic local-model scorecard-scaffold-scores
+docker compose run --rm dev agentic local-model scorecard-recommend
 ```
 
 ## Learn The Codebase
@@ -160,7 +162,8 @@ LangGraph is currently used for safe local `workflow-preview` and
 Local OpenAI-compatible models can be configured for bounded draft and dry-run
 work through LM Studio or Ollama. Use `docs/local_model_scorecard.md` to compare
 local models on repeatable agent-style prompts before assigning them to roles.
-See `docs/local_models.md` for setup.
+Use `docs/local_model_role_assignment.md` for the manual scoring and role
+assignment process. See `docs/local_models.md` for setup.
 
 For release and repository hygiene, use `docs/public_launch_checklist.md`,
 `docs/release_process.md`, `docs/v0_1_release_checklist.md`,
@@ -202,6 +205,8 @@ That file is ignored and blocked by policy. The public-safe example is
   Studio, Ollama, and safety boundaries.
 - `docs/local_model_scorecard.md` explains how to compare local models on the
   same public-safe agent-style prompts before role assignment.
+- `docs/local_model_role_assignment.md` explains manual local model scoring,
+  role assignment, and safety boundaries.
 - `docs/release_process.md` explains how PR merges differ from GitHub releases
   and what checks are required before a release.
 - `docs/v0_1_release_checklist.md` is the manual checklist for the v0.1

@@ -67,8 +67,25 @@ docker compose run --rm -e LOCAL_MODEL_API_KEY=lm-studio dev agentic local-model
 docker compose run --rm -e LOCAL_MODEL_API_KEY=lm-studio dev agentic local-model scorecard-run --model-label gemma
 ```
 
-Then fill in `.agentic/local_model_scorecard/scorecard_template.yaml` manually
-using the saved responses and run `scorecard-report` again.
+Then scaffold a local human scoring file from the saved responses:
+
+```powershell
+docker compose run --rm dev agentic local-model scorecard-scaffold-scores
+```
+
+Fill in `.agentic/local_model_scorecard/scorecard_scores.yaml` manually using
+the saved responses. Leave incomplete rows blank until a human reviewer has
+scored them. The scoring file is a local artifact and should not be committed by
+default.
+
+After scoring, generate advisory role recommendations:
+
+```powershell
+docker compose run --rm dev agentic local-model scorecard-recommend
+```
+
+The command writes generated reports under `reports/` and does not update
+`.agentic/agent_runtime.yaml`.
 
 ## Scoring
 
@@ -83,18 +100,25 @@ Score each model and role manually across these dimensions:
 - clarity
 - speed_notes
 - overall_fit_for_role
+- reviewer_notes
 
-Recommended role mapping is manual:
+Recommended role mapping is manual. The scoring scaffold uses these role ids:
 
-- Developer Agent
-- Test Agent
-- Docs Agent
-- Reviewer Agent
-- Maintenance Agent
+- developer_agent
+- test_agent
+- docs_agent
+- reviewer_agent
+- maintenance_agent
 
-Do not claim a winner until comparable model runs have been scored by the human
-owner. A model can be good for docs and weak for code review, or useful for test
-ideas but too loose for implementation planning.
+`scorecard-recommend` ranks complete human-scored entries by
+`overall_fit_for_role` first, then by `safety_compliance`,
+`hallucination_control`, `correctness`, and `instruction_following`. It ignores
+incomplete rows and reports them as warnings. Do not claim a winner until
+comparable model runs have been scored by the human owner. A model can be good
+for docs and weak for code review, or useful for test ideas but too loose for
+implementation planning.
+
+See `docs/local_model_role_assignment.md` for the full role assignment process.
 
 ## Safety Boundaries
 
@@ -109,6 +133,12 @@ The scorecard:
 - must not commit, push, merge, deploy, or call GitHub APIs
 - must not expose secrets
 - must not approve high-risk changes automatically
+- should prefer plain ASCII in prompt responses
+- should avoid emoji/checkmark symbols because Windows and PowerShell logs may
+  show encoding artifacts such as "âœ“"
+- should use requested headings exactly
+- should avoid wrapping entire responses in unnecessary nested Markdown code
+  fences
 
 For high-risk DeFi/security logic, cloud/human review is still needed even when
 a local model performs well on the scorecard. Use local models to reduce cost and

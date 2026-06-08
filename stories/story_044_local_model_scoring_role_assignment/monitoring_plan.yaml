@@ -1,0 +1,10 @@
+logs_required: true
+watch_for:
+- missing_scorecard_scores
+- incomplete_score_entry
+- invalid_score_field
+- committed_scorecard_result
+- committed_scorecard_scores
+- committed_role_recommendation_report
+- accidental_runtime_default_change
+- cloud_model_call

@@ -98,6 +98,15 @@ def find_artifact_policy_violations(tracked_files: list[str]) -> list[ArtifactPo
             )
             continue
 
+        if is_local_model_scorecard_scoring_artifact_path(normalized_path):
+            violations.append(
+                ArtifactPolicyViolation(
+                    path=normalized_path,
+                    reason="local model scorecard scoring artifact is tracked",
+                ),
+            )
+            continue
+
         if normalized_path == "reports/local_model_scorecard_report.md":
             violations.append(
                 ArtifactPolicyViolation(
@@ -196,6 +205,14 @@ def is_local_model_scorecard_result_path(parts: list[str], filename: str) -> boo
     )
 
 
+def is_local_model_scorecard_scoring_artifact_path(normalized_path: str) -> bool:
+    return normalized_path in {
+        ".agentic/local_model_scorecard/scorecard_scores.yaml",
+        "reports/local_model_role_recommendations.md",
+        "reports/local_model_role_recommendations.yaml",
+    }
+
+
 def is_runtime_queue_item_path(parts: list[str], filename: str) -> bool:
     if filename == ".gitkeep":
         return False
@@ -264,7 +281,8 @@ def format_artifact_policy_report(result: ArtifactPolicyResult) -> str:
         "",
         "Tracked files must not include generated review artifacts, support queue runtime files, "
         "queue runtime files, feature scan runtime files, local model scorecard results, "
-        "zip files, environment files, or private operator guidance.",
+        "local model scorecard scoring artifacts, zip files, environment files, or "
+        "private operator guidance.",
         "",
         "Violations:",
     ]
