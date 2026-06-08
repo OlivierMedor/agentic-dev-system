@@ -1,0 +1,33 @@
+test_layers_version: 1
+unit_tests:
+  required: true
+  action: add_or_update
+  frequency: every_commit
+  evidence_or_reason: Add tests for scorecard-scaffold-scores creation and overwrite
+    behavior, scorecard-recommend incomplete-score behavior, report creation from
+    complete scores, overall-fit ranking, tie-breaker ranking, incomplete warnings,
+    artifact/public-readiness blocking, docs existence and model/safety wording, and
+    README/docs links.
+integration_tests:
+  required: true
+  action: add_or_update
+  frequency: every_pull_request
+  evidence_or_reason: CLI tests cover scorecard-scaffold-scores default project behavior
+    and scorecard-recommend report output using local fake files only.
+mock_e2e_tests:
+  required: true
+  action: confirm_existing
+  frequency: before_merge
+  evidence_or_reason: Existing mock E2E workflow coverage exercises story workflow;
+    recommendation logic is covered by focused unit tests.
+live_read_only_checks:
+  required: false
+  action: not_applicable_with_reason
+  frequency: manual_only
+  evidence_or_reason: This story reads local files and human scores only; live model
+    calls are not required.
+remote_dev_smoke_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: after_remote_dev_deploy
+  evidence_or_reason: This story does not deploy to a remote dev environment.

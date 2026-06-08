@@ -98,10 +98,13 @@ local model, and create a manual report:
 docker compose run --rm dev agentic local-model scorecard-create --force
 docker compose run --rm dev agentic local-model scorecard-run --model-label qwen3-coder-30b
 docker compose run --rm dev agentic local-model scorecard-report
+docker compose run --rm dev agentic local-model scorecard-scaffold-scores
+docker compose run --rm dev agentic local-model scorecard-recommend
 ```
 
 See `docs/local_model_scorecard.md` for the scorecard workflow and manual
-comparison process.
+comparison process. See `docs/local_model_role_assignment.md` for manual scoring
+and role assignment.
 
 ## Recommended Model Roles
 

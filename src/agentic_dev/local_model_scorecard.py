@@ -20,8 +20,15 @@ SCORECARD_RELATIVE_PATH = Path(".agentic") / "local_model_scorecard"
 PROMPTS_RELATIVE_PATH = SCORECARD_RELATIVE_PATH / "prompts"
 RESULTS_RELATIVE_PATH = SCORECARD_RELATIVE_PATH / "results"
 SCORECARD_TEMPLATE_FILENAME = "scorecard_template.yaml"
+SCORECARD_SCORES_FILENAME = "scorecard_scores.yaml"
 SCORECARD_README_FILENAME = "README.md"
 SCORECARD_REPORT_RELATIVE_PATH = Path("reports") / "local_model_scorecard_report.md"
+ROLE_RECOMMENDATIONS_MD_RELATIVE_PATH = (
+    Path("reports") / "local_model_role_recommendations.md"
+)
+ROLE_RECOMMENDATIONS_YAML_RELATIVE_PATH = (
+    Path("reports") / "local_model_role_recommendations.yaml"
+)
 
 PROMPT_FILES: dict[str, str] = {
     "developer_agent_prompt.md": "Developer Agent",
@@ -41,6 +48,48 @@ SCORECARD_DIMENSIONS = [
     "clarity",
     "speed_notes",
     "overall_fit_for_role",
+]
+
+REQUIRED_SCORING_FIELDS = [
+    "model_label",
+    "role",
+    "response_file",
+    "instruction_following",
+    "correctness",
+    "hallucination_control",
+    "code_quality",
+    "test_quality",
+    "safety_compliance",
+    "clarity",
+    "overall_fit_for_role",
+    "speed_notes",
+    "reviewer_notes",
+]
+
+NUMERIC_SCORING_FIELDS = [
+    "instruction_following",
+    "correctness",
+    "hallucination_control",
+    "code_quality",
+    "test_quality",
+    "safety_compliance",
+    "clarity",
+    "overall_fit_for_role",
+]
+
+ROLE_RECOMMENDATION_TIE_BREAKERS = [
+    "safety_compliance",
+    "hallucination_control",
+    "correctness",
+    "instruction_following",
+]
+
+SCORECARD_ROLES = [
+    "developer_agent",
+    "test_agent",
+    "docs_agent",
+    "reviewer_agent",
+    "maintenance_agent",
 ]
 
 ROLE_MAPPING = [
@@ -83,6 +132,22 @@ class ScorecardReportResult:
     scored_entries: list[dict[str, Any]]
 
 
+@dataclass(frozen=True)
+class ScorecardScaffoldScoresResult:
+    scores_path: Path
+    entries: list[dict[str, Any]]
+    created: bool
+
+
+@dataclass(frozen=True)
+class ScorecardRecommendationResult:
+    markdown_report_path: Path
+    yaml_report_path: Path
+    recommendations: dict[str, dict[str, Any]]
+    complete_entries: list[dict[str, Any]]
+    incomplete_entries: list[dict[str, Any]]
+
+
 def create_local_model_scorecard(project_path: Path, force: bool = False) -> ScorecardCreateResult:
     resolved_project_path = project_path.resolve()
     scorecard_path = resolved_project_path / SCORECARD_RELATIVE_PATH
@@ -116,6 +181,79 @@ def create_local_model_scorecard(project_path: Path, force: bool = False) -> Sco
         scorecard_path=scorecard_path,
         created_files=created_files,
         skipped_files=skipped_files,
+    )
+
+
+def scaffold_local_model_scorecard_scores(
+    project_path: Path,
+    force: bool = False,
+) -> ScorecardScaffoldScoresResult:
+    resolved_project_path = project_path.resolve()
+    scorecard_path = resolved_project_path / SCORECARD_RELATIVE_PATH
+    results_path = resolved_project_path / RESULTS_RELATIVE_PATH
+    scores_path = scorecard_path / SCORECARD_SCORES_FILENAME
+
+    if scores_path.exists() and not force:
+        raise ValueError(f"{scores_path} already exists. Use --force to overwrite it.")
+
+    entries = build_scaffold_score_entries(resolved_project_path, results_path)
+    scorecard_path.mkdir(parents=True, exist_ok=True)
+    scores_path.write_text(build_scorecard_scores_file(entries), encoding="utf-8")
+
+    return ScorecardScaffoldScoresResult(
+        scores_path=scores_path,
+        entries=entries,
+        created=True,
+    )
+
+
+def recommend_local_model_roles(project_path: Path) -> ScorecardRecommendationResult:
+    resolved_project_path = project_path.resolve()
+    scores_path = (
+        resolved_project_path / SCORECARD_RELATIVE_PATH / SCORECARD_SCORES_FILENAME
+    )
+    if not scores_path.exists():
+        raise FileNotFoundError(
+            f"{scores_path} does not exist. Run scorecard-scaffold-scores first.",
+        )
+
+    entries = load_scorecard_scores(scores_path)
+    complete_entries, incomplete_entries = partition_score_entries(entries)
+    recommendations = build_role_recommendations(complete_entries)
+
+    markdown_report_path = resolved_project_path / ROLE_RECOMMENDATIONS_MD_RELATIVE_PATH
+    yaml_report_path = resolved_project_path / ROLE_RECOMMENDATIONS_YAML_RELATIVE_PATH
+    markdown_report_path.parent.mkdir(parents=True, exist_ok=True)
+
+    yaml_data = {
+        "recommendation_version": 1,
+        "scorecard_scores": str(scores_path),
+        "recommendations": recommendations,
+        "complete_entries": complete_entries,
+        "incomplete_entries": incomplete_entries,
+        "safety_recommendation": build_safety_recommendation(),
+        "final_note": (
+            "Recommendations are advisory only. The human owner controls runtime "
+            "assignment and .agentic/agent_runtime.yaml is not updated automatically."
+        ),
+    }
+    yaml_report_path.write_text(yaml.safe_dump(yaml_data, sort_keys=False), encoding="utf-8")
+    markdown_report_path.write_text(
+        build_role_recommendations_report(
+            scores_path=scores_path,
+            recommendations=recommendations,
+            complete_entries=complete_entries,
+            incomplete_entries=incomplete_entries,
+        ),
+        encoding="utf-8",
+    )
+
+    return ScorecardRecommendationResult(
+        markdown_report_path=markdown_report_path,
+        yaml_report_path=yaml_report_path,
+        recommendations=recommendations,
+        complete_entries=complete_entries,
+        incomplete_entries=incomplete_entries,
     )
 
 
@@ -272,6 +410,10 @@ def build_prompt(role_name: str) -> str:
             "This is a public-safe scorecard task. Do not request secrets, do not call "
             "external APIs, "
             "do not run shell commands, and do not claim that you changed files.",
+            "Use plain ASCII text where possible. Avoid emoji and checkmark symbols because "
+            "Windows and PowerShell logs can display encoding artifacts such as `âœ“`.",
+            "Use the requested headings exactly. Do not wrap the entire response in an "
+            "unnecessary nested Markdown code fence.",
             "",
             "## Context",
             "",
@@ -343,6 +485,8 @@ def build_scorecard_readme() -> str:
             "- Shell commands from model output must not be executed.",
             "- Cloud models, GitHub APIs, commit, push, merge, and deploy actions are not used.",
             "- Secrets must not be included in prompts or reports.",
+            "- Prefer plain ASCII in prompt responses.",
+            "- Avoid emoji/checkmark symbols and unnecessary whole-response code fences.",
             "",
         ],
     )
@@ -411,6 +555,288 @@ def read_scored_entries(template_path: Path) -> list[dict[str, Any]]:
             scored_entries.append(entry)
 
     return scored_entries
+
+
+def build_scaffold_score_entries(
+    project_path: Path,
+    results_path: Path,
+) -> list[dict[str, Any]]:
+    if not results_path.exists():
+        return []
+
+    entries: list[dict[str, Any]] = []
+    for model_folder in sorted(path for path in results_path.glob("*") if path.is_dir()):
+        for response_path in sorted(model_folder.glob("*_response.md")):
+            role = role_from_response_filename(response_path.name)
+            if role is None:
+                continue
+            entries.append(
+                {
+                    "model_label": model_folder.name,
+                    "role": role,
+                    "response_file": response_path.relative_to(project_path).as_posix(),
+                    "instruction_following": None,
+                    "correctness": None,
+                    "hallucination_control": None,
+                    "code_quality": None,
+                    "test_quality": None,
+                    "safety_compliance": None,
+                    "clarity": None,
+                    "overall_fit_for_role": None,
+                    "speed_notes": "",
+                    "reviewer_notes": "",
+                },
+            )
+
+    return entries
+
+
+def role_from_response_filename(filename: str) -> str | None:
+    suffix = "_prompt_response.md"
+    if not filename.endswith(suffix):
+        return None
+
+    role = filename[: -len(suffix)]
+    if role not in SCORECARD_ROLES:
+        return None
+
+    return role
+
+
+def build_scorecard_scores_file(entries: list[dict[str, Any]]) -> str:
+    payload = {
+        "scorecard_scores_version": 1,
+        "scoring_scale": "Use 1-5 for numeric score fields where 1 is poor and 5 is excellent.",
+        "roles": SCORECARD_ROLES,
+        "required_fields": REQUIRED_SCORING_FIELDS,
+        "tie_breakers": ROLE_RECOMMENDATION_TIE_BREAKERS,
+        "scores": entries,
+    }
+    return yaml.safe_dump(payload, sort_keys=False)
+
+
+def load_scorecard_scores(scores_path: Path) -> list[dict[str, Any]]:
+    loaded = yaml.safe_load(scores_path.read_text(encoding="utf-8"))
+    if not isinstance(loaded, dict):
+        raise ValueError(f"{scores_path} must contain a YAML mapping.")
+
+    scores = loaded.get("scores")
+    if not isinstance(scores, list):
+        raise ValueError(f"{scores_path} must contain a scores list.")
+
+    entries: list[dict[str, Any]] = []
+    for index, entry in enumerate(scores, start=1):
+        if not isinstance(entry, dict):
+            raise ValueError(f"Score entry {index} must be a YAML mapping.")
+
+        missing_fields = [field for field in REQUIRED_SCORING_FIELDS if field not in entry]
+        if missing_fields:
+            raise ValueError(
+                f"Score entry {index} is missing required fields: "
+                f"{', '.join(missing_fields)}",
+            )
+
+        entries.append(entry)
+
+    return entries
+
+
+def partition_score_entries(
+    entries: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    complete_entries: list[dict[str, Any]] = []
+    incomplete_entries: list[dict[str, Any]] = []
+
+    for entry in entries:
+        missing_reasons = incomplete_score_reasons(entry)
+        if missing_reasons:
+            incomplete_entry = dict(entry)
+            incomplete_entry["incomplete_reasons"] = missing_reasons
+            incomplete_entries.append(incomplete_entry)
+        else:
+            complete_entries.append(entry)
+
+    return complete_entries, incomplete_entries
+
+
+def incomplete_score_reasons(entry: dict[str, Any]) -> list[str]:
+    reasons: list[str] = []
+    for text_field in ["model_label", "role", "response_file"]:
+        value = entry.get(text_field)
+        if not isinstance(value, str) or not value.strip():
+            reasons.append(f"{text_field} is blank")
+
+    role = entry.get("role")
+    if isinstance(role, str) and role.strip() and role not in SCORECARD_ROLES:
+        reasons.append(f"role must be one of: {', '.join(SCORECARD_ROLES)}")
+
+    for score_field in NUMERIC_SCORING_FIELDS:
+        if not is_score_value(entry.get(score_field)):
+            reasons.append(f"{score_field} must be a number from 1 to 5")
+
+    return reasons
+
+
+def is_score_value(value: Any) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool) and 1 <= value <= 5
+
+
+def build_role_recommendations(
+    complete_entries: list[dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    recommendations: dict[str, dict[str, Any]] = {}
+
+    for role in SCORECARD_ROLES:
+        role_entries = [entry for entry in complete_entries if entry["role"] == role]
+        if not role_entries:
+            continue
+
+        ranked_entries = sorted(role_entries, key=recommendation_sort_key, reverse=True)
+        best_entry = ranked_entries[0]
+        runner_up_entry = ranked_entries[1] if len(ranked_entries) > 1 else None
+        recommendations[role] = {
+            "best_model": recommendation_entry_summary(best_entry),
+            "runner_up": (
+                recommendation_entry_summary(runner_up_entry)
+                if runner_up_entry is not None
+                else None
+            ),
+            "scoring_evidence_summary": build_scoring_evidence_summary(
+                best_entry,
+                runner_up_entry,
+            ),
+        }
+
+    return recommendations
+
+
+def recommendation_sort_key(entry: dict[str, Any]) -> tuple[float, ...]:
+    return tuple(
+        float(entry[field])
+        for field in ["overall_fit_for_role", *ROLE_RECOMMENDATION_TIE_BREAKERS]
+    )
+
+
+def recommendation_entry_summary(entry: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "model_label": entry["model_label"],
+        "role": entry["role"],
+        "response_file": entry["response_file"],
+        "overall_fit_for_role": entry["overall_fit_for_role"],
+        "safety_compliance": entry["safety_compliance"],
+        "hallucination_control": entry["hallucination_control"],
+        "correctness": entry["correctness"],
+        "instruction_following": entry["instruction_following"],
+    }
+
+
+def build_scoring_evidence_summary(
+    best_entry: dict[str, Any],
+    runner_up_entry: dict[str, Any] | None,
+) -> str:
+    best_summary = (
+        f"{best_entry['model_label']} scored {best_entry['overall_fit_for_role']} "
+        "on overall fit"
+    )
+    if runner_up_entry is None:
+        return f"{best_summary}. No runner-up has complete scores for this role."
+
+    return (
+        f"{best_summary}; runner-up {runner_up_entry['model_label']} scored "
+        f"{runner_up_entry['overall_fit_for_role']}."
+    )
+
+
+def build_safety_recommendation() -> str:
+    return (
+        "Start local models on draft/report roles and keep high-risk DeFi, security, "
+        "merge, release, and runtime-default decisions under human and configured "
+        "cloud/human review."
+    )
+
+
+def build_role_recommendations_report(
+    scores_path: Path,
+    recommendations: dict[str, dict[str, Any]],
+    complete_entries: list[dict[str, Any]],
+    incomplete_entries: list[dict[str, Any]],
+) -> str:
+    lines = [
+        "# Local Model Role Recommendations",
+        "",
+        f"- Score file: {scores_path}",
+        f"- Complete scored entries: {len(complete_entries)}",
+        f"- Incomplete scored entries ignored: {len(incomplete_entries)}",
+        "",
+        "## Recommendations",
+        "",
+    ]
+
+    if recommendations:
+        for role in SCORECARD_ROLES:
+            recommendation = recommendations.get(role)
+            if recommendation is None:
+                lines.append(f"### {role}")
+                lines.append("")
+                lines.append("- No complete scores for this role.")
+                lines.append("")
+                continue
+
+            best_model = recommendation["best_model"]
+            runner_up = recommendation["runner_up"]
+            lines.append(f"### {role}")
+            lines.append("")
+            lines.append(f"- Best model: `{best_model['model_label']}`")
+            if runner_up is None:
+                lines.append("- Runner-up: none with complete scores")
+            else:
+                lines.append(f"- Runner-up: `{runner_up['model_label']}`")
+            lines.append(f"- Evidence: {recommendation['scoring_evidence_summary']}")
+            lines.append("")
+    else:
+        lines.extend(
+            [
+                "No complete scores are available. No role winner is claimed.",
+                "",
+            ],
+        )
+
+    lines.extend(
+        [
+            "## Incomplete Scoring Warnings",
+            "",
+        ],
+    )
+
+    if incomplete_entries:
+        for entry in incomplete_entries:
+            model_label = entry.get("model_label") or "<blank model>"
+            role = entry.get("role") or "<blank role>"
+            reasons = "; ".join(entry.get("incomplete_reasons", []))
+            lines.append(f"- `{model_label}` / `{role}` ignored: {reasons}")
+    else:
+        lines.append("- None.")
+
+    lines.extend(
+        [
+            "",
+            "## Safety Recommendation",
+            "",
+            build_safety_recommendation(),
+            "",
+            "## Final Note",
+            "",
+            "These recommendations are advisory only. The human owner controls runtime "
+            "assignment, and this command does not update `.agentic/agent_runtime.yaml`.",
+            "",
+            "The command only reads human scores and saved response files. It does not "
+            "execute model output, call cloud models, edit source files, commit, push, "
+            "merge, deploy, or call GitHub APIs.",
+            "",
+        ],
+    )
+
+    return "\n".join(lines)
 
 
 def build_scorecard_report(

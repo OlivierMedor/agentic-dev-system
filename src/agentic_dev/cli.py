@@ -23,7 +23,9 @@ from agentic_dev.local_model_runtime import (
 from agentic_dev.local_model_scorecard import (
     create_local_model_scorecard,
     create_local_model_scorecard_report,
+    recommend_local_model_roles,
     run_local_model_scorecard,
+    scaffold_local_model_scorecard_scores,
 )
 from agentic_dev.maintenance_scan import (
     create_maintenance_scan_packet,
@@ -719,6 +721,33 @@ def main() -> None:
         help="Target project folder. Defaults to the current directory.",
     )
 
+    local_model_scorecard_scaffold_scores_parser = local_model_subparsers.add_parser(
+        "scorecard-scaffold-scores",
+        help="Create a blank human scoring file from saved scorecard responses.",
+    )
+    local_model_scorecard_scaffold_scores_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    local_model_scorecard_scaffold_scores_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite an existing scorecard_scores.yaml file.",
+    )
+
+    local_model_scorecard_recommend_parser = local_model_subparsers.add_parser(
+        "scorecard-recommend",
+        help="Create advisory local model role recommendations from human scores.",
+    )
+    local_model_scorecard_recommend_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
     local_agent_parser = subparsers.add_parser(
         "local-agent",
         help="Run bounded local-agent actions using the local model runtime.",
@@ -1368,6 +1397,22 @@ def main() -> None:
                 result = create_local_model_scorecard_report(args.project)
                 print("Local model scorecard report created.")
                 print(f"Report written to: {result.report_path}")
+
+            if args.local_model_command == "scorecard-scaffold-scores":
+                result = scaffold_local_model_scorecard_scores(args.project, args.force)
+                print("Local model scorecard scores scaffold created.")
+                print(f"Scores written to: {result.scores_path}")
+                print(f"Scoring entries created: {len(result.entries)}")
+
+            if args.local_model_command == "scorecard-recommend":
+                result = recommend_local_model_roles(args.project)
+                print("Local model role recommendation reports created.")
+                print(f"Markdown report written to: {result.markdown_report_path}")
+                print(f"YAML report written to: {result.yaml_report_path}")
+                print(f"Complete scored entries used: {len(result.complete_entries)}")
+                print(f"Incomplete scored entries ignored: {len(result.incomplete_entries)}")
+                if not result.recommendations:
+                    print("No complete scores found. No role winner was claimed.")
 
         if args.command == "local-agent":
             if args.local_agent_command == "run-prompt":
