@@ -89,7 +89,9 @@ docker compose run --rm dev agentic local-agent run-prompt --prompt-file prompt.
 
 `local-agent run-prompt` saves output only. It does not apply code changes,
 execute model output, commit, push, merge, deploy, call GitHub APIs, expose
-secret values, or call cloud models.
+secret values, or call cloud models. It also saves a sibling
+`*_raw_response.json` file so empty or unusual OpenAI-compatible responses can
+be debugged. Empty or whitespace-only content is treated as a failure.
 
 Send a story prompt-pack file to the local model and save a draft report plus
 metadata:

@@ -32,6 +32,7 @@ The public-readiness check fails if Git tracks any of these paths:
 - `.agentic/feature_scan/*.md` and `.agentic/feature_scan/*.yaml`
 - `.agentic/local_model_scorecard/results/**`
 - `stories/**/reports/local_agent_drafts/*` except `.gitkeep`
+- `reports/**/*_raw_response.json`
 - `.agentic/local_model_scorecard/scorecard_scores.yaml`
 - `reports/local_model_scorecard_report.md`
 - `reports/local_model_role_recommendations.md`
@@ -74,7 +75,7 @@ Run these checks before any public-release decision:
 
 Also manually review the current branch and any open PR for credentials, private customer or
 operator context, generated review packets, local support tickets, feature scan runtime files,
-local model scorecard outputs, local agent draft outputs, and queue item runtime files. Public readiness is a guardrail, not a
+local model scorecard outputs, local agent draft outputs, local model raw responses, and queue item runtime files. Public readiness is a guardrail, not a
 full secret scanner.
 
 For the final public-launch sequence, use `docs/public_launch_checklist.md`.

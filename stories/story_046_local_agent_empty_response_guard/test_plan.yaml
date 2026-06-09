@@ -1,0 +1,33 @@
+test_layers_version: 1
+unit_tests:
+  required: true
+  action: add_or_update
+  frequency: every_commit
+  evidence_or_reason: Add tests for empty response failure, whitespace response failure,
+    non-empty success, content list extraction, choices[0].text extraction, output_text
+    extraction, raw response JSON saving, metadata response_character_count, draft
+    status on empty content, run-prompt empty failure, safety boundaries, artifact/public-readiness
+    blocking, and docs wording.
+integration_tests:
+  required: true
+  action: add_or_update
+  frequency: every_pull_request
+  evidence_or_reason: Existing CLI tests cover local-agent command output paths; unit
+    tests exercise command behavior with fake HTTP clients.
+mock_e2e_tests:
+  required: true
+  action: confirm_existing
+  frequency: before_merge
+  evidence_or_reason: Existing mock E2E workflow coverage exercises the local story
+    workflow; local model calls are unit-tested with fake HTTP clients.
+live_read_only_checks:
+  required: false
+  action: not_applicable_with_reason
+  frequency: manual_only
+  evidence_or_reason: Live local model calls depend on optional host-side LM Studio
+    or Ollama setup and are not required in automated tests.
+remote_dev_smoke_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: after_remote_dev_deploy
+  evidence_or_reason: This story does not deploy to a remote dev environment.

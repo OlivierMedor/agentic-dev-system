@@ -102,6 +102,7 @@ class LocalModelValidationResult:
 class LocalModelCallResult:
     config_path: Path
     report_path: Path | None
+    raw_response_path: Path | None
     response_text: str
     raw_response: dict[str, Any]
 
@@ -115,6 +116,7 @@ class LocalAgentDraftResult:
     prompt_file: Path
     output_file: Path
     metadata_file: Path
+    raw_response_file: Path
     response_text: str
     raw_response: dict[str, Any]
 
@@ -220,6 +222,7 @@ def run_local_model_dry_run(
     return LocalModelCallResult(
         config_path=config_path,
         report_path=report_path,
+        raw_response_path=None,
         response_text=response_text,
         raw_response=response,
     )
@@ -238,15 +241,23 @@ def run_local_agent_prompt(
         raise FileNotFoundError(f"Prompt file does not exist: {resolved_prompt_file}")
 
     prompt = resolved_prompt_file.read_text(encoding="utf-8")
-    response = call_local_model(config, prompt, http_client)
-    response_text = extract_response_text(response)
     resolved_output_file = output_file.resolve()
+    response = call_local_model(config, prompt, http_client)
+    raw_response_path = raw_response_path_for_output(resolved_output_file)
+    write_raw_response(raw_response_path, response)
+    response_text = extract_response_text(response)
+    if not response_text.strip():
+        raise ValueError(
+            "Local model returned an empty response. "
+            f"Raw response saved to: {raw_response_path}",
+        )
     resolved_output_file.parent.mkdir(parents=True, exist_ok=True)
     resolved_output_file.write_text(response_text, encoding="utf-8")
 
     return LocalModelCallResult(
         config_path=config_path,
         report_path=resolved_output_file,
+        raw_response_path=raw_response_path,
         response_text=response_text,
         raw_response=response,
     )
@@ -291,15 +302,46 @@ def run_local_agent_draft(
         output_file,
     )
     metadata_file = resolved_output_file.with_suffix(".yaml")
+    raw_response_file = raw_response_path_for_draft_output(resolved_output_file)
 
-    existing_outputs = [path for path in [resolved_output_file, metadata_file] if path.exists()]
+    existing_outputs = [
+        path for path in [resolved_output_file, metadata_file, raw_response_file] if path.exists()
+    ]
     if existing_outputs and not force:
         existing = ", ".join(str(path) for path in existing_outputs)
         raise ValueError(f"Local agent draft output already exists: {existing}. Use --force to overwrite.")
 
     prompt = resolved_prompt_file.read_text(encoding="utf-8")
     raw_response = call_local_model(config, prompt, http_client)
+    write_raw_response(raw_response_file, raw_response)
     response_text = extract_response_text(raw_response)
+    finish_reason = extract_finish_reason(raw_response)
+
+    if not response_text.strip():
+        resolved_output_file.parent.mkdir(parents=True, exist_ok=True)
+        write_local_agent_draft_metadata(
+            metadata_file=metadata_file,
+            story=story,
+            agent=agent,
+            model_label=safe_model_label,
+            configured_model=config.model,
+            prompt_file=resolved_prompt_file,
+            output_file=resolved_output_file,
+            raw_response_file=raw_response_file,
+            prompt_character_count=len(prompt),
+            response_character_count=0,
+            finish_reason=finish_reason,
+            status="empty_model_response",
+            next_action=(
+                "Inspect the raw response JSON and local model/server config. Common causes "
+                "include model/server mismatch, prompt too large, unsupported response shape, "
+                "or a model response with no final content."
+            ),
+        )
+        raise ValueError(
+            "Local model returned an empty response. "
+            f"Metadata saved to: {metadata_file}. Raw response saved to: {raw_response_file}",
+        )
 
     resolved_output_file.parent.mkdir(parents=True, exist_ok=True)
     resolved_output_file.write_text(response_text, encoding="utf-8")
@@ -311,6 +353,12 @@ def run_local_agent_draft(
         configured_model=config.model,
         prompt_file=resolved_prompt_file,
         output_file=resolved_output_file,
+        raw_response_file=raw_response_file,
+        prompt_character_count=len(prompt),
+        response_character_count=len(response_text),
+        finish_reason=finish_reason,
+        status="draft_saved",
+        next_action="Human/Codex review required before applying any draft content.",
     )
 
     return LocalAgentDraftResult(
@@ -321,6 +369,7 @@ def run_local_agent_draft(
         prompt_file=resolved_prompt_file,
         output_file=resolved_output_file,
         metadata_file=metadata_file,
+        raw_response_file=raw_response_file,
         response_text=response_text,
         raw_response=raw_response,
     )
@@ -379,6 +428,12 @@ def write_local_agent_draft_metadata(
     configured_model: str,
     prompt_file: Path,
     output_file: Path,
+    raw_response_file: Path,
+    prompt_character_count: int,
+    response_character_count: int,
+    finish_reason: str | None,
+    status: str,
+    next_action: str,
 ) -> None:
     metadata = {
         "story": story,
@@ -387,16 +442,41 @@ def write_local_agent_draft_metadata(
         "configured_model": configured_model,
         "prompt_file": str(prompt_file),
         "output_file": str(output_file),
-        "status": "draft_saved",
+        "raw_response_file": str(raw_response_file),
+        "prompt_character_count": prompt_character_count,
+        "response_character_count": response_character_count,
+        "finish_reason": finish_reason,
+        "status": status,
         "applied_to_source": False,
         "executed_model_output": False,
         "called_cloud_models": False,
         "called_github_apis": False,
         "committed_or_merged": False,
         "deployed": False,
-        "next_action": "Human/Codex review required before applying any draft content.",
+        "next_action": next_action,
     }
     metadata_file.write_text(yaml.safe_dump(metadata, sort_keys=False), encoding="utf-8")
+
+
+def raw_response_path_for_output(output_file: Path) -> Path:
+    resolved_output_file = output_file.resolve()
+    return resolved_output_file.with_name(f"{resolved_output_file.stem}_raw_response.json")
+
+
+def raw_response_path_for_draft_output(output_file: Path) -> Path:
+    stem = output_file.stem
+    if stem.endswith("_draft"):
+        stem = stem[: -len("_draft")]
+
+    return output_file.with_name(f"{stem}_raw_response.json")
+
+
+def write_raw_response(raw_response_path: Path, raw_response: dict[str, Any]) -> None:
+    raw_response_path.parent.mkdir(parents=True, exist_ok=True)
+    raw_response_path.write_text(
+        json.dumps(raw_response, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
 
 
 def call_local_model(
@@ -436,10 +516,14 @@ def build_headers(config: LocalModelRuntimeConfig) -> dict[str, str]:
 
 
 def extract_response_text(response: dict[str, Any]) -> str:
+    output_text = response.get("output_text")
+    if isinstance(output_text, str):
+        return output_text
+
     choices = response.get("choices")
 
     if not isinstance(choices, list) or not choices:
-        raise ValueError("Local model response must include at least one choice.")
+        raise ValueError("Local model response must include output_text or at least one choice.")
 
     first_choice = choices[0]
     if not isinstance(first_choice, dict):
@@ -450,12 +534,47 @@ def extract_response_text(response: dict[str, Any]) -> str:
         content = message.get("content")
         if isinstance(content, str):
             return content
+        if isinstance(content, list):
+            return extract_text_from_content_parts(content)
 
     text = first_choice.get("text")
     if isinstance(text, str):
         return text
 
-    raise ValueError("Local model response choice must include message.content or text.")
+    raise ValueError(
+        "Local model response choice must include message.content, text, or output_text.",
+    )
+
+
+def extract_text_from_content_parts(content: list[Any]) -> str:
+    text_parts: list[str] = []
+
+    for part in content:
+        if not isinstance(part, dict):
+            continue
+
+        part_type = part.get("type")
+        text = part.get("text")
+        if part_type in {None, "text", "output_text"} and isinstance(text, str):
+            text_parts.append(text)
+
+    return "".join(text_parts)
+
+
+def extract_finish_reason(response: dict[str, Any]) -> str | None:
+    choices = response.get("choices")
+    if not isinstance(choices, list) or not choices:
+        return None
+
+    first_choice = choices[0]
+    if not isinstance(first_choice, dict):
+        return None
+
+    finish_reason = first_choice.get("finish_reason")
+    if isinstance(finish_reason, str):
+        return finish_reason
+
+    return None
 
 
 def write_dry_run_report(

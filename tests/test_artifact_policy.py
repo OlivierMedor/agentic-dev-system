@@ -110,6 +110,7 @@ def test_local_agent_draft_outputs_are_blocked_except_gitkeep() -> None:
     blocked_paths = [
         "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/docs_agent_gemma-4-26b_draft.md",
         "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/docs_agent_gemma-4-26b_draft.yaml",
+        "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/docs_agent_gemma-4-26b_raw_response.json",
     ]
 
     assert violation_paths(
@@ -118,6 +119,15 @@ def test_local_agent_draft_outputs_are_blocked_except_gitkeep() -> None:
             "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/.gitkeep",
         ],
     ) == blocked_paths
+
+
+def test_local_model_raw_response_files_are_blocked() -> None:
+    blocked_paths = [
+        "reports/debug_docs_agent_prompt_raw_response.json",
+        "reports/nested/debug_docs_agent_prompt_raw_response.json",
+    ]
+
+    assert violation_paths(blocked_paths) == blocked_paths
 
 
 def test_runtime_queue_item_files_are_blocked_except_gitkeep() -> None:
@@ -157,6 +167,7 @@ def test_multiple_violations_are_all_reported() -> None:
         "stories/story_011_artifact_policy_guard/remote_dev_validation/remote_dev_packet.md",
         ".agentic/local_model_scorecard/results/qwen3/run_summary.md",
         "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/docs_agent_gemma-4-26b_draft.md",
+        "reports/debug_docs_agent_prompt_raw_response.json",
         "reports/local_model_scorecard_report.md",
         ".agentic/local_model_scorecard/scorecard_scores.yaml",
         "reports/local_model_role_recommendations.md",
@@ -173,6 +184,7 @@ def test_multiple_violations_are_all_reported() -> None:
         "stories/story_011_artifact_policy_guard/remote_dev_validation/remote_dev_packet.md",
         ".agentic/local_model_scorecard/results/qwen3/run_summary.md",
         "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/docs_agent_gemma-4-26b_draft.md",
+        "reports/debug_docs_agent_prompt_raw_response.json",
         "reports/local_model_scorecard_report.md",
         ".agentic/local_model_scorecard/scorecard_scores.yaml",
         "reports/local_model_role_recommendations.md",

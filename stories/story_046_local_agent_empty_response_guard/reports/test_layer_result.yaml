@@ -1,0 +1,53 @@
+story: story_046_local_agent_empty_response_guard
+status: PASSED
+passed_checks:
+- unit_tests is addressed.
+- integration_tests is addressed.
+- mock_e2e_tests is addressed.
+- live_read_only_checks is addressed.
+- remote_dev_smoke_tests is addressed.
+failed_checks: []
+layers:
+  unit_tests:
+    status: PASSED
+    required: true
+    action: add_or_update
+    frequency: every_commit
+    evidence_or_reason: Add tests for empty response failure, whitespace response
+      failure, non-empty success, content list extraction, choices[0].text extraction,
+      output_text extraction, raw response JSON saving, metadata response_character_count,
+      draft status on empty content, run-prompt empty failure, safety boundaries,
+      artifact/public-readiness blocking, and docs wording.
+    failed_checks: []
+  integration_tests:
+    status: PASSED
+    required: true
+    action: add_or_update
+    frequency: every_pull_request
+    evidence_or_reason: Existing CLI tests cover local-agent command output paths;
+      unit tests exercise command behavior with fake HTTP clients.
+    failed_checks: []
+  mock_e2e_tests:
+    status: PASSED
+    required: true
+    action: confirm_existing
+    frequency: before_merge
+    evidence_or_reason: Existing mock E2E workflow coverage exercises the local story
+      workflow; local model calls are unit-tested with fake HTTP clients.
+    failed_checks: []
+  live_read_only_checks:
+    status: PASSED
+    required: false
+    action: not_applicable_with_reason
+    frequency: manual_only
+    evidence_or_reason: Live local model calls depend on optional host-side LM Studio
+      or Ollama setup and are not required in automated tests.
+    failed_checks: []
+  remote_dev_smoke_tests:
+    status: PASSED
+    required: false
+    action: not_applicable_with_reason
+    frequency: after_remote_dev_deploy
+    evidence_or_reason: This story does not deploy to a remote dev environment.
+    failed_checks: []
+next_action: Continue to the quality gate or finalize-story workflow.
