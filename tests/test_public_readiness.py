@@ -85,6 +85,8 @@ def test_public_readiness_blocks_other_runtime_artifacts() -> None:
         ".agentic/local_model_scorecard/results/qwen3/developer_agent_prompt_raw_response.json",
         "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/docs_agent_gemma-4-26b_draft.md",
         "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/docs_agent_gemma-4-26b_draft.yaml",
+        "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/docs_agent_gemma-4-26b_raw_response.json",
+        "reports/debug_docs_agent_prompt_raw_response.json",
         "reports/local_model_scorecard_report.md",
         ".agentic/local_model_scorecard/scorecard_scores.yaml",
         "reports/local_model_role_recommendations.md",

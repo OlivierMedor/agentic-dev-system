@@ -1,0 +1,11 @@
+logs_required: true
+watch_for:
+- empty_model_response
+- unsupported_response_shape
+- missing_raw_response_debug_artifact
+- accidental_source_edit_from_model_output
+- model_output_executed
+- committed_local_agent_draft
+- committed_raw_response
+- secret_exposure
+- cloud_model_call

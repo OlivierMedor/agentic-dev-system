@@ -1471,6 +1471,7 @@ def main() -> None:
                 )
                 print("Local agent prompt run succeeded.")
                 print(f"Output written to: {result.report_path}")
+                print(f"Raw response written to: {result.raw_response_path}")
                 print(
                     "Safety: output was saved only; no files were applied, no commands were "
                     "executed, and no Git/GitHub/deploy actions were taken."
@@ -1489,6 +1490,7 @@ def main() -> None:
                 print("Local agent draft saved.")
                 print(f"Draft output: {result.output_file}")
                 print(f"Metadata: {result.metadata_file}")
+                print(f"Raw response: {result.raw_response_file}")
                 print(
                     "Safety: draft output was saved only; no source files were edited, no model "
                     "output was executed, and no cloud, GitHub, commit, merge, or deploy actions "

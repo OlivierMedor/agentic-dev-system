@@ -81,11 +81,34 @@ The command writes:
 
 - `stories/<story>/reports/local_agent_drafts/<agent>_<model-label>_draft.md`
 - `stories/<story>/reports/local_agent_drafts/<agent>_<model-label>_draft.yaml`
+- `stories/<story>/reports/local_agent_drafts/<agent>_<model-label>_raw_response.json`
 
 The metadata YAML records the story, agent, model label, configured model,
-prompt file, output file, status, and safety flags showing that no source edits,
-shell execution, cloud calls, GitHub API calls, commits, merges, or deployments
-were performed.
+prompt file, output file, raw response file, prompt character count, response
+character count, finish reason, status, and safety flags showing that no source
+edits, shell execution, cloud calls, GitHub API calls, commits, merges, or
+deployments were performed.
+
+## Empty Responses
+
+Empty or whitespace-only model content is treated as a failure, not a saved
+draft. In that case the command writes metadata with
+`status: empty_model_response`, saves the raw response JSON for debugging, and
+exits with an error instead of silently accepting an empty Markdown file.
+
+Common causes include:
+
+- A model/server mismatch.
+- The configured model name does not match the model loaded by the server.
+- The prompt too large failure mode, where the prompt exceeds the loaded model
+  or server settings.
+- The prompt is too large for the loaded model or server settings.
+- The local server returns an unsupported response shape.
+- The model refuses to produce final content.
+- A model refuses to produce final content.
+- The response contains only hidden/internal reasoning and no final answer.
+
+Inspect the raw response JSON and `.agentic/agent_runtime.yaml` before rerunning.
 
 ## Prompt Safety
 

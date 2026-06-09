@@ -107,6 +107,15 @@ def find_artifact_policy_violations(tracked_files: list[str]) -> list[ArtifactPo
             )
             continue
 
+        if is_local_model_raw_response_path(parts, filename):
+            violations.append(
+                ArtifactPolicyViolation(
+                    path=normalized_path,
+                    reason="local model raw response file is tracked",
+                ),
+            )
+            continue
+
         if is_local_model_scorecard_scoring_artifact_path(normalized_path):
             violations.append(
                 ArtifactPolicyViolation(
@@ -226,6 +235,14 @@ def is_local_agent_draft_output_path(parts: list[str], filename: str) -> bool:
     )
 
 
+def is_local_model_raw_response_path(parts: list[str], filename: str) -> bool:
+    return (
+        len(parts) >= 2
+        and parts[0] == "reports"
+        and filename.endswith("_raw_response.json")
+    )
+
+
 def is_local_model_scorecard_scoring_artifact_path(normalized_path: str) -> bool:
     return normalized_path in {
         ".agentic/local_model_scorecard/scorecard_scores.yaml",
@@ -302,8 +319,8 @@ def format_artifact_policy_report(result: ArtifactPolicyResult) -> str:
         "",
         "Tracked files must not include generated review artifacts, support queue runtime files, "
         "queue runtime files, feature scan runtime files, local model scorecard results, "
-        "local agent draft outputs, local model scorecard scoring artifacts, zip files, "
-        "environment files, or private operator guidance.",
+        "local agent draft outputs, local model raw responses, local model scorecard scoring "
+        "artifacts, zip files, environment files, or private operator guidance.",
         "",
         "Violations:",
     ]

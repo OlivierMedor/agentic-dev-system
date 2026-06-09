@@ -11,6 +11,7 @@ from agentic_dev.local_model_runtime import (
     LOCAL_AGENT_DRAFT_PROMPT_FILES,
     LocalModelRuntimeConfig,
     build_headers,
+    extract_response_text,
     run_local_agent_draft,
     run_local_agent_prompt,
     run_local_model_dry_run,
@@ -20,8 +21,13 @@ from agentic_dev.runtime_config import default_runtime_config_text
 
 
 class FakeLocalModelHttpClient:
-    def __init__(self, response_text: str = "LOCAL_MODEL_OK") -> None:
+    def __init__(
+        self,
+        response_text: str = "LOCAL_MODEL_OK",
+        raw_response: dict[str, Any] | None = None,
+    ) -> None:
         self.response_text = response_text
+        self.raw_response = raw_response
         self.calls: list[dict[str, Any]] = []
 
     def post_json(
@@ -39,7 +45,14 @@ class FakeLocalModelHttpClient:
                 "timeout_seconds": timeout_seconds,
             },
         )
-        return {"choices": [{"message": {"content": self.response_text}}]}
+        if self.raw_response is not None:
+            return self.raw_response
+
+        return {
+            "choices": [
+                {"finish_reason": "stop", "message": {"content": self.response_text}},
+            ],
+        }
 
 
 def write_runtime_config(project_path: Path, local_model_runtime: dict[str, Any]) -> Path:
@@ -164,9 +177,78 @@ def test_run_prompt_saves_response_to_output_file(tmp_path: Path) -> None:
 
     assert result.response_text == "raw local response"
     assert output_file.read_text(encoding="utf-8") == "raw local response"
+    assert result.raw_response_path == tmp_path.resolve() / "reports" / "local_agent_output_raw_response.json"
+    assert result.raw_response_path.exists()
+    raw_response = yaml.safe_load(result.raw_response_path.read_text(encoding="utf-8"))
+    assert raw_response["choices"][0]["message"]["content"] == "raw local response"
     assert fake_client.calls[0]["payload"]["messages"] == [
         {"role": "user", "content": "Summarize the story."},
     ]
+
+
+@pytest.mark.parametrize("response_text", ["", "   \n\t"])
+def test_run_prompt_treats_empty_or_whitespace_response_as_failure(
+    tmp_path: Path,
+    response_text: str,
+) -> None:
+    write_runtime_config(tmp_path, valid_local_model_runtime_config())
+    prompt_file = tmp_path / "prompt.md"
+    output_file = tmp_path / "reports" / "local_agent_output.md"
+    prompt_file.write_text("Summarize the story.", encoding="utf-8")
+    fake_client = FakeLocalModelHttpClient(response_text)
+
+    with pytest.raises(ValueError, match="Local model returned an empty response"):
+        run_local_agent_prompt(tmp_path, prompt_file, output_file, fake_client)
+
+    raw_response_path = tmp_path.resolve() / "reports" / "local_agent_output_raw_response.json"
+    assert raw_response_path.exists()
+    assert not output_file.exists()
+
+
+def test_extract_response_text_supports_content_list_text_parts() -> None:
+    response = {
+        "choices": [
+            {
+                "message": {
+                    "content": [
+                        {"type": "text", "text": "first"},
+                        {"type": "output_text", "text": " second"},
+                    ],
+                },
+            },
+        ],
+    }
+
+    assert extract_response_text(response) == "first second"
+
+
+def test_extract_response_text_supports_choice_text() -> None:
+    response = {"choices": [{"text": "legacy text response"}]}
+
+    assert extract_response_text(response) == "legacy text response"
+
+
+def test_extract_response_text_supports_top_level_output_text() -> None:
+    response = {"output_text": "responses api final text"}
+
+    assert extract_response_text(response) == "responses api final text"
+
+
+def test_extract_response_text_ignores_hidden_reasoning_only_response() -> None:
+    response = {
+        "choices": [
+            {
+                "message": {
+                    "content": [
+                        {"type": "reasoning", "text": "private chain of thought"},
+                    ],
+                },
+                "finish_reason": "stop",
+            },
+        ],
+    }
+
+    assert extract_response_text(response) == ""
 
 
 def test_run_prompt_does_not_apply_code_changes(tmp_path: Path) -> None:
@@ -287,6 +369,15 @@ def test_local_agent_draft_saves_markdown_output_and_metadata_yaml(tmp_path: Pat
         / "docs_agent_gemma-4-26b_draft.md"
     )
     assert result.output_file.read_text(encoding="utf-8") == "## Draft\n\nUse this after review."
+    assert result.raw_response_file == (
+        tmp_path.resolve()
+        / "stories"
+        / "story_045_demo"
+        / "reports"
+        / "local_agent_drafts"
+        / "docs_agent_gemma-4-26b_raw_response.json"
+    )
+    assert result.raw_response_file.exists()
     metadata = yaml.safe_load(result.metadata_file.read_text(encoding="utf-8"))
     assert metadata["story"] == "story_045_demo"
     assert metadata["agent"] == "docs_agent"
@@ -294,6 +385,10 @@ def test_local_agent_draft_saves_markdown_output_and_metadata_yaml(tmp_path: Pat
     assert metadata["configured_model"] == "qwen3-coder-30b-a3b-instruct"
     assert metadata["prompt_file"] == str(result.prompt_file)
     assert metadata["output_file"] == str(result.output_file)
+    assert metadata["raw_response_file"] == str(result.raw_response_file)
+    assert metadata["prompt_character_count"] == len("Prompt file 05_docs_agent_prompt.md")
+    assert metadata["response_character_count"] == len("## Draft\n\nUse this after review.")
+    assert metadata["finish_reason"] == "stop"
     assert metadata["status"] == "draft_saved"
     assert metadata["applied_to_source"] is False
     assert metadata["executed_model_output"] is False
@@ -302,6 +397,51 @@ def test_local_agent_draft_saves_markdown_output_and_metadata_yaml(tmp_path: Pat
     assert metadata["committed_or_merged"] is False
     assert metadata["deployed"] is False
     assert "Human/Codex review required" in metadata["next_action"]
+
+
+@pytest.mark.parametrize("response_text", ["", "   \n\t"])
+def test_local_agent_draft_treats_empty_or_whitespace_response_as_failure(
+    tmp_path: Path,
+    response_text: str,
+) -> None:
+    write_runtime_config(tmp_path, valid_local_model_runtime_config())
+    create_story_prompt_pack(tmp_path)
+    fake_client = FakeLocalModelHttpClient(response_text)
+
+    with pytest.raises(ValueError, match="Local model returned an empty response"):
+        run_local_agent_draft(
+            tmp_path,
+            "story_045_demo",
+            "docs_agent",
+            model_label="gemma-4-26b",
+            http_client=fake_client,
+        )
+
+    draft_path = (
+        tmp_path.resolve()
+        / "stories"
+        / "story_045_demo"
+        / "reports"
+        / "local_agent_drafts"
+        / "docs_agent_gemma-4-26b_draft.md"
+    )
+    metadata_path = draft_path.with_suffix(".yaml")
+    raw_response_path = draft_path.with_name("docs_agent_gemma-4-26b_raw_response.json")
+
+    assert not draft_path.exists()
+    assert raw_response_path.exists()
+    metadata = yaml.safe_load(metadata_path.read_text(encoding="utf-8"))
+    assert metadata["status"] == "empty_model_response"
+    assert metadata["response_character_count"] == 0
+    assert metadata["raw_response_file"] == str(raw_response_path)
+    assert metadata["applied_to_source"] is False
+    assert metadata["executed_model_output"] is False
+    assert metadata["called_cloud_models"] is False
+    assert metadata["called_github_apis"] is False
+    assert metadata["committed_or_merged"] is False
+    assert metadata["deployed"] is False
+    assert "Inspect the raw response JSON" in metadata["next_action"]
+    assert "draft_saved" not in metadata["status"]
 
 
 def test_local_agent_draft_does_not_edit_source_or_execute_model_output(tmp_path: Path) -> None:
@@ -393,7 +533,11 @@ def test_cli_local_agent_draft_defaults_project_to_current_directory(
         return type(
             "DraftResult",
             (),
-            {"output_file": output_file, "metadata_file": metadata_file},
+            {
+                "output_file": output_file,
+                "metadata_file": metadata_file,
+                "raw_response_file": tmp_path / "draft_raw_response.json",
+            },
         )()
 
     monkeypatch.chdir(tmp_path)
@@ -498,6 +642,12 @@ def test_local_agent_drafts_doc_mentions_models_tools_and_review_boundaries() ->
         "High-risk DeFi",
         "agentic local-agent draft",
         "plain ASCII",
+        "empty_model_response",
+        "raw response JSON",
+        "model/server mismatch",
+        "prompt too large",
+        "unsupported response shape",
+        "model refuses to produce final content",
     ]
 
     for phrase in required_phrases:
