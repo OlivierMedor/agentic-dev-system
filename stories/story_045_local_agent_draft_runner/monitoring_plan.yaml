@@ -1,0 +1,10 @@
+logs_required: true
+watch_for:
+- missing_local_agent_prompt
+- invalid_local_model_runtime_config
+- local_model_server_unavailable
+- accidental_source_edit_from_model_output
+- model_output_executed
+- committed_local_agent_draft
+- secret_exposure
+- cloud_model_call

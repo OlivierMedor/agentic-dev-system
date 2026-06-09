@@ -147,6 +147,18 @@ def test_generated_role_prompts_include_required_agent_specific_rules(tmp_path: 
     assert "Do not approve unless pytest and Ruff pass." in reviewer_prompt
 
 
+def test_generated_prompts_include_local_agent_safety_format_guidance(tmp_path: Path) -> None:
+    story_path = create_prompt_pack_story(tmp_path)
+
+    generate_prompt_pack(tmp_path, STORY)
+
+    developer_prompt = read_prompt(story_path / "prompt_pack" / "03_developer_agent_prompt.md")
+    assert "Prefer plain ASCII output." in developer_prompt
+    assert "Avoid emoji/checkmark symbols." in developer_prompt
+    assert "Avoid unnecessary nested Markdown code fences." in developer_prompt
+    assert "Use requested headings exactly." in developer_prompt
+
+
 def test_missing_story_folder_raises_clear_error(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError, match="Story folder does not exist") as error:
         generate_prompt_pack(tmp_path, STORY)

@@ -226,6 +226,10 @@ You are the {display_name} for `{story}`.
 - Do not make unrelated changes.
 - Do not overwrite another agent's report unless explicitly instructed.
 - Do not ignore project rules, quality gates, test plan, or monitoring plan.
+- Prefer plain ASCII output.
+- Avoid emoji/checkmark symbols.
+- Avoid unnecessary nested Markdown code fences.
+- Use requested headings exactly.
 
 ## Final Reporting Requirement
 

@@ -21,6 +21,7 @@ def test_allowed_project_paths_do_not_violate_artifact_policy() -> None:
         ".agentic/local_model_scorecard/prompts/developer_agent_prompt.md",
         ".agentic/local_model_scorecard/scorecard_template.yaml",
         ".agentic/local_model_scorecard/results/.gitkeep",
+        "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/.gitkeep",
         ".agentic/improvement_queue/pending/.gitkeep",
         ".agentic/maintenance_queue/pending/.gitkeep",
         ".agentic/feature_queue/pending/.gitkeep",
@@ -105,6 +106,20 @@ def test_local_model_scorecard_results_are_blocked_except_gitkeep() -> None:
     ) == blocked_paths
 
 
+def test_local_agent_draft_outputs_are_blocked_except_gitkeep() -> None:
+    blocked_paths = [
+        "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/docs_agent_gemma-4-26b_draft.md",
+        "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/docs_agent_gemma-4-26b_draft.yaml",
+    ]
+
+    assert violation_paths(
+        [
+            *blocked_paths,
+            "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/.gitkeep",
+        ],
+    ) == blocked_paths
+
+
 def test_runtime_queue_item_files_are_blocked_except_gitkeep() -> None:
     blocked_paths = [
         ".agentic/improvement_queue/pending/IMP-20260605-120000.yaml",
@@ -141,6 +156,7 @@ def test_multiple_violations_are_all_reported() -> None:
         "stories/story_011_artifact_policy_guard/cloud_review_packet/cloud_review_prompt.md",
         "stories/story_011_artifact_policy_guard/remote_dev_validation/remote_dev_packet.md",
         ".agentic/local_model_scorecard/results/qwen3/run_summary.md",
+        "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/docs_agent_gemma-4-26b_draft.md",
         "reports/local_model_scorecard_report.md",
         ".agentic/local_model_scorecard/scorecard_scores.yaml",
         "reports/local_model_role_recommendations.md",
@@ -156,6 +172,7 @@ def test_multiple_violations_are_all_reported() -> None:
         "stories/story_011_artifact_policy_guard/cloud_review_packet/cloud_review_prompt.md",
         "stories/story_011_artifact_policy_guard/remote_dev_validation/remote_dev_packet.md",
         ".agentic/local_model_scorecard/results/qwen3/run_summary.md",
+        "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/docs_agent_gemma-4-26b_draft.md",
         "reports/local_model_scorecard_report.md",
         ".agentic/local_model_scorecard/scorecard_scores.yaml",
         "reports/local_model_role_recommendations.md",

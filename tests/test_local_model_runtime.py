@@ -8,8 +8,10 @@ import yaml
 
 from agentic_dev.cli import main
 from agentic_dev.local_model_runtime import (
+    LOCAL_AGENT_DRAFT_PROMPT_FILES,
     LocalModelRuntimeConfig,
     build_headers,
+    run_local_agent_draft,
     run_local_agent_prompt,
     run_local_model_dry_run,
     validate_local_model_runtime_config,
@@ -60,6 +62,16 @@ def valid_local_model_runtime_config() -> dict[str, Any]:
         "max_output_tokens": 4096,
         "temperature": 0.2,
     }
+
+
+def create_story_prompt_pack(project_path: Path, story: str = "story_045_demo") -> Path:
+    prompt_pack_path = project_path / "stories" / story / "prompt_pack"
+    prompt_pack_path.mkdir(parents=True, exist_ok=True)
+    for prompt_relative_path in set(LOCAL_AGENT_DRAFT_PROMPT_FILES.values()):
+        prompt_path = project_path / "stories" / story / prompt_relative_path
+        prompt_path.parent.mkdir(parents=True, exist_ok=True)
+        prompt_path.write_text(f"Prompt file {prompt_path.name}", encoding="utf-8")
+    return prompt_pack_path
 
 
 def test_local_model_config_validation_passes_for_valid_config(tmp_path: Path) -> None:
@@ -173,6 +185,239 @@ def test_run_prompt_does_not_apply_code_changes(tmp_path: Path) -> None:
     assert output_file.read_text(encoding="utf-8") == "print('changed')\n"
 
 
+@pytest.mark.parametrize(
+    ("agent", "prompt_filename"),
+    [
+        ("developer_agent", "03_developer_agent_prompt.md"),
+        ("test_agent", "04_test_agent_prompt.md"),
+        ("docs_agent", "05_docs_agent_prompt.md"),
+        ("reviewer_agent", "07_local_reviewer_agent_prompt.md"),
+        ("maintenance_agent", "07_local_reviewer_agent_prompt.md"),
+    ],
+)
+def test_local_agent_draft_maps_supported_agents_to_prompt_files(
+    tmp_path: Path,
+    agent: str,
+    prompt_filename: str,
+) -> None:
+    write_runtime_config(tmp_path, valid_local_model_runtime_config())
+    create_story_prompt_pack(tmp_path)
+    fake_client = FakeLocalModelHttpClient("draft response")
+
+    result = run_local_agent_draft(
+        tmp_path,
+        "story_045_demo",
+        agent,
+        model_label="gemma-4-26b",
+        http_client=fake_client,
+    )
+
+    assert result.prompt_file.name == prompt_filename
+    assert fake_client.calls[0]["payload"]["messages"] == [
+        {"role": "user", "content": f"Prompt file {prompt_filename}"},
+    ]
+
+
+def test_local_agent_draft_raises_clear_error_for_missing_story(tmp_path: Path) -> None:
+    write_runtime_config(tmp_path, valid_local_model_runtime_config())
+
+    with pytest.raises(FileNotFoundError, match="Story folder does not exist"):
+        run_local_agent_draft(
+            tmp_path,
+            "story_missing",
+            "docs_agent",
+            model_label="gemma-4-26b",
+            http_client=FakeLocalModelHttpClient(),
+        )
+
+
+def test_local_agent_draft_raises_clear_error_for_missing_prompt_file(tmp_path: Path) -> None:
+    write_runtime_config(tmp_path, valid_local_model_runtime_config())
+    prompt_pack_path = tmp_path / "stories" / "story_045_demo" / "prompt_pack"
+    prompt_pack_path.mkdir(parents=True)
+
+    with pytest.raises(FileNotFoundError, match="Prompt file does not exist"):
+        run_local_agent_draft(
+            tmp_path,
+            "story_045_demo",
+            "docs_agent",
+            model_label="gemma-4-26b",
+            http_client=FakeLocalModelHttpClient(),
+        )
+
+
+def test_local_agent_draft_refuses_when_local_runtime_disabled(tmp_path: Path) -> None:
+    config = valid_local_model_runtime_config()
+    config["enabled"] = False
+    write_runtime_config(tmp_path, config)
+    create_story_prompt_pack(tmp_path)
+    fake_client = FakeLocalModelHttpClient()
+
+    with pytest.raises(ValueError, match="local_model_runtime.enabled must be true"):
+        run_local_agent_draft(
+            tmp_path,
+            "story_045_demo",
+            "docs_agent",
+            model_label="gemma-4-26b",
+            http_client=fake_client,
+        )
+
+    assert fake_client.calls == []
+
+
+def test_local_agent_draft_saves_markdown_output_and_metadata_yaml(tmp_path: Path) -> None:
+    write_runtime_config(tmp_path, valid_local_model_runtime_config())
+    create_story_prompt_pack(tmp_path)
+    fake_client = FakeLocalModelHttpClient("## Draft\n\nUse this after review.")
+
+    result = run_local_agent_draft(
+        tmp_path,
+        "story_045_demo",
+        "docs_agent",
+        model_label="gemma-4-26b",
+        http_client=fake_client,
+    )
+
+    assert result.output_file == (
+        tmp_path.resolve()
+        / "stories"
+        / "story_045_demo"
+        / "reports"
+        / "local_agent_drafts"
+        / "docs_agent_gemma-4-26b_draft.md"
+    )
+    assert result.output_file.read_text(encoding="utf-8") == "## Draft\n\nUse this after review."
+    metadata = yaml.safe_load(result.metadata_file.read_text(encoding="utf-8"))
+    assert metadata["story"] == "story_045_demo"
+    assert metadata["agent"] == "docs_agent"
+    assert metadata["model_label"] == "gemma-4-26b"
+    assert metadata["configured_model"] == "qwen3-coder-30b-a3b-instruct"
+    assert metadata["prompt_file"] == str(result.prompt_file)
+    assert metadata["output_file"] == str(result.output_file)
+    assert metadata["status"] == "draft_saved"
+    assert metadata["applied_to_source"] is False
+    assert metadata["executed_model_output"] is False
+    assert metadata["called_cloud_models"] is False
+    assert metadata["called_github_apis"] is False
+    assert metadata["committed_or_merged"] is False
+    assert metadata["deployed"] is False
+    assert "Human/Codex review required" in metadata["next_action"]
+
+
+def test_local_agent_draft_does_not_edit_source_or_execute_model_output(tmp_path: Path) -> None:
+    write_runtime_config(tmp_path, valid_local_model_runtime_config())
+    create_story_prompt_pack(tmp_path)
+    source_file = tmp_path / "src" / "app.py"
+    source_file.parent.mkdir(parents=True)
+    source_file.write_text("print('original')\n", encoding="utf-8")
+    marker_file = tmp_path / "marker.txt"
+    marker_file.write_text("still here\n", encoding="utf-8")
+    fake_client = FakeLocalModelHttpClient(
+        "Replace src/app.py with changed content and run: Remove-Item marker.txt",
+    )
+
+    result = run_local_agent_draft(
+        tmp_path,
+        "story_045_demo",
+        "developer_agent",
+        model_label="devstral",
+        http_client=fake_client,
+    )
+
+    assert source_file.read_text(encoding="utf-8") == "print('original')\n"
+    assert marker_file.read_text(encoding="utf-8") == "still here\n"
+    assert "Remove-Item marker.txt" in result.output_file.read_text(encoding="utf-8")
+
+
+def test_local_agent_draft_does_not_overwrite_without_force(tmp_path: Path) -> None:
+    write_runtime_config(tmp_path, valid_local_model_runtime_config())
+    create_story_prompt_pack(tmp_path)
+    run_local_agent_draft(
+        tmp_path,
+        "story_045_demo",
+        "docs_agent",
+        model_label="gemma-4-26b",
+        http_client=FakeLocalModelHttpClient("first"),
+    )
+
+    with pytest.raises(ValueError, match="already exists"):
+        run_local_agent_draft(
+            tmp_path,
+            "story_045_demo",
+            "docs_agent",
+            model_label="gemma-4-26b",
+            http_client=FakeLocalModelHttpClient("second"),
+        )
+
+
+def test_local_agent_draft_force_overwrites_existing_output(tmp_path: Path) -> None:
+    write_runtime_config(tmp_path, valid_local_model_runtime_config())
+    create_story_prompt_pack(tmp_path)
+    first = run_local_agent_draft(
+        tmp_path,
+        "story_045_demo",
+        "docs_agent",
+        model_label="gemma-4-26b",
+        http_client=FakeLocalModelHttpClient("first"),
+    )
+
+    second = run_local_agent_draft(
+        tmp_path,
+        "story_045_demo",
+        "docs_agent",
+        model_label="gemma-4-26b",
+        force=True,
+        http_client=FakeLocalModelHttpClient("second"),
+    )
+
+    assert second.output_file == first.output_file
+    assert second.output_file.read_text(encoding="utf-8") == "second"
+
+
+def test_cli_local_agent_draft_defaults_project_to_current_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    write_runtime_config(tmp_path, valid_local_model_runtime_config())
+    create_story_prompt_pack(tmp_path)
+    output_file = tmp_path / "draft.md"
+
+    def fake_run_local_agent_draft(**kwargs: Any) -> Any:
+        assert kwargs["project_path"] == Path.cwd()
+        assert kwargs["story"] == "story_045_demo"
+        assert kwargs["agent"] == "docs_agent"
+        output_file.write_text("fake draft", encoding="utf-8")
+        metadata_file = tmp_path / "draft.yaml"
+        metadata_file.write_text("status: draft_saved\n", encoding="utf-8")
+        return type(
+            "DraftResult",
+            (),
+            {"output_file": output_file, "metadata_file": metadata_file},
+        )()
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("agentic_dev.cli.run_local_agent_draft", fake_run_local_agent_draft)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "agentic",
+            "local-agent",
+            "draft",
+            "--story",
+            "story_045_demo",
+            "--agent",
+            "docs_agent",
+        ],
+    )
+
+    main()
+
+    captured = capsys.readouterr()
+    assert "Local agent draft saved." in captured.out
+    assert "Safety: draft output was saved only" in captured.out
+
+
 def test_cli_local_model_validate_prints_pass(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -225,6 +470,34 @@ def test_local_models_doc_mentions_tools_models_and_safety_boundaries() -> None:
         "does not apply code changes",
         "does not commit, push, merge, deploy, or call GitHub APIs",
         "Cloud models are not called",
+    ]
+
+    for phrase in required_phrases:
+        assert phrase in guide
+
+
+def test_readme_or_docs_link_to_local_agent_drafts_doc() -> None:
+    readme = Path("README.md").read_text(encoding="utf-8")
+    local_models = Path("docs/local_models.md").read_text(encoding="utf-8")
+
+    assert "docs/local_agent_drafts.md" in readme
+    assert "docs/local_agent_drafts.md" in local_models
+
+
+def test_local_agent_drafts_doc_mentions_models_tools_and_review_boundaries() -> None:
+    guide = Path("docs/local_agent_drafts.md").read_text(encoding="utf-8")
+
+    required_phrases = [
+        "Gemma",
+        "Devstral",
+        "Qwen",
+        "LM Studio",
+        "save-only",
+        "Human/Codex review",
+        "human/cloud review",
+        "High-risk DeFi",
+        "agentic local-agent draft",
+        "plain ASCII",
     ]
 
     for phrase in required_phrases:

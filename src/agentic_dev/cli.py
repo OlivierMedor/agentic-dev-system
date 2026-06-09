@@ -16,6 +16,7 @@ from agentic_dev.improvement_scan import (
 from agentic_dev.local_model_runtime import (
     DEFAULT_DRY_RUN_PROMPT,
     format_local_model_validation_result,
+    run_local_agent_draft,
     run_local_agent_prompt,
     run_local_model_dry_run,
     validate_local_model_runtime_config,
@@ -780,6 +781,53 @@ def main() -> None:
         help="Target project folder. Defaults to the current directory.",
     )
 
+    local_agent_draft_parser = local_agent_subparsers.add_parser(
+        "draft",
+        help="Send a story prompt-pack file to the local model and save a draft report.",
+    )
+    local_agent_draft_parser.add_argument(
+        "--story",
+        required=True,
+        help="Story folder name under the project's stories folder.",
+    )
+    local_agent_draft_parser.add_argument(
+        "--agent",
+        required=True,
+        choices=[
+            "developer_agent",
+            "test_agent",
+            "docs_agent",
+            "reviewer_agent",
+            "maintenance_agent",
+        ],
+        help="Local draft agent prompt to run.",
+    )
+    local_agent_draft_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    local_agent_draft_parser.add_argument(
+        "--prompt-file",
+        type=Path,
+        help="Optional prompt file override. Relative paths are resolved from the project root.",
+    )
+    local_agent_draft_parser.add_argument(
+        "--output-file",
+        type=Path,
+        help="Optional draft output file override. Relative paths are resolved from the project root.",
+    )
+    local_agent_draft_parser.add_argument(
+        "--model-label",
+        help="Optional safe label for the loaded local model.",
+    )
+    local_agent_draft_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite an existing draft output and metadata file.",
+    )
+
     support_ticket_parser = subparsers.add_parser(
         "support-ticket",
         help="Create and manage structured support tickets for blocked agents.",
@@ -1426,6 +1474,25 @@ def main() -> None:
                 print(
                     "Safety: output was saved only; no files were applied, no commands were "
                     "executed, and no Git/GitHub/deploy actions were taken."
+                )
+
+            if args.local_agent_command == "draft":
+                result = run_local_agent_draft(
+                    project_path=args.project,
+                    story=args.story,
+                    agent=args.agent,
+                    prompt_file=args.prompt_file,
+                    output_file=args.output_file,
+                    model_label=args.model_label,
+                    force=args.force,
+                )
+                print("Local agent draft saved.")
+                print(f"Draft output: {result.output_file}")
+                print(f"Metadata: {result.metadata_file}")
+                print(
+                    "Safety: draft output was saved only; no source files were edited, no model "
+                    "output was executed, and no cloud, GitHub, commit, merge, or deploy actions "
+                    "were taken."
                 )
 
         if args.command == "support-ticket":

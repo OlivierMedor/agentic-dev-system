@@ -122,6 +122,7 @@ Local model runtime checks:
 docker compose run --rm dev agentic local-model validate
 docker compose run --rm dev agentic local-model dry-run
 docker compose run --rm dev agentic local-agent run-prompt --prompt-file prompt.md --output-file reports/local_agent_output.md
+docker compose run --rm dev agentic local-agent draft --story <story> --agent docs_agent --model-label gemma-4-26b
 docker compose run --rm dev agentic local-model scorecard-create
 docker compose run --rm dev agentic local-model scorecard-report
 docker compose run --rm dev agentic local-model scorecard-scaffold-scores
@@ -163,7 +164,8 @@ Local OpenAI-compatible models can be configured for bounded draft and dry-run
 work through LM Studio or Ollama. Use `docs/local_model_scorecard.md` to compare
 local models on repeatable agent-style prompts before assigning them to roles.
 Use `docs/local_model_role_assignment.md` for the manual scoring and role
-assignment process. See `docs/local_models.md` for setup.
+assignment process. Use `docs/local_agent_drafts.md` to save story prompt-pack
+responses as reviewable local drafts. See `docs/local_models.md` for setup.
 
 For release and repository hygiene, use `docs/public_launch_checklist.md`,
 `docs/release_process.md`, `docs/v0_1_release_checklist.md`,
@@ -203,6 +205,8 @@ That file is ignored and blocked by policy. The public-safe example is
   release hygiene.
 - `docs/local_models.md` explains local OpenAI-compatible runtime setup with LM
   Studio, Ollama, and safety boundaries.
+- `docs/local_agent_drafts.md` explains save-only local draft reports from story
+  prompt-pack files.
 - `docs/local_model_scorecard.md` explains how to compare local models on the
   same public-safe agent-style prompts before role assignment.
 - `docs/local_model_role_assignment.md` explains manual local model scoring,
