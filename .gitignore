@@ -28,6 +28,8 @@ stories/**/cloud_review_packet/*
 !stories/**/cloud_review_packet/.gitkeep
 stories/**/remote_dev_validation/*
 !stories/**/remote_dev_validation/.gitkeep
+stories/**/reports/local_agent_drafts/*
+!stories/**/reports/local_agent_drafts/.gitkeep
 .agentic/support_queue/**/*.yaml
 .agentic/support_queue/**/*.md
 !.agentic/support_queue/**/.gitkeep

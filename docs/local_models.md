@@ -91,6 +91,17 @@ docker compose run --rm dev agentic local-agent run-prompt --prompt-file prompt.
 execute model output, commit, push, merge, deploy, call GitHub APIs, expose
 secret values, or call cloud models.
 
+Send a story prompt-pack file to the local model and save a draft report plus
+metadata:
+
+```powershell
+docker compose run --rm -e LOCAL_MODEL_API_KEY=lm-studio dev agentic local-agent draft --story <story> --agent docs_agent --model-label gemma-4-26b
+```
+
+See `docs/local_agent_drafts.md` for the save-only draft workflow, prompt-file
+mapping, runtime artifact policy, and human/cloud review boundary for high-risk
+logic.
+
 Create repeatable local-agent scorecard prompts, run them against a configured
 local model, and create a manual report:
 

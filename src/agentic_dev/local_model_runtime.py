@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
+
+import yaml
 
 from agentic_dev.runtime_config import load_runtime_config
 
@@ -14,6 +17,14 @@ from agentic_dev.runtime_config import load_runtime_config
 LOCAL_MODEL_PROVIDER = "local_openai_compatible"
 DEFAULT_DRY_RUN_PROMPT = "Reply with LOCAL_MODEL_OK only."
 DRY_RUN_REPORT_RELATIVE_PATH = Path("reports") / "local_model_dry_run_report.md"
+LOCAL_AGENT_DRAFTS_FOLDER = Path("reports") / "local_agent_drafts"
+LOCAL_AGENT_DRAFT_PROMPT_FILES = {
+    "developer_agent": Path("prompt_pack") / "03_developer_agent_prompt.md",
+    "test_agent": Path("prompt_pack") / "04_test_agent_prompt.md",
+    "docs_agent": Path("prompt_pack") / "05_docs_agent_prompt.md",
+    "reviewer_agent": Path("prompt_pack") / "07_local_reviewer_agent_prompt.md",
+    "maintenance_agent": Path("prompt_pack") / "07_local_reviewer_agent_prompt.md",
+}
 
 
 class LocalModelHttpClient(Protocol):
@@ -91,6 +102,19 @@ class LocalModelValidationResult:
 class LocalModelCallResult:
     config_path: Path
     report_path: Path | None
+    response_text: str
+    raw_response: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class LocalAgentDraftResult:
+    story: str
+    agent: str
+    model_label: str
+    configured_model: str
+    prompt_file: Path
+    output_file: Path
+    metadata_file: Path
     response_text: str
     raw_response: dict[str, Any]
 
@@ -226,6 +250,153 @@ def run_local_agent_prompt(
         response_text=response_text,
         raw_response=response,
     )
+
+
+def run_local_agent_draft(
+    project_path: Path,
+    story: str,
+    agent: str,
+    prompt_file: Path | None = None,
+    output_file: Path | None = None,
+    model_label: str | None = None,
+    force: bool = False,
+    http_client: LocalModelHttpClient | None = None,
+) -> LocalAgentDraftResult:
+    resolved_project_path = project_path.resolve()
+    story_path = resolved_project_path / "stories" / story
+
+    if not story_path.exists() or not story_path.is_dir():
+        raise FileNotFoundError(f"Story folder does not exist: {story_path}")
+
+    if agent not in LOCAL_AGENT_DRAFT_PROMPT_FILES:
+        supported = ", ".join(sorted(LOCAL_AGENT_DRAFT_PROMPT_FILES))
+        raise ValueError(f"Unsupported local draft agent: {agent}. Supported agents: {supported}")
+
+    resolved_prompt_file = resolve_local_agent_prompt_file(
+        resolved_project_path,
+        story_path,
+        agent,
+        prompt_file,
+    )
+    if not resolved_prompt_file.exists():
+        raise FileNotFoundError(f"Prompt file does not exist: {resolved_prompt_file}")
+
+    config_path, config = load_local_model_runtime_config(resolved_project_path)
+    safe_model_label = sanitize_local_model_label(model_label or config.model)
+    resolved_output_file = resolve_local_agent_output_file(
+        resolved_project_path,
+        story_path,
+        agent,
+        safe_model_label,
+        output_file,
+    )
+    metadata_file = resolved_output_file.with_suffix(".yaml")
+
+    existing_outputs = [path for path in [resolved_output_file, metadata_file] if path.exists()]
+    if existing_outputs and not force:
+        existing = ", ".join(str(path) for path in existing_outputs)
+        raise ValueError(f"Local agent draft output already exists: {existing}. Use --force to overwrite.")
+
+    prompt = resolved_prompt_file.read_text(encoding="utf-8")
+    raw_response = call_local_model(config, prompt, http_client)
+    response_text = extract_response_text(raw_response)
+
+    resolved_output_file.parent.mkdir(parents=True, exist_ok=True)
+    resolved_output_file.write_text(response_text, encoding="utf-8")
+    write_local_agent_draft_metadata(
+        metadata_file=metadata_file,
+        story=story,
+        agent=agent,
+        model_label=safe_model_label,
+        configured_model=config.model,
+        prompt_file=resolved_prompt_file,
+        output_file=resolved_output_file,
+    )
+
+    return LocalAgentDraftResult(
+        story=story,
+        agent=agent,
+        model_label=safe_model_label,
+        configured_model=config.model,
+        prompt_file=resolved_prompt_file,
+        output_file=resolved_output_file,
+        metadata_file=metadata_file,
+        response_text=response_text,
+        raw_response=raw_response,
+    )
+
+
+def resolve_local_agent_prompt_file(
+    project_path: Path,
+    story_path: Path,
+    agent: str,
+    prompt_file: Path | None,
+) -> Path:
+    if prompt_file is not None:
+        if prompt_file.is_absolute():
+            return prompt_file.resolve()
+        return (project_path / prompt_file).resolve()
+
+    prompt_pack_path = story_path / "prompt_pack"
+    if not prompt_pack_path.exists() or not prompt_pack_path.is_dir():
+        raise FileNotFoundError(f"Prompt pack folder does not exist: {prompt_pack_path}")
+
+    return (story_path / LOCAL_AGENT_DRAFT_PROMPT_FILES[agent]).resolve()
+
+
+def resolve_local_agent_output_file(
+    project_path: Path,
+    story_path: Path,
+    agent: str,
+    model_label: str,
+    output_file: Path | None,
+) -> Path:
+    if output_file is not None:
+        if output_file.is_absolute():
+            return output_file.resolve()
+        return (project_path / output_file).resolve()
+
+    filename = f"{agent}_{model_label}_draft.md"
+    return (story_path / LOCAL_AGENT_DRAFTS_FOLDER / filename).resolve()
+
+
+def sanitize_local_model_label(model_label: str) -> str:
+    label = model_label.strip()
+
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", label):
+        raise ValueError(
+            "--model-label must contain only letters, numbers, dots, underscores, or hyphens.",
+        )
+
+    return label
+
+
+def write_local_agent_draft_metadata(
+    metadata_file: Path,
+    story: str,
+    agent: str,
+    model_label: str,
+    configured_model: str,
+    prompt_file: Path,
+    output_file: Path,
+) -> None:
+    metadata = {
+        "story": story,
+        "agent": agent,
+        "model_label": model_label,
+        "configured_model": configured_model,
+        "prompt_file": str(prompt_file),
+        "output_file": str(output_file),
+        "status": "draft_saved",
+        "applied_to_source": False,
+        "executed_model_output": False,
+        "called_cloud_models": False,
+        "called_github_apis": False,
+        "committed_or_merged": False,
+        "deployed": False,
+        "next_action": "Human/Codex review required before applying any draft content.",
+    }
+    metadata_file.write_text(yaml.safe_dump(metadata, sort_keys=False), encoding="utf-8")
 
 
 def call_local_model(
