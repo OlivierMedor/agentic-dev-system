@@ -92,6 +92,17 @@ def prepare_reported_story(story_path: Path) -> None:
     write_required_agent_reports(story_path)
 
 
+def write_micro_readiness_result(story_path: Path, status: str = "READY_FOR_MICRO") -> None:
+    write_yaml(
+        story_path / "reports" / "micro_readiness_result.yaml",
+        {
+            "status": status,
+            "warnings": [],
+            "failed_checks": [],
+        },
+    )
+
+
 def write_ready_finalize_result(story_path: Path) -> None:
     write_yaml(
         story_path / "reports" / "finalize_story_result.yaml",
@@ -236,6 +247,7 @@ def test_workflow_preview_recommends_configured_agent_runtime_when_reports_are_m
 ) -> None:
     story_path = create_story(tmp_path)
     prepare_prompted_story(story_path)
+    write_micro_readiness_result(story_path)
 
     result = run_workflow_preview(tmp_path, STORY)
     result_data = read_yaml(result.result_path)
@@ -247,6 +259,21 @@ def test_workflow_preview_recommends_configured_agent_runtime_when_reports_are_m
     assert "developer_report.md" in report
     assert "test_report.md" in report
     assert "local_review_report.md" in report
+
+
+def test_workflow_preview_recommends_micro_readiness_when_result_is_missing(
+    tmp_path: Path,
+) -> None:
+    story_path = create_story(tmp_path)
+    prepare_prompted_story(story_path)
+
+    result = run_workflow_preview(tmp_path, STORY)
+    result_data = read_yaml(result.result_path)
+    report = result.report_path.read_text(encoding="utf-8")
+
+    assert result_data["recommended_next_action"] == "Run micro-readiness."
+    assert result_data["suggested_command"] == f"agentic micro-readiness --story {STORY}"
+    assert "micro_readiness_result.yaml is not recorded yet" in report
 
 
 def test_workflow_preview_recommends_workflow_run_cloud_review_prep_after_finalize_is_ready(

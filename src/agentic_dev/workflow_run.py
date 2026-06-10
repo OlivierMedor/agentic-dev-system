@@ -10,6 +10,7 @@ from langgraph.graph import StateGraph
 
 from agentic_dev.cloud_review_packet import create_cloud_review_packet
 from agentic_dev.finalize_story import finalize_story
+from agentic_dev.micro_readiness import run_micro_readiness
 from agentic_dev.next_step import format_bullet_list, validate_story_folder
 from agentic_dev.prepare_story import prepare_story
 from agentic_dev.review_bundle import create_review_bundle
@@ -286,6 +287,11 @@ def build_safe_steps(project_path: Path, story: str, phase: str) -> list[SafeSte
                 description="Create or refresh the story setup artifacts without running agents.",
             ),
             SafeStep(
+                name="micro-readiness",
+                command=("agentic", "micro-readiness", "--project", project_text, "--story", story),
+                description="Check story sizing guidance for micro-mode local prompts.",
+            ),
+            SafeStep(
                 name="workflow-preview",
                 command=("agentic", "workflow-preview", "--project", project_text, "--story", story),
                 description="Refresh the LangGraph route preview report.",
@@ -367,6 +373,20 @@ def run_safe_step(project_path: Path, story: str, step: SafeStep) -> SafeStepRes
                 step,
                 passed,
                 f"test-layers status: {result.status}",
+                result.result_path,
+                result.report_path,
+            )
+
+        if step.name == "micro-readiness":
+            result = run_micro_readiness(project_path, story)
+            return build_step_result(
+                step,
+                True,
+                (
+                    "micro-readiness status: "
+                    f"{result.status}; warnings: {len(result.warnings)}; "
+                    f"failed checks: {len(result.failed_checks)}"
+                ),
                 result.result_path,
                 result.report_path,
             )

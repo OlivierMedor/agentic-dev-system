@@ -50,13 +50,15 @@ visited, and explains which safe local steps would run.
 plan and safety report. With `--execute`, it runs only:
 
 - `prepare-story`
+- `micro-readiness`
 - `workflow-preview`
 
 The prepare phase creates or refreshes the local setup artifacts: `agent_plan.yaml`, prompt files
 under `prompt_pack/`, `story_runbook.md`, `reports/prepare_story_report.md`, `status.yaml`, and the
-route preview report. It does not execute agents, run generated prompts, call cloud models, call
-GitHub APIs, commit, push, merge, deploy, run destructive commands, or run arbitrary commands from
-user input.
+micro-readiness and route preview reports. Micro-readiness gives story sizing guidance for choosing
+micro mode, slim mode, or a stronger configured agent runtime. It does not execute agents, run
+generated prompts, call cloud models, call GitHub APIs, commit, push, merge, deploy, run destructive
+commands, or run arbitrary commands from user input.
 
 `workflow-run --phase local-finalize` validates final local evidence after the required agent
 reports are present. Without `--execute`, it writes only the plan and safety report. With

@@ -115,6 +115,22 @@ def write_workflow_run_result(
     write_yaml(story_path / "reports" / "workflow_run_result.yaml", data)
 
 
+def write_micro_readiness_result(
+    story_path: Path,
+    status: str = "READY_FOR_MICRO",
+    warnings: list[str] | None = None,
+) -> None:
+    write_yaml(
+        story_path / "reports" / "micro_readiness_result.yaml",
+        {
+            "status": status,
+            "warnings": warnings or [],
+            "failed_checks": [],
+            "recommended_action": "Use the recorded micro-readiness guidance.",
+        },
+    )
+
+
 def write_cloud_review_export(story_path: Path) -> None:
     export_path = story_path / "cloud_review_packet" / "cloud_review_export.md"
     export_path.parent.mkdir()
@@ -225,6 +241,7 @@ def test_prompts_without_required_reports_recommend_configured_agent_runtime(
 ) -> None:
     story_path = create_story(tmp_path)
     prepare_prompted_story(story_path)
+    write_micro_readiness_result(story_path, "READY_FOR_MICRO")
 
     result = run_next_step(tmp_path, STORY)
     text = recommendation_text(result)
@@ -237,6 +254,69 @@ def test_prompts_without_required_reports_recommend_configured_agent_runtime(
     assert "local_review_report.md" in text
     assert "configured agent runtime" in text
     assert "Codex" not in text
+    assert "micro-readiness status: READY_FOR_MICRO." in text
+
+
+def test_prepared_story_without_micro_readiness_recommends_micro_readiness(
+    tmp_path: Path,
+) -> None:
+    story_path = create_story(tmp_path)
+    prepare_prompted_story(story_path)
+
+    result = run_next_step(tmp_path, STORY)
+    text = recommendation_text(result)
+
+    assert result.recommendation.title == "Run micro-readiness."
+    assert result.recommendation.command == f"agentic micro-readiness --story {STORY}"
+    assert "micro_readiness_result.yaml is not recorded yet" in result.recommendation.reason
+    assert (
+        f"agentic workflow-run --story {STORY} --phase prepare --execute"
+    ) in text
+    assert "configured agent runtime" in text
+
+
+def test_next_step_warns_when_micro_readiness_is_too_large(
+    tmp_path: Path,
+) -> None:
+    story_path = create_story(tmp_path)
+    prepare_prompted_story(story_path)
+    write_micro_readiness_result(
+        story_path,
+        "TOO_LARGE_FOR_MICRO",
+        ["Several assigned agents exceed the target character count."],
+    )
+
+    result = run_next_step(tmp_path, STORY)
+    text = recommendation_text(result)
+
+    assert result.recommendation.title == "Review story size or configured agent runtime."
+    assert result.recommendation.command is None
+    assert "TOO_LARGE_FOR_MICRO" in result.recommendation.reason
+    assert "Split or narrow the story" in text
+    assert "stronger configured agent runtime" in text
+    assert "automatic" in text
+    assert "Codex" not in text
+
+
+def test_next_step_continues_with_warning_explanation_for_micro_warnings(
+    tmp_path: Path,
+) -> None:
+    story_path = create_story(tmp_path)
+    prepare_prompted_story(story_path)
+    write_micro_readiness_result(
+        story_path,
+        "MICRO_READY_WITH_WARNINGS",
+        ["Story appears to touch several modules."],
+    )
+
+    result = run_next_step(tmp_path, STORY)
+    text = recommendation_text(result)
+
+    assert result.recommendation.title == "Run the generated agent prompts."
+    assert result.recommendation.command is None
+    assert "warnings are guidance" in text
+    assert "Local models may need micro mode" in text
+    assert "story may need splitting" in text
 
 
 def test_test_layers_version_one_without_result_recommends_workflow_run_local_finalize(

@@ -27,6 +27,7 @@ LOCAL_FINALIZE_STEPS = [
 ]
 PREPARE_STEPS = [
     "prepare-story",
+    "micro-readiness",
     "workflow-preview",
 ]
 CLOUD_REVIEW_PREP_STEPS = [
@@ -248,6 +249,7 @@ def test_workflow_run_prepare_dry_run_writes_plan_without_running_safe_steps(
     assert_workflow_run_safety_flags(result_data)
     assert "Dry run only. No workflow steps ran" in report
     assert "prepare-story" in report
+    assert "micro-readiness" in report
     assert "workflow-preview" in report
 
 
@@ -285,8 +287,35 @@ def test_workflow_run_prepare_execute_runs_only_safe_prepare_steps_with_fake_run
     assert_workflow_run_safety_flags(result_data)
     assert "Execution happened because `--execute` was provided." in report
     assert "prepare-story: PASSED" in report
+    assert "micro-readiness: PASSED" in report
     assert "workflow-preview: PASSED" in report
     assert "generated agent prompts" in report
+
+
+def test_workflow_run_prepare_records_micro_readiness_step_result(
+    tmp_path: Path,
+) -> None:
+    create_story(tmp_path)
+    calls: list[str] = []
+
+    result = run_workflow_run(
+        tmp_path,
+        STORY,
+        phase=PREPARE_PHASE,
+        execute=True,
+        step_runner=fake_step_runner(calls),
+    )
+    result_data = read_yaml(result.result_path)
+
+    micro_step = next(
+        step_result
+        for step_result in result_data["step_results"]
+        if step_result["step"] == "micro-readiness"
+    )
+    assert calls == PREPARE_STEPS
+    assert micro_step["ran"] is True
+    assert micro_step["status"] == "PASSED"
+    assert "agentic micro-readiness" in micro_step["command"]
 
 
 def test_workflow_run_cloud_review_prep_dry_run_writes_plan_without_running_steps(
@@ -566,7 +595,7 @@ def test_prepare_safe_steps_are_hardcoded_allowlist(tmp_path: Path) -> None:
     steps = build_safe_steps(tmp_path, STORY, PREPARE_PHASE)
 
     assert [step.name for step in steps] == PREPARE_STEPS
-    assert [step.command[0] for step in steps] == ["agentic", "agentic"]
+    assert [step.command[0] for step in steps] == ["agentic", "agentic", "agentic"]
     assert [step.command[1] for step in steps] == PREPARE_STEPS
     for step in steps:
         assert "--project" in step.command
