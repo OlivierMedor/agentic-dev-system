@@ -123,6 +123,7 @@ docker compose run --rm dev agentic local-model validate
 docker compose run --rm dev agentic local-model dry-run
 docker compose run --rm dev agentic local-agent run-prompt --prompt-file prompt.md --output-file reports/local_agent_output.md
 docker compose run --rm -e LOCAL_MODEL_API_KEY=lm-studio dev agentic local-agent draft --story story_045_local_agent_draft_runner --agent docs_agent --model-label gemma-4-26b --prompt-mode slim --force
+docker compose run --rm -e LOCAL_MODEL_API_KEY=lm-studio dev agentic local-agent draft --story story_045_local_agent_draft_runner --agent docs_agent --model-label gemma-4-26b --prompt-mode micro --force
 docker compose run --rm dev agentic local-model scorecard-create
 docker compose run --rm dev agentic local-model scorecard-report
 docker compose run --rm dev agentic local-model scorecard-scaffold-scores
@@ -165,8 +166,10 @@ work through LM Studio or Ollama. Use `docs/local_model_scorecard.md` to compare
 local models on repeatable agent-style prompts before assigning them to roles.
 Use `docs/local_model_role_assignment.md` for the manual scoring and role
 assignment process. Use `docs/local_agent_drafts.md` to save story context as
-reviewable local drafts, and `docs/local_agent_context_packets.md` for slim
-local-model context packets. See `docs/local_models.md` for setup.
+reviewable local drafts, and `docs/local_agent_context_packets.md` for slim and
+micro local-model context packets. Use micro mode when Gemma returns hidden
+`reasoning_content` but empty visible content. See `docs/local_models.md` for
+setup.
 
 For release and repository hygiene, use `docs/public_launch_checklist.md`,
 `docs/release_process.md`, `docs/v0_1_release_checklist.md`,
@@ -209,7 +212,8 @@ That file is ignored and blocked by policy. The public-safe example is
 - `docs/local_agent_drafts.md` explains save-only local draft reports from story
   context or prompt-pack files.
 - `docs/local_agent_context_packets.md` explains slim local-agent context
-  packets and truncation warnings for local models.
+  packets, micro final-answer-focused packets, and truncation warnings for local
+  models.
 - `docs/local_model_scorecard.md` explains how to compare local models on the
   same public-safe agent-style prompts before role assignment.
 - `docs/local_model_role_assignment.md` explains manual local model scoring,

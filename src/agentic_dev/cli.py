@@ -815,12 +815,13 @@ def main() -> None:
     )
     local_agent_draft_parser.add_argument(
         "--prompt-mode",
-        choices=["full", "slim"],
+        choices=["full", "micro", "slim"],
         default="slim",
         help=(
             "Prompt mode for local-agent drafts. slim builds a local-model-friendly context "
-            "packet and is the default. full uses the story prompt_pack file. Ignored when "
-            "--prompt-file is provided."
+            "packet and is the default. micro builds the smallest final-answer-focused "
+            "context. full uses the story prompt_pack file. Ignored when --prompt-file is "
+            "provided."
         ),
     )
     local_agent_draft_parser.add_argument(

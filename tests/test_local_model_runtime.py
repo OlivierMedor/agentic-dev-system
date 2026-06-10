@@ -91,7 +91,25 @@ def create_story_context(project_path: Path, story: str = "story_047_demo") -> P
     story_path = project_path / "stories" / story
     story_path.mkdir(parents=True, exist_ok=True)
     (story_path / "story.md").write_text(
-        "# Story 047\n\nSlim prompt story content.",
+        "\n".join(
+            [
+                "# Story 047",
+                "",
+                "## Goal",
+                "",
+                "Slim prompt story content.",
+                "",
+                "## Acceptance Criteria",
+                "",
+                "- Add micro prompt mode.",
+                "- Keep full mode working.",
+                "- Keep slim mode working.",
+                "- Save a context packet.",
+                "- Record metadata.",
+                "- Exclude runtime artifacts.",
+                "",
+            ],
+        ),
         encoding="utf-8",
     )
     (story_path / "status.yaml").write_text("status: in_progress\n", encoding="utf-8")
@@ -101,7 +119,15 @@ def create_story_context(project_path: Path, story: str = "story_047_demo") -> P
         encoding="utf-8",
     )
     (story_path / "agent_plan.yaml").write_text(
-        "assigned_agents:\n  - name: docs_agent\n",
+        "\n".join(
+            [
+                "assigned_agents:",
+                "  - id: docs_agent",
+                "    responsibility: Update documentation related to this story.",
+                "    expected_output: reports/docs_report.md",
+                "",
+            ],
+        ),
         encoding="utf-8",
     )
     instructions_path = story_path / "instructions" / "docs_agent.md"
@@ -420,6 +446,146 @@ def test_local_agent_draft_slim_mode_creates_context_packet_with_allowed_sources
     assert str(story_path / "story.md") in metadata["source_files_used"]
     assert str(story_path / "instructions" / "docs_agent.md") in metadata["source_files_used"]
     assert "prompt_file" not in metadata
+
+
+def test_local_agent_draft_micro_mode_creates_small_context_packet(
+    tmp_path: Path,
+) -> None:
+    write_runtime_config(tmp_path, valid_local_model_runtime_config())
+    story_path = create_story_context(tmp_path)
+    excluded_files = {
+        story_path / "review_bundle" / "handoff.md": "review_bundle excluded content",
+        story_path / "cloud_review_packet" / "cloud_review_export.md": (
+            "cloud_review_packet excluded content"
+        ),
+        story_path / "remote_dev_validation" / "packet.md": (
+            "remote_dev_validation excluded content"
+        ),
+        story_path / "reports" / "local_agent_drafts" / "old_draft.md": (
+            "previous draft output excluded content"
+        ),
+        story_path / "reports" / "local_agent_drafts" / "old_raw_response.json": (
+            "raw response excluded content"
+        ),
+        story_path / "prompt_pack" / "05_docs_agent_prompt.md": (
+            "long prompt pack excluded content"
+        ),
+        story_path / "reports" / "large_report.md": "large report excluded content",
+    }
+    for path, content in excluded_files.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+    fake_client = FakeLocalModelHttpClient("micro draft response")
+
+    result = run_local_agent_draft(
+        tmp_path,
+        "story_047_demo",
+        "docs_agent",
+        model_label="gemma-4-26b",
+        prompt_mode="micro",
+        http_client=fake_client,
+    )
+
+    assert result.context_file is not None
+    context = result.context_file.read_text(encoding="utf-8")
+    metadata = yaml.safe_load(result.metadata_file.read_text(encoding="utf-8"))
+    assert result.prompt_mode == "micro"
+    assert "# Local Agent Micro Context Packet" in context
+    assert "prompt_mode: micro" in context
+    assert "story: story_047_demo" in context
+    assert "agent: docs_agent" in context
+    assert "Update documentation related to this story." in context
+    assert "Slim prompt story content." in context
+    assert "Add micro prompt mode." in context
+    assert "Exclude runtime artifacts." not in context
+    assert str(result.output_file) in context
+    assert "Return only the final visible answer in message.content." in context
+    assert "Do not put the answer only in reasoning_content." in context
+    assert "Do not include hidden reasoning." in context
+    assert "return a short visible explanation" in context
+    assert len(context) < 2000
+    for content in excluded_files.values():
+        assert content not in context
+    assert metadata["prompt_mode"] == "micro"
+    assert metadata["context_file"] == str(result.context_file)
+    assert metadata["context_character_count"] == len(context)
+    assert str(story_path / "story.md") in metadata["source_files_used"]
+    assert str(story_path / "agent_plan.yaml") in metadata["source_files_used"]
+    assert "prompt_file" not in metadata
+
+
+def test_local_agent_draft_micro_context_is_smaller_than_slim_context(
+    tmp_path: Path,
+) -> None:
+    write_runtime_config(tmp_path, valid_local_model_runtime_config())
+    create_story_context(tmp_path)
+    slim = run_local_agent_draft(
+        tmp_path,
+        "story_047_demo",
+        "docs_agent",
+        model_label="gemma-slim",
+        prompt_mode="slim",
+        http_client=FakeLocalModelHttpClient("slim draft response"),
+    )
+    micro = run_local_agent_draft(
+        tmp_path,
+        "story_047_demo",
+        "docs_agent",
+        model_label="gemma-micro",
+        prompt_mode="micro",
+        http_client=FakeLocalModelHttpClient("micro draft response"),
+    )
+
+    slim_metadata = yaml.safe_load(slim.metadata_file.read_text(encoding="utf-8"))
+    micro_metadata = yaml.safe_load(micro.metadata_file.read_text(encoding="utf-8"))
+    assert micro_metadata["context_character_count"] < slim_metadata["context_character_count"]
+
+
+def test_local_agent_draft_micro_empty_reasoning_only_response_fails(
+    tmp_path: Path,
+) -> None:
+    write_runtime_config(tmp_path, valid_local_model_runtime_config())
+    create_story_context(tmp_path)
+    fake_client = FakeLocalModelHttpClient(
+        raw_response={
+            "choices": [
+                {
+                    "finish_reason": "length",
+                    "message": {
+                        "content": "",
+                        "reasoning_content": "internal reasoning only",
+                    },
+                },
+            ],
+        },
+    )
+
+    with pytest.raises(ValueError, match="Local model returned an empty response"):
+        run_local_agent_draft(
+            tmp_path,
+            "story_047_demo",
+            "docs_agent",
+            model_label="gemma-4-26b",
+            prompt_mode="micro",
+            http_client=fake_client,
+        )
+
+    metadata_path = (
+        tmp_path.resolve()
+        / "stories"
+        / "story_047_demo"
+        / "reports"
+        / "local_agent_drafts"
+        / "docs_agent_gemma-4-26b_draft.yaml"
+    )
+    metadata = yaml.safe_load(metadata_path.read_text(encoding="utf-8"))
+    assert metadata["prompt_mode"] == "micro"
+    assert metadata["status"] == "empty_model_response"
+    assert metadata["response_character_count"] == 0
+    assert any(
+        "local model returned hidden/internal reasoning" in warning
+        for warning in metadata["warnings"]
+    )
 
 
 def test_local_agent_draft_raises_clear_error_for_missing_story(tmp_path: Path) -> None:
@@ -780,6 +946,53 @@ def test_cli_local_agent_draft_defaults_project_to_current_directory(
     assert "Safety: draft output was saved only" in captured.out
 
 
+def test_cli_local_agent_draft_accepts_micro_prompt_mode(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    output_file = tmp_path / "draft.md"
+
+    def fake_run_local_agent_draft(**kwargs: Any) -> Any:
+        assert kwargs["prompt_mode"] == "micro"
+        metadata_file = tmp_path / "draft.yaml"
+        return type(
+            "DraftResult",
+            (),
+            {
+                "output_file": output_file,
+                "metadata_file": metadata_file,
+                "raw_response_file": tmp_path / "draft_raw_response.json",
+                "context_file": tmp_path / "context.md",
+                "status": "draft_saved",
+                "prompt_mode": "micro",
+                "warnings": [],
+            },
+        )()
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("agentic_dev.cli.run_local_agent_draft", fake_run_local_agent_draft)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "agentic",
+            "local-agent",
+            "draft",
+            "--story",
+            "story_047_demo",
+            "--agent",
+            "docs_agent",
+            "--prompt-mode",
+            "micro",
+        ],
+    )
+
+    main()
+
+    captured = capsys.readouterr()
+    assert "Prompt mode: micro" in captured.out
+
+
 def test_cli_local_model_validate_prints_pass(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -856,11 +1069,13 @@ def test_local_agent_context_packets_doc_explains_slim_mode_and_truncation() -> 
     required_phrases = [
         "one-page work orders",
         "prompt_mode: slim",
+        "prompt_mode: micro",
         "Gemma",
         "reasoning_content",
         "finish_reason: length",
         "draft_saved_with_warning",
         "empty_model_response",
+        "Return only the final visible answer in message.content",
         "Human/Codex review",
         "does not execute model output",
     ]
@@ -890,6 +1105,7 @@ def test_local_agent_drafts_doc_mentions_models_tools_and_review_boundaries() ->
         "unsupported response shape",
         "model refuses to produce final content",
         "--prompt-mode slim",
+        "--prompt-mode micro",
         "draft_saved_with_warning",
         "model output may be truncated",
     ]
