@@ -26,6 +26,9 @@ agentic generate-stories
 agentic workflow-run --phase prepare --execute
   |
   v
+micro-readiness sizing guidance
+  |
+  v
 configured agent runtime
   |
   v
@@ -105,6 +108,11 @@ docker compose run --rm dev agentic merge-readiness --story STORY_SLUG
 docker compose run --rm dev agentic project-status
 ```
 
+`workflow-run --phase prepare --execute` runs `prepare-story`,
+`micro-readiness`, and `workflow-preview`. The micro-readiness result helps
+choose micro, slim, or stronger configured agent runtime usage before generated
+prompts are run.
+
 Local validation and hygiene:
 
 ```powershell
@@ -171,6 +179,10 @@ reviewable local drafts, and `docs/local_agent_context_packets.md` for slim and
 micro local-model context packets. Use micro mode when Gemma returns hidden
 `reasoning_content` but empty visible content. See `docs/local_models.md` for
 setup.
+
+Use `docs/micro_readiness.md` to interpret story sizing guidance. Warnings mean
+local models may need micro mode, slim mode, a stronger configured agent
+runtime, or a story split; they are not automatic workflow failures.
 
 For release and repository hygiene, use `docs/public_launch_checklist.md`,
 `docs/release_process.md`, `docs/v0_1_release_checklist.md`,

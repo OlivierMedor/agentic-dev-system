@@ -1,0 +1,11 @@
+logs_required: true
+watch_for:
+- missing_micro_readiness_result
+- malformed_micro_readiness_result
+- oversized_micro_prompt_estimate
+- story_should_be_split
+- workflow_prepare_safety_flag_regression
+- local_model_call
+- cloud_model_call
+- generated_prompt_execution
+- automatic_merge_or_deploy

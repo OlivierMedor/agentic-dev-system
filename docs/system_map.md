@@ -253,6 +253,8 @@ workflow-run --phase prepare
   |
   +--> prepare-story
   |
+  +--> micro-readiness
+  |
   `--> workflow-preview
 ```
 

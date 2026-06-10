@@ -1,0 +1,32 @@
+test_layers_version: 1
+unit_tests:
+  required: true
+  action: add_or_update
+  frequency: every_commit
+  evidence_or_reason: Add tests for workflow-run prepare dry-run and execute step
+    sequence, micro-readiness step result recording, project-status display and malformed
+    handling, next-step missing micro-readiness guidance, TOO_LARGE_FOR_MICRO guidance,
+    READY_FOR_MICRO continuation, and warning guidance.
+integration_tests:
+  required: true
+  action: add_or_update
+  frequency: every_pull_request
+  evidence_or_reason: CLI paths are covered by existing workflow-run, project-status,
+    and next-step tests without real local or cloud model calls.
+mock_e2e_tests:
+  required: true
+  action: confirm_existing
+  frequency: before_merge
+  evidence_or_reason: Existing workflow-run coverage exercises deterministic local
+    story phases; this story extends the prepare allowlist only.
+live_read_only_checks:
+  required: false
+  action: not_applicable_with_reason
+  frequency: manual_only
+  evidence_or_reason: Micro-readiness reads local story files only and does not require
+    live model servers or cloud credentials.
+remote_dev_smoke_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: after_remote_dev_deploy
+  evidence_or_reason: This story does not deploy to a remote dev environment.

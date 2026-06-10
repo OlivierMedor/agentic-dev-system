@@ -32,6 +32,16 @@ agent-specific micro-mode tasks.
 
 ## Run The Check
 
+The normal prepare workflow now runs micro-readiness automatically:
+
+```powershell
+docker compose run --rm dev agentic workflow-run --story STORY_SLUG --phase prepare --execute
+```
+
+That prepare phase runs `prepare-story`, `micro-readiness`, and
+`workflow-preview`. Use the standalone command when you want to refresh only the
+sizing report:
+
 ```powershell
 docker compose run --rm dev agentic micro-readiness --story STORY_SLUG
 ```
@@ -85,3 +95,30 @@ The check looks at:
 
 The result is advisory. Human judgment still decides whether the story is worth
 running through the full workflow.
+
+Warnings are guidance, not automatic failure. A story with
+`MICRO_READY_WITH_WARNINGS` can continue through the normal workflow, but the
+operator should read the warning text before choosing a local prompt mode or
+runtime.
+
+## When To Split A Story
+
+Split or narrow the story when `TOO_LARGE_FOR_MICRO` points to several
+oversized agent estimates, too many acceptance criteria, broad module reach, or
+multiple unrelated workflow areas. A good split gives each new story a single
+clear goal, explicit not-in-scope boundaries, and agent responsibilities that
+can be summarized without pulling in unrelated context.
+
+Do not split just because one warning exists. Use the warning as a prompt to
+check whether the story is still cohesive.
+
+## Micro Mode Versus Stronger Runtime
+
+Use micro mode when each agent has a focused responsibility and a short prompt
+can state the goal, top acceptance criteria, expected output, and safety rules.
+This is often the best first choice for smaller local models that struggle with
+long prompt packs.
+
+Use slim mode or a stronger configured agent runtime when the story is cohesive
+but the agent needs more context than micro mode can provide. If the story is
+not cohesive, prefer splitting it before relying on a stronger model.

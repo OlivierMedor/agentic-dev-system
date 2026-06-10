@@ -247,6 +247,82 @@ def test_project_status_handles_malformed_workflow_run_result_gracefully(
     assert "Invalid YAML" in report
 
 
+def test_project_status_reads_and_displays_micro_readiness_status(
+    tmp_path: Path,
+) -> None:
+    story_path = create_story(tmp_path, "story_micro_ready", {"status": "planned"})
+    write_yaml(
+        story_path / "reports" / "micro_readiness_result.yaml",
+        {
+            "status": "MICRO_READY_WITH_WARNINGS",
+            "warnings": ["Story appears to touch several modules."],
+        },
+    )
+
+    story_status = collect_story_status(tmp_path, story_path)
+    result = run_project_status(tmp_path)
+
+    assert story_status.micro_readiness_exists is True
+    assert story_status.micro_readiness_status == "MICRO_READY_WITH_WARNINGS"
+    assert story_status.micro_readiness_warning_count == 1
+    assert "micro_readiness_status=MICRO_READY_WITH_WARNINGS (warnings=1)" in (
+        result.terminal_summary
+    )
+
+    report = result.report_path.read_text(encoding="utf-8")
+    assert "- micro_readiness_result.yaml: present" in report
+    assert "micro_readiness_status=MICRO_READY_WITH_WARNINGS" in report
+    assert "warning_count=1" in report
+
+
+def test_project_status_handles_missing_micro_readiness_as_not_recorded(
+    tmp_path: Path,
+) -> None:
+    story_path = create_story(tmp_path, "story_without_micro_readiness", {"status": "planned"})
+
+    story_status = collect_story_status(tmp_path, story_path)
+    result = run_project_status(tmp_path)
+
+    assert story_status.micro_readiness_exists is False
+    assert story_status.micro_readiness_status is None
+    assert story_status.micro_readiness_warning_count is None
+    assert "micro_readiness_status=not recorded (warnings=not recorded)" in (
+        result.terminal_summary
+    )
+
+    report = result.report_path.read_text(encoding="utf-8")
+    assert "- micro_readiness_result.yaml: missing" in report
+    assert "micro_readiness_status=not recorded" in report
+    assert "warning_count=not recorded" in report
+
+
+def test_project_status_handles_malformed_micro_readiness_gracefully(
+    tmp_path: Path,
+) -> None:
+    story_path = create_story(tmp_path, "story_bad_micro_readiness", {"status": "planned"})
+    reports_path = story_path / "reports"
+    reports_path.mkdir()
+    (reports_path / "micro_readiness_result.yaml").write_text(
+        "status: [unterminated\n",
+        encoding="utf-8",
+    )
+
+    story_status = collect_story_status(tmp_path, story_path)
+    result = run_project_status(tmp_path)
+
+    assert story_status.micro_readiness_exists is True
+    assert story_status.micro_readiness_status is None
+    assert story_status.micro_readiness_warning_count is None
+    assert story_status.warnings
+    assert "Invalid YAML" in story_status.warnings[0]
+
+    report = result.report_path.read_text(encoding="utf-8")
+    assert "- micro_readiness_result.yaml: present" in report
+    assert "micro_readiness_status=not recorded" in report
+    assert "warning_count=not recorded" in report
+    assert "Invalid YAML" in report
+
+
 @pytest.mark.parametrize(
     "validation_status",
     [

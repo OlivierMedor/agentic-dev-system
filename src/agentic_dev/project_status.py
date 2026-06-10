@@ -68,6 +68,9 @@ class StoryProjectStatus:
     workflow_run_status: str | None
     workflow_run_executed: bool | None
     workflow_run_safety_summary: str
+    micro_readiness_exists: bool
+    micro_readiness_status: str | None
+    micro_readiness_warning_count: int | None
     cloud_review_exists: bool
     cloud_review_decision: str | None
     remote_dev_validation_exists: bool
@@ -157,6 +160,7 @@ def collect_story_status(project_path: Path, story_path: Path) -> StoryProjectSt
     quality_gate_path = reports_path / "quality_gate_result.yaml"
     finalize_path = reports_path / "finalize_story_result.yaml"
     workflow_run_path = reports_path / "workflow_run_result.yaml"
+    micro_readiness_path = reports_path / "micro_readiness_result.yaml"
     cloud_review_path = reports_path / "cloud_review_result.yaml"
     remote_dev_validation_path = reports_path / "remote_dev_validation_result.yaml"
     merge_readiness_path = reports_path / "merge_readiness_result.yaml"
@@ -166,6 +170,7 @@ def collect_story_status(project_path: Path, story_path: Path) -> StoryProjectSt
     quality_gate_data = load_optional_yaml_mapping(quality_gate_path, warnings)
     finalize_data = load_optional_yaml_mapping(finalize_path, warnings)
     workflow_run_data = load_optional_yaml_mapping(workflow_run_path, warnings)
+    micro_readiness_data = load_optional_yaml_mapping(micro_readiness_path, warnings)
     cloud_review_data = load_optional_yaml_mapping(cloud_review_path, warnings)
     remote_dev_validation_data = load_optional_yaml_mapping(remote_dev_validation_path, warnings)
     merge_readiness_data = load_optional_yaml_mapping(merge_readiness_path, warnings)
@@ -190,6 +195,8 @@ def collect_story_status(project_path: Path, story_path: Path) -> StoryProjectSt
         workflow_run_path.exists(),
         workflow_run_data,
     )
+    micro_readiness_status = optional_text(micro_readiness_data.get("status"))
+    micro_readiness_warning_count = warning_count(micro_readiness_data.get("warnings"))
     cloud_review_decision = optional_text(cloud_review_data.get("decision"))
     remote_dev_validation_status = optional_text(remote_dev_validation_data.get("validation_status"))
     if (
@@ -263,6 +270,9 @@ def collect_story_status(project_path: Path, story_path: Path) -> StoryProjectSt
         workflow_run_status=workflow_run_status,
         workflow_run_executed=workflow_run_executed,
         workflow_run_safety_summary=workflow_run_safety_summary,
+        micro_readiness_exists=micro_readiness_path.exists(),
+        micro_readiness_status=micro_readiness_status,
+        micro_readiness_warning_count=micro_readiness_warning_count,
         cloud_review_exists=cloud_review_path.exists(),
         cloud_review_decision=cloud_review_decision,
         remote_dev_validation_exists=remote_dev_validation_path.exists(),
@@ -564,6 +574,17 @@ def format_terminal_summary(
             f"(phase={workflow_run_phase}, executed={format_optional_bool(story.workflow_run_executed)})"
         )
         lines.append(f"    workflow_run_safety_summary={story.workflow_run_safety_summary}")
+        micro_readiness_status = story.micro_readiness_status or "not recorded"
+        micro_readiness_warnings = (
+            str(story.micro_readiness_warning_count)
+            if story.micro_readiness_warning_count is not None
+            else "not recorded"
+        )
+        lines.append(
+            "    "
+            f"micro_readiness_status={micro_readiness_status} "
+            f"(warnings={micro_readiness_warnings})"
+        )
         remote_dev_status = story.remote_dev_validation_status or "not recorded"
         lines.append(f"    remote_dev_validation={remote_dev_status}")
         if story.merge_readiness_status:
@@ -688,6 +709,13 @@ def format_story_section(story: StoryProjectStatus) -> list[str]:
         ),
         f"- workflow_run_safety_summary: {story.workflow_run_safety_summary}",
         (
+            "- micro_readiness_result.yaml: "
+            f"{format_present(story.micro_readiness_exists)}, "
+            f"micro_readiness_status={story.micro_readiness_status or 'not recorded'}, "
+            "warning_count="
+            f"{story.micro_readiness_warning_count if story.micro_readiness_warning_count is not None else 'not recorded'}"
+        ),
+        (
             "- cloud_review_result.yaml: "
             f"{format_present(story.cloud_review_exists)}, "
             f"decision={story.cloud_review_decision or 'missing'}"
@@ -753,6 +781,13 @@ def optional_text(value: Any) -> str | None:
 def optional_bool(value: Any) -> bool | None:
     if isinstance(value, bool):
         return value
+
+    return None
+
+
+def warning_count(value: Any) -> int | None:
+    if isinstance(value, list):
+        return len(value)
 
     return None
 

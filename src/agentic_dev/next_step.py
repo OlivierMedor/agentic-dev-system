@@ -6,6 +6,12 @@ from typing import Any
 
 import yaml
 
+from agentic_dev.micro_readiness import (
+    MICRO_READY_WITH_WARNINGS,
+    READY_FOR_MICRO,
+    TOO_LARGE_FOR_MICRO,
+)
+
 
 BAD_RESULT_VALUES = {"REQUEST_CHANGES", "DEV_FAILED", "NOT_RUN", "request_changes"}
 READY_REMOTE_DEV_STATUSES = {"DEV_VALIDATED", "DEV_VALIDATED_WITH_NOTES"}
@@ -34,6 +40,7 @@ RESULT_FILES = (
     "quality_gate_result.yaml",
     "finalize_story_result.yaml",
     "workflow_run_result.yaml",
+    "micro_readiness_result.yaml",
     "cloud_review_result.yaml",
     "merge_readiness_result.yaml",
     "remote_dev_validation_result.yaml",
@@ -224,6 +231,7 @@ def choose_recommendation(evidence: StoryEvidence) -> NextStepRecommendation:
                 f"prompt_pack present: {format_bool(evidence.prompt_pack_exists)}",
                 f"prompt files found: {len(evidence.prompt_files)}",
                 "workflow-run prepare wraps prepare-story and workflow-preview safely.",
+                "The prepare phase also records micro-readiness story sizing guidance.",
                 (
                     "It does not execute agents, run generated prompts, call cloud models, "
                     "call GitHub APIs, commit, push, merge, or deploy."
@@ -235,6 +243,62 @@ def choose_recommendation(evidence: StoryEvidence) -> NextStepRecommendation:
         report for report in REQUIRED_AGENT_REPORTS if not (evidence.reports_path / report).is_file()
     ]
     if evidence.prompt_files and missing_agent_reports:
+        micro_readiness_result = evidence.result_data.get("micro_readiness_result.yaml")
+        micro_status = text_value((micro_readiness_result or {}).get("status"))
+        micro_warnings = list_values((micro_readiness_result or {}).get("warnings"))
+        if micro_readiness_result is None:
+            return NextStepRecommendation(
+                title="Run micro-readiness.",
+                command=f"agentic micro-readiness --story {evidence.story}",
+                reason=(
+                    "The story is prepared with an agent plan and prompt pack, but "
+                    "reports/micro_readiness_result.yaml is not recorded yet."
+                ),
+                details=[
+                    "Run the direct micro-readiness command for sizing guidance.",
+                    (
+                        "If story setup should be refreshed, run "
+                        f"agentic workflow-run --story {evidence.story} --phase "
+                        "prepare --execute."
+                    ),
+                    (
+                        "Micro-readiness helps choose micro, slim, or stronger "
+                        "configured agent runtime usage before generated prompts are run."
+                    ),
+                ],
+            )
+
+        if micro_status == TOO_LARGE_FOR_MICRO:
+            return NextStepRecommendation(
+                title="Review story size or configured agent runtime.",
+                command=None,
+                reason=(
+                    "micro_readiness_result.yaml reports TOO_LARGE_FOR_MICRO, so "
+                    "micro mode is probably the wrong first choice for this story."
+                ),
+                details=[
+                    "Split or narrow the story before relying on agent-specific micro prompts.",
+                    "Alternatively use a stronger configured agent runtime for this story.",
+                    "Warnings: " + format_inline_list(micro_warnings),
+                    "Do not treat this as approval to merge or deploy automatically.",
+                ],
+            )
+
+        details = [
+            "Missing required reports: " + ", ".join(missing_agent_reports),
+            f"Prompt files found: {len(evidence.prompt_files)}",
+        ]
+        if micro_status == READY_FOR_MICRO:
+            details.append("micro-readiness status: READY_FOR_MICRO.")
+        elif micro_status == MICRO_READY_WITH_WARNINGS:
+            details.append(
+                "micro-readiness warnings are guidance, not an automatic workflow failure."
+            )
+            details.append(
+                "Local models may need micro mode, or the story may need splitting if "
+                "warnings point to broad or unclear scope."
+            )
+            details.append("Micro-readiness warnings: " + format_inline_list(micro_warnings))
         return NextStepRecommendation(
             title="Run the generated agent prompts.",
             command=None,
@@ -242,10 +306,7 @@ def choose_recommendation(evidence: StoryEvidence) -> NextStepRecommendation:
                 "Prompt files exist, but required agent reports are still missing. "
                 "Run the generated prompts using the configured agent runtime."
             ),
-            details=[
-                "Missing required reports: " + ", ".join(missing_agent_reports),
-                f"Prompt files found: {len(evidence.prompt_files)}",
-            ],
+            details=details,
         )
 
     workflow_run_result = evidence.result_data.get("workflow_run_result.yaml")
@@ -604,3 +665,17 @@ def text_value(value: Any) -> str | None:
 
     text = str(value).strip()
     return text or None
+
+
+def list_values(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+
+    return [str(item) for item in value if str(item).strip()]
+
+
+def format_inline_list(values: list[str]) -> str:
+    if not values:
+        return "none recorded."
+
+    return "; ".join(values)

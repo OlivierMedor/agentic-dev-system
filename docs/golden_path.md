@@ -134,7 +134,7 @@ small hardcoded allowlist for the selected phase.
 
 ```text
 prepare
-  runs: prepare-story, workflow-preview
+  runs: prepare-story, micro-readiness, workflow-preview
   use: set up a story workspace before agent work
 
 local-finalize
@@ -148,6 +148,11 @@ cloud-review-prep
 
 The runner does not execute agents, run arbitrary story commands, call cloud
 models, call GitHub APIs, commit, push, merge, or deploy.
+
+The prepare phase also records micro-readiness. That result helps decide whether
+generated prompts should be run in micro mode, slim mode, or with a stronger
+configured agent runtime. Warnings are guidance for story sizing and local model
+fit; they are not automatic merge, deploy, or workflow blockers.
 
 ## Queue differences
 
