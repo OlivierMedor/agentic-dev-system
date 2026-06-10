@@ -3093,6 +3093,87 @@ stories:
         - secret_exposure
         - cloud_model_call
 
+  - id: STORY-049
+    slug: story_049_micro_readiness_story_sizing
+    title: Micro-Readiness and Story Sizing Guard
+    goal: Add a deterministic micro-readiness check that helps decide whether each assigned agent's responsibility can be summarized in a clear local-model micro prompt.
+    why: Micro local-agent prompts are most useful when each agent has a focused task. The workflow needs an explicit sizing guard that warns when a story is too broad, too vague, or too large for agent-specific micro-mode assignments.
+    acceptance_criteria:
+      - Add Story 049 to blueprints/blueprint.yaml.
+      - Add an agentic micro-readiness command with required --story, optional --project, and optional --target-chars defaulting to 2000.
+      - Validate the story folder, read story.md, agent_plan.yaml when present, and instructions/ when present.
+      - Estimate whether each assigned core agent can receive a target-sized micro prompt using the required prompt ingredients.
+      - Write reports/micro_readiness_result.yaml and reports/micro_readiness_report.md, then print a beginner-friendly summary.
+      - Result statuses include READY_FOR_MICRO, MICRO_READY_WITH_WARNINGS, TOO_LARGE_FOR_MICRO, and NEEDS_REVIEW.
+      - Heuristics warn or fail for oversized acceptance criteria, vague goals, missing boundaries, missing or incomplete agent plans, oversized agent estimates, broad module touch, and split signals.
+      - Update docs/micro_readiness.md, docs/story_sizing.md, and README.md with concise operator guidance.
+      - Add tests for story-folder validation, focused stories, acceptance-criteria sizing, missing boundaries, missing agent plans, per-agent estimates, report outputs, target override, model-call safety, and no real Git repo requirement.
+    not_in_scope:
+      - No local model calls.
+      - No cloud model calls.
+      - No agent execution.
+      - No source changes based on model output.
+      - No automatic commit, push, merge, deploy, or GitHub API calls from the command.
+      - No replacement for human story sizing judgment.
+      - No generated review bundle, cloud review packet, remote dev validation, local_agent_context, or local_agent_drafts artifacts committed.
+    definition_of_done:
+      - docker compose build passes.
+      - pytest passes.
+      - ruff passes.
+      - artifact-policy passes.
+      - public-readiness passes.
+      - runtime-config validate passes.
+      - project-status runs.
+      - Story 049 generate-stories passes.
+      - Story 049 prepare workflow-run passes.
+      - Story 049 micro-readiness command passes.
+      - Story 049 local-finalize workflow-run passes.
+      - Story 049 cloud-review-prep workflow-run passes.
+      - Review bundle is generated for Story 049 but generated bundle files are not committed.
+      - Story reports are written for development, testing, and local review.
+    test_plan:
+      test_layers_version: 1
+      unit_tests:
+        required: true
+        action: add_or_update
+        frequency: every_commit
+        evidence_or_reason: Add deterministic tests for story-folder validation, focused story readiness, acceptance-criteria sizing warnings, missing boundaries, missing agent plans, per-agent estimates, report outputs, target override, no model calls, and no Git repo dependency.
+      integration_tests:
+        required: true
+        action: add_or_update
+        frequency: every_pull_request
+        evidence_or_reason: CLI coverage verifies micro-readiness command wiring, default project behavior, target override handling, and model-call safety without live models.
+      mock_e2e_tests:
+        required: true
+        action: confirm_existing
+        frequency: before_merge
+        evidence_or_reason: Existing workflow-run coverage exercises story workspace preparation and finalization; this command is deterministic and tested through the CLI path.
+      live_read_only_checks:
+        required: false
+        action: not_applicable_with_reason
+        frequency: manual_only
+        evidence_or_reason: The command reads local story files only and does not require live services or model servers.
+      remote_dev_smoke_tests:
+        required: false
+        action: not_applicable_with_reason
+        frequency: after_remote_dev_deploy
+        evidence_or_reason: This story does not deploy to a remote dev environment.
+    monitoring_plan:
+      logs_required: true
+      watch_for:
+        - missing_story_folder
+        - missing_story_file
+        - missing_agent_plan
+        - oversized_micro_prompt_estimate
+        - vague_story_goal
+        - too_many_acceptance_criteria
+        - missing_not_in_scope
+        - story_should_be_split
+        - local_model_call
+        - cloud_model_call
+        - agent_execution
+        - accidental_source_edit_from_model_output
+
   - id: STORY-048
     slug: story_048_micro_local_agent_prompt_mode
     title: Add Micro Local-Agent Prompt Mode For Gemma Reliability

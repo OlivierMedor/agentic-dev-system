@@ -33,6 +33,10 @@ from agentic_dev.maintenance_scan import (
     record_maintenance_findings,
 )
 from agentic_dev.merge_readiness import run_merge_readiness
+from agentic_dev.micro_readiness import (
+    DEFAULT_TARGET_CHARACTERS,
+    run_micro_readiness,
+)
 from agentic_dev.next_step import run_next_step
 from agentic_dev.prepare_story import prepare_story
 from agentic_dev.project_status import run_project_status
@@ -565,6 +569,28 @@ def main() -> None:
         "--story",
         required=True,
         help="Story folder name under the project's stories folder.",
+    )
+
+    micro_readiness_parser = subparsers.add_parser(
+        "micro-readiness",
+        help="Check whether a story is focused enough for agent-specific micro prompts.",
+    )
+    micro_readiness_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    micro_readiness_parser.add_argument(
+        "--story",
+        required=True,
+        help="Story folder name under the project's stories folder.",
+    )
+    micro_readiness_parser.add_argument(
+        "--target-chars",
+        type=int,
+        default=DEFAULT_TARGET_CHARACTERS,
+        help="Target maximum characters per estimated agent micro prompt. Defaults to 2000.",
     )
 
     project_status_parser = subparsers.add_parser(
@@ -1382,6 +1408,10 @@ def main() -> None:
             print(f"Report: {result.report_path}")
             print(f"Status file: {result.status_path}")
             print(f"Next action: {result.next_action}")
+
+        if args.command == "micro-readiness":
+            result = run_micro_readiness(args.project, args.story, args.target_chars)
+            print(result.terminal_summary)
 
         if args.command == "project-status":
             result = run_project_status(args.project, args.story)
