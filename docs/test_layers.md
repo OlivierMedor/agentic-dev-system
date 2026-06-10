@@ -72,8 +72,8 @@ Run:
 docker compose run --rm dev agentic test-layers --story story_014_test_layer_support
 ```
 
-The command writes `stories/<story>/reports/test_layer_result.yaml` and
-`stories/<story>/reports/test_layer_report.md`. The quality gate requires
+The command writes `stories/STORY_SLUG/reports/test_layer_result.yaml` and
+`stories/STORY_SLUG/reports/test_layer_report.md`. The quality gate requires
 `reports/test_layer_result.yaml` to have `status: PASSED` whenever the file exists, and requires it
 when `test_plan.yaml` uses `test_layers_version: 1`.
 

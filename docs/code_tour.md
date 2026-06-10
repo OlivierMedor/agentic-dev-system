@@ -139,7 +139,7 @@ inside the same container setup.
 Most validation commands use this shape:
 
 ```powershell
-docker compose run --rm dev <command>
+docker compose run --rm dev COMMAND
 ```
 
 ## `README.md`

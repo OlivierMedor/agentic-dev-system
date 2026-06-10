@@ -93,14 +93,22 @@ secret values, or call cloud models. It also saves a sibling
 `*_raw_response.json` file so empty or unusual OpenAI-compatible responses can
 be debugged. Empty or whitespace-only content is treated as a failure.
 
-Send a story prompt-pack file to the local model and save a draft report plus
+Send story context to the local model and save a draft report plus
 metadata:
 
 ```powershell
-docker compose run --rm -e LOCAL_MODEL_API_KEY=lm-studio dev agentic local-agent draft --story <story> --agent docs_agent --model-label gemma-4-26b
+docker compose run --rm -e LOCAL_MODEL_API_KEY=lm-studio dev agentic local-agent draft --story story_045_local_agent_draft_runner --agent docs_agent --model-label gemma-4-26b --prompt-mode slim --force
 ```
 
-See `docs/local_agent_drafts.md` for the save-only draft workflow, prompt-file
+`--prompt-mode slim` is the default for local-agent drafts. It saves a smaller
+context packet under `stories/STORY_SLUG/reports/local_agent_context/` before
+calling the local model. Full `prompt_pack` files are often too large for local
+models and should be used only for debugging or stronger models. If a response
+returns `finish_reason: length`, the saved draft may be truncated and the
+metadata records a warning.
+
+See `docs/local_agent_drafts.md` for the save-only draft workflow,
+`docs/local_agent_context_packets.md` for slim context packets, prompt-file
 mapping, runtime artifact policy, and human/cloud review boundary for high-risk
 logic.
 

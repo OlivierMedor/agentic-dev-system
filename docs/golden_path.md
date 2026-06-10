@@ -12,7 +12,7 @@ The CLI examples show the command after `agentic`. In Docker, run them from the
 repo root as:
 
 ```powershell
-docker compose run --rm dev agentic <command>
+docker compose run --rm dev agentic COMMAND
 ```
 
 ## What the system is
@@ -45,10 +45,10 @@ project repo
 Important repo files:
 
 - `blueprints/blueprint.yaml` describes approved stories.
-- `stories/<story>/story.md` explains one story's goal and acceptance criteria.
-- `stories/<story>/test_plan.yaml` explains test coverage expectations.
-- `stories/<story>/monitoring_plan.yaml` explains what failures to watch for.
-- `stories/<story>/reports/` stores human-readable story reports.
+- `stories/STORY_SLUG/story.md` explains one story's goal and acceptance criteria.
+- `stories/STORY_SLUG/test_plan.yaml` explains test coverage expectations.
+- `stories/STORY_SLUG/monitoring_plan.yaml` explains what failures to watch for.
+- `stories/STORY_SLUG/reports/` stores human-readable story reports.
 - `src/` and `tests/` hold implementation and project tests.
 - `docs/` holds operator and workflow documentation.
 
@@ -103,7 +103,7 @@ as Git status, diffs, test output, lint output, file tree, and a handoff summary
 Review bundles live under:
 
 ```text
-stories/<story>/review_bundle/
+stories/STORY_SLUG/review_bundle/
 ```
 
 They are useful for reviewers, but generated bundle files should not be
@@ -117,7 +117,7 @@ the story, review context, checklist, result template, and final export file.
 Cloud review packets live under:
 
 ```text
-stories/<story>/cloud_review_packet/
+stories/STORY_SLUG/cloud_review_packet/
 ```
 
 The operator sends `cloud_review_export.md` to the main cloud model manually.
@@ -207,18 +207,18 @@ Run these commands in order for the common path:
 
 ```powershell
 agentic generate-stories
-agentic workflow-run --story <story> --phase prepare --execute
-agentic next-step --story <story>
+agentic workflow-run --story STORY_SLUG --phase prepare --execute
+agentic next-step --story STORY_SLUG
 agentic project-status
-agentic workflow-run --story <story> --phase local-finalize --execute
-agentic workflow-run --story <story> --phase cloud-review-prep --execute
-agentic record-cloud-review --story <story> --result-file <path>
-agentic merge-readiness --story <story>
+agentic workflow-run --story STORY_SLUG --phase local-finalize --execute
+agentic workflow-run --story STORY_SLUG --phase cloud-review-prep --execute
+agentic record-cloud-review --story STORY_SLUG --result-file OUTPUT_FILE
+agentic merge-readiness --story STORY_SLUG
 agentic artifact-policy
 ```
 
-Use `agentic next-step --story <story>` whenever you are unsure what should happen
-next. Use `agentic project-status` to see the dashboard for all stories.
+Use `agentic next-step --story STORY_SLUG` whenever you are unsure what should
+happen next. Use `agentic project-status` to see the dashboard for all stories.
 
 ## Remote or dev-like validation
 
@@ -227,9 +227,9 @@ owner decides. In that case, create a manual validation packet, run the remote
 checks outside this CLI, then record the result:
 
 ```powershell
-agentic remote-dev-packet --story <story>
-agentic record-remote-dev --story <story> --result-file <path>
-agentic merge-readiness --story <story>
+agentic remote-dev-packet --story STORY_SLUG
+agentic record-remote-dev --story STORY_SLUG --result-file OUTPUT_FILE
+agentic merge-readiness --story STORY_SLUG
 ```
 
 Remote dev validation is evidence recording. These commands do not deploy or
@@ -243,7 +243,7 @@ missing, a command fails in a way that needs judgment, or scope is ambiguous:
 1. Stop expanding the story.
 2. Record the blocker in the support queue.
 3. Keep `status.yaml` blocked until the answer is recorded.
-4. Run `agentic next-step --story <story>` after the blocker is answered.
+4. Run `agentic next-step --story STORY_SLUG` after the blocker is answered.
 
 Do not guess around a blocker just to reach finalization.
 
@@ -256,7 +256,7 @@ If tests, logs, CI, remote dev, or integrations fail:
 3. Rerun the focused check first, then the required local checks.
 4. If the failure points to broader repair work, record it in the maintenance
    queue instead of expanding the active story.
-5. Rerun `agentic workflow-run --story <story> --phase local-finalize --execute`
+5. Rerun `agentic workflow-run --story STORY_SLUG --phase local-finalize --execute`
    after the fix and reports are ready.
 
 ## What not to commit
@@ -264,9 +264,9 @@ If tests, logs, CI, remote dev, or integrations fail:
 Do not commit:
 
 - Secrets or `.env` files.
-- Generated review bundle files under `stories/<story>/review_bundle/`.
-- Generated cloud review packet files under `stories/<story>/cloud_review_packet/`.
-- Generated remote dev validation files under `stories/<story>/remote_dev_validation/`.
+- Generated review bundle files under `stories/STORY_SLUG/review_bundle/`.
+- Generated cloud review packet files under `stories/STORY_SLUG/cloud_review_packet/`.
+- Generated remote dev validation files under `stories/STORY_SLUG/remote_dev_validation/`.
 - Support queue runtime ticket files.
 - Feature scan runtime files.
 - Temporary files, zip files, or `review_to_chatgpt/`.

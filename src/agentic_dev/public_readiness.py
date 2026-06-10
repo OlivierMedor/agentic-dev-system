@@ -9,6 +9,7 @@ from agentic_dev.artifact_policy import (
     is_generated_cloud_review_packet_path,
     is_generated_remote_dev_validation_path,
     is_generated_review_bundle_path,
+    is_local_agent_context_output_path,
     is_local_agent_draft_output_path,
     is_local_model_raw_response_path,
     is_local_model_scorecard_result_path,
@@ -95,6 +96,9 @@ def public_readiness_violation_reason(
 
     if is_local_agent_draft_output_path(parts, filename):
         return "local agent draft outputs must remain untracked"
+
+    if is_local_agent_context_output_path(parts, filename):
+        return "local agent context packets must remain untracked"
 
     if is_local_model_raw_response_path(parts, filename):
         return "local model raw response files must remain untracked"
@@ -187,7 +191,8 @@ def format_public_readiness_report(result: PublicReadinessResult) -> str:
             "- `.agentic/feature_scan/*.md` and `*.yaml` runtime files",
             "- `.agentic/local_model_scorecard/results/**`",
             "- `stories/**/reports/local_agent_drafts/*` except `.gitkeep`",
-            "- `reports/**/*_raw_response.json`",
+            "- `stories/**/reports/local_agent_context/*` except `.gitkeep`",
+            "- `*_raw_response.json`",
             "- `.agentic/local_model_scorecard/scorecard_scores.yaml`",
             "- `reports/local_model_scorecard_report.md`",
             "- `reports/local_model_role_recommendations.md`",

@@ -89,19 +89,19 @@ must stay local.
 Run commands from the repo root through Docker:
 
 ```powershell
-docker compose run --rm dev agentic <command>
+docker compose run --rm dev agentic COMMAND
 ```
 
 Common workflow commands:
 
 ```powershell
 docker compose run --rm dev agentic generate-stories
-docker compose run --rm dev agentic workflow-run --story <story> --phase prepare --execute
-docker compose run --rm dev agentic next-step --story <story>
-docker compose run --rm dev agentic workflow-run --story <story> --phase local-finalize --execute
-docker compose run --rm dev agentic workflow-run --story <story> --phase cloud-review-prep --execute
-docker compose run --rm dev agentic record-cloud-review --story <story> --result-file <path>
-docker compose run --rm dev agentic merge-readiness --story <story>
+docker compose run --rm dev agentic workflow-run --story STORY_SLUG --phase prepare --execute
+docker compose run --rm dev agentic next-step --story STORY_SLUG
+docker compose run --rm dev agentic workflow-run --story STORY_SLUG --phase local-finalize --execute
+docker compose run --rm dev agentic workflow-run --story STORY_SLUG --phase cloud-review-prep --execute
+docker compose run --rm dev agentic record-cloud-review --story STORY_SLUG --result-file OUTPUT_FILE
+docker compose run --rm dev agentic merge-readiness --story STORY_SLUG
 docker compose run --rm dev agentic project-status
 ```
 
@@ -122,7 +122,7 @@ Local model runtime checks:
 docker compose run --rm dev agentic local-model validate
 docker compose run --rm dev agentic local-model dry-run
 docker compose run --rm dev agentic local-agent run-prompt --prompt-file prompt.md --output-file reports/local_agent_output.md
-docker compose run --rm dev agentic local-agent draft --story <story> --agent docs_agent --model-label gemma-4-26b
+docker compose run --rm -e LOCAL_MODEL_API_KEY=lm-studio dev agentic local-agent draft --story story_045_local_agent_draft_runner --agent docs_agent --model-label gemma-4-26b --prompt-mode slim --force
 docker compose run --rm dev agentic local-model scorecard-create
 docker compose run --rm dev agentic local-model scorecard-report
 docker compose run --rm dev agentic local-model scorecard-scaffold-scores
@@ -164,8 +164,9 @@ Local OpenAI-compatible models can be configured for bounded draft and dry-run
 work through LM Studio or Ollama. Use `docs/local_model_scorecard.md` to compare
 local models on repeatable agent-style prompts before assigning them to roles.
 Use `docs/local_model_role_assignment.md` for the manual scoring and role
-assignment process. Use `docs/local_agent_drafts.md` to save story prompt-pack
-responses as reviewable local drafts. See `docs/local_models.md` for setup.
+assignment process. Use `docs/local_agent_drafts.md` to save story context as
+reviewable local drafts, and `docs/local_agent_context_packets.md` for slim
+local-model context packets. See `docs/local_models.md` for setup.
 
 For release and repository hygiene, use `docs/public_launch_checklist.md`,
 `docs/release_process.md`, `docs/v0_1_release_checklist.md`,
@@ -206,7 +207,9 @@ That file is ignored and blocked by policy. The public-safe example is
 - `docs/local_models.md` explains local OpenAI-compatible runtime setup with LM
   Studio, Ollama, and safety boundaries.
 - `docs/local_agent_drafts.md` explains save-only local draft reports from story
-  prompt-pack files.
+  context or prompt-pack files.
+- `docs/local_agent_context_packets.md` explains slim local-agent context
+  packets and truncation warnings for local models.
 - `docs/local_model_scorecard.md` explains how to compare local models on the
   same public-safe agent-style prompts before role assignment.
 - `docs/local_model_role_assignment.md` explains manual local model scoring,

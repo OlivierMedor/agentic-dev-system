@@ -32,7 +32,8 @@ The public-readiness check fails if Git tracks any of these paths:
 - `.agentic/feature_scan/*.md` and `.agentic/feature_scan/*.yaml`
 - `.agentic/local_model_scorecard/results/**`
 - `stories/**/reports/local_agent_drafts/*` except `.gitkeep`
-- `reports/**/*_raw_response.json`
+- `stories/**/reports/local_agent_context/*` except `.gitkeep`
+- `*_raw_response.json`
 - `.agentic/local_model_scorecard/scorecard_scores.yaml`
 - `reports/local_model_scorecard_report.md`
 - `reports/local_model_role_recommendations.md`

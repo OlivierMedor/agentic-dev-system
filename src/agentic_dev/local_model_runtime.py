@@ -18,6 +18,8 @@ LOCAL_MODEL_PROVIDER = "local_openai_compatible"
 DEFAULT_DRY_RUN_PROMPT = "Reply with LOCAL_MODEL_OK only."
 DRY_RUN_REPORT_RELATIVE_PATH = Path("reports") / "local_model_dry_run_report.md"
 LOCAL_AGENT_DRAFTS_FOLDER = Path("reports") / "local_agent_drafts"
+LOCAL_AGENT_CONTEXT_FOLDER = Path("reports") / "local_agent_context"
+LOCAL_AGENT_PROMPT_MODES = {"full", "slim"}
 LOCAL_AGENT_DRAFT_PROMPT_FILES = {
     "developer_agent": Path("prompt_pack") / "03_developer_agent_prompt.md",
     "test_agent": Path("prompt_pack") / "04_test_agent_prompt.md",
@@ -25,6 +27,20 @@ LOCAL_AGENT_DRAFT_PROMPT_FILES = {
     "reviewer_agent": Path("prompt_pack") / "07_local_reviewer_agent_prompt.md",
     "maintenance_agent": Path("prompt_pack") / "07_local_reviewer_agent_prompt.md",
 }
+LOCAL_AGENT_INSTRUCTION_FILES = {
+    "developer_agent": Path("instructions") / "developer_agent.md",
+    "test_agent": Path("instructions") / "test_agent.md",
+    "docs_agent": Path("instructions") / "docs_agent.md",
+    "reviewer_agent": Path("instructions") / "local_reviewer_agent.md",
+    "maintenance_agent": Path("instructions") / "local_reviewer_agent.md",
+}
+SLIM_CONTEXT_SOURCE_FILES = [
+    Path("story.md"),
+    Path("status.yaml"),
+    Path("test_plan.yaml"),
+    Path("monitoring_plan.yaml"),
+    Path("agent_plan.yaml"),
+]
 
 
 class LocalModelHttpClient(Protocol):
@@ -113,12 +129,16 @@ class LocalAgentDraftResult:
     agent: str
     model_label: str
     configured_model: str
+    prompt_mode: str
     prompt_file: Path
+    context_file: Path | None
     output_file: Path
     metadata_file: Path
     raw_response_file: Path
     response_text: str
     raw_response: dict[str, Any]
+    status: str
+    warnings: list[str]
 
 
 def validate_local_model_runtime_config(project_path: Path) -> LocalModelValidationResult:
@@ -270,6 +290,7 @@ def run_local_agent_draft(
     prompt_file: Path | None = None,
     output_file: Path | None = None,
     model_label: str | None = None,
+    prompt_mode: str = "slim",
     force: bool = False,
     http_client: LocalModelHttpClient | None = None,
 ) -> LocalAgentDraftResult:
@@ -283,14 +304,8 @@ def run_local_agent_draft(
         supported = ", ".join(sorted(LOCAL_AGENT_DRAFT_PROMPT_FILES))
         raise ValueError(f"Unsupported local draft agent: {agent}. Supported agents: {supported}")
 
-    resolved_prompt_file = resolve_local_agent_prompt_file(
-        resolved_project_path,
-        story_path,
-        agent,
-        prompt_file,
-    )
-    if not resolved_prompt_file.exists():
-        raise FileNotFoundError(f"Prompt file does not exist: {resolved_prompt_file}")
+    if prompt_mode not in LOCAL_AGENT_PROMPT_MODES:
+        raise ValueError("--prompt-mode must be one of: full, slim.")
 
     config_path, config = load_local_model_runtime_config(resolved_project_path)
     safe_model_label = sanitize_local_model_label(model_label or config.model)
@@ -303,15 +318,46 @@ def run_local_agent_draft(
     )
     metadata_file = resolved_output_file.with_suffix(".yaml")
     raw_response_file = raw_response_path_for_draft_output(resolved_output_file)
+    effective_prompt_mode = "custom" if prompt_file is not None else prompt_mode
+    context_file = (
+        resolve_local_agent_context_file(story_path, agent, safe_model_label)
+        if effective_prompt_mode == "slim"
+        else None
+    )
 
-    existing_outputs = [
-        path for path in [resolved_output_file, metadata_file, raw_response_file] if path.exists()
-    ]
+    tracked_outputs = [resolved_output_file, metadata_file, raw_response_file, context_file]
+    existing_outputs = [path for path in tracked_outputs if path is not None and path.exists()]
     if existing_outputs and not force:
         existing = ", ".join(str(path) for path in existing_outputs)
         raise ValueError(f"Local agent draft output already exists: {existing}. Use --force to overwrite.")
 
-    prompt = resolved_prompt_file.read_text(encoding="utf-8")
+    prompt_file_for_metadata: Path | None = None
+    source_files_used: list[Path] = []
+    if effective_prompt_mode == "slim":
+        assert context_file is not None
+        prompt, source_files_used = build_slim_local_agent_prompt(
+            project_path=resolved_project_path,
+            story_path=story_path,
+            story=story,
+            agent=agent,
+            output_file=resolved_output_file,
+        )
+        context_file.parent.mkdir(parents=True, exist_ok=True)
+        context_file.write_text(prompt, encoding="utf-8")
+        resolved_prompt_file = context_file
+    else:
+        resolved_prompt_file = resolve_local_agent_prompt_file(
+            resolved_project_path,
+            story_path,
+            agent,
+            prompt_file,
+        )
+        if not resolved_prompt_file.exists():
+            raise FileNotFoundError(f"Prompt file does not exist: {resolved_prompt_file}")
+        prompt = resolved_prompt_file.read_text(encoding="utf-8")
+        prompt_file_for_metadata = resolved_prompt_file
+        source_files_used = [resolved_prompt_file]
+
     raw_response = call_local_model(config, prompt, http_client)
     write_raw_response(raw_response_file, raw_response)
     response_text = extract_response_text(raw_response)
@@ -325,13 +371,18 @@ def run_local_agent_draft(
             agent=agent,
             model_label=safe_model_label,
             configured_model=config.model,
-            prompt_file=resolved_prompt_file,
+            prompt_mode=effective_prompt_mode,
+            prompt_file=prompt_file_for_metadata,
+            context_file=context_file,
             output_file=resolved_output_file,
             raw_response_file=raw_response_file,
             prompt_character_count=len(prompt),
             response_character_count=0,
             finish_reason=finish_reason,
             status="empty_model_response",
+            warnings=empty_response_warnings(finish_reason),
+            context_character_count=len(prompt) if effective_prompt_mode == "slim" else None,
+            source_files_used=source_files_used,
             next_action=(
                 "Inspect the raw response JSON and local model/server config. Common causes "
                 "include model/server mismatch, prompt too large, unsupported response shape, "
@@ -345,20 +396,32 @@ def run_local_agent_draft(
 
     resolved_output_file.parent.mkdir(parents=True, exist_ok=True)
     resolved_output_file.write_text(response_text, encoding="utf-8")
+    warnings = truncation_warnings(finish_reason)
+    status = "draft_saved_with_warning" if warnings else "draft_saved"
+    next_action = (
+        "Review draft carefully or retry with slim prompt / higher output token limit."
+        if warnings
+        else "Human/Codex review required before applying any draft content."
+    )
     write_local_agent_draft_metadata(
         metadata_file=metadata_file,
         story=story,
         agent=agent,
         model_label=safe_model_label,
         configured_model=config.model,
-        prompt_file=resolved_prompt_file,
+        prompt_mode=effective_prompt_mode,
+        prompt_file=prompt_file_for_metadata,
+        context_file=context_file,
         output_file=resolved_output_file,
         raw_response_file=raw_response_file,
         prompt_character_count=len(prompt),
         response_character_count=len(response_text),
         finish_reason=finish_reason,
-        status="draft_saved",
-        next_action="Human/Codex review required before applying any draft content.",
+        status=status,
+        warnings=warnings,
+        context_character_count=len(prompt) if effective_prompt_mode == "slim" else None,
+        source_files_used=source_files_used,
+        next_action=next_action,
     )
 
     return LocalAgentDraftResult(
@@ -366,12 +429,16 @@ def run_local_agent_draft(
         agent=agent,
         model_label=safe_model_label,
         configured_model=config.model,
+        prompt_mode=effective_prompt_mode,
         prompt_file=resolved_prompt_file,
+        context_file=context_file,
         output_file=resolved_output_file,
         metadata_file=metadata_file,
         raw_response_file=raw_response_file,
         response_text=response_text,
         raw_response=raw_response,
+        status=status,
+        warnings=warnings,
     )
 
 
@@ -409,6 +476,102 @@ def resolve_local_agent_output_file(
     return (story_path / LOCAL_AGENT_DRAFTS_FOLDER / filename).resolve()
 
 
+def resolve_local_agent_context_file(story_path: Path, agent: str, model_label: str) -> Path:
+    filename = f"{agent}_{model_label}_context.md"
+    return (story_path / LOCAL_AGENT_CONTEXT_FOLDER / filename).resolve()
+
+
+def build_slim_local_agent_prompt(
+    project_path: Path,
+    story_path: Path,
+    story: str,
+    agent: str,
+    output_file: Path,
+) -> tuple[str, list[Path]]:
+    source_files = source_files_for_slim_prompt(story_path, agent)
+    sections = [
+        "# Local Agent Slim Context Packet",
+        "",
+        "## Metadata",
+        "",
+        "- prompt_mode: slim",
+        f"- story: {story}",
+        f"- agent: {agent}",
+        f"- expected_output_file: {output_file}",
+        "",
+        "## Safety Rules",
+        "",
+        "- Write a draft report only.",
+        "- Do not edit source files.",
+        "- Do not execute commands or model output.",
+        "- Do not call cloud models.",
+        "- Do not call GitHub APIs.",
+        "- Do not commit, push, merge, or deploy.",
+        "- Do not claim files were changed.",
+        "- Do not claim commands were run.",
+        "- Do not invent files.",
+        "",
+        "## Final Answer Instructions",
+        "",
+        "- Return final answer only in the visible assistant message content.",
+        "- Do not use hidden/internal reasoning as the answer.",
+        "- Keep response under 1200 words unless asked otherwise.",
+        "- Use plain ASCII only.",
+        "- Do not use emoji or checkmark symbols.",
+        "- Do not wrap the entire answer in a Markdown code fence.",
+        "- Use the requested headings exactly.",
+        "- Do not claim files were changed.",
+        "- Do not claim commands were run.",
+        "- Do not invent files.",
+        "- Write a draft report only.",
+        "",
+        "## Requested Headings",
+        "",
+        "Use these headings exactly:",
+        "",
+        "1. Summary",
+        "2. Draft Report",
+        "3. Risks And Gaps",
+        "4. Suggested Next Steps",
+        "",
+        "## Story Context",
+        "",
+    ]
+
+    used_files: list[Path] = []
+    for source_file in source_files:
+        if not source_file.exists() or not source_file.is_file():
+            continue
+        relative_source = source_file.relative_to(project_path)
+        used_files.append(source_file)
+        sections.extend(
+            [
+                f"### {relative_source.as_posix()}",
+                "",
+                source_file.read_text(encoding="utf-8").strip(),
+                "",
+            ],
+        )
+
+    sections.extend(
+        [
+            "## Output",
+            "",
+            f"Write the draft report intended for: {output_file}",
+            "",
+        ],
+    )
+    return "\n".join(sections), used_files
+
+
+def source_files_for_slim_prompt(story_path: Path, agent: str) -> list[Path]:
+    source_files = [story_path / relative_path for relative_path in SLIM_CONTEXT_SOURCE_FILES]
+    instruction_file = LOCAL_AGENT_INSTRUCTION_FILES.get(agent)
+    if instruction_file is not None:
+        source_files.append(story_path / instruction_file)
+    return source_files
+
+
 def sanitize_local_model_label(model_label: str) -> str:
     label = model_label.strip()
 
@@ -426,13 +589,18 @@ def write_local_agent_draft_metadata(
     agent: str,
     model_label: str,
     configured_model: str,
-    prompt_file: Path,
+    prompt_mode: str,
+    prompt_file: Path | None,
+    context_file: Path | None,
     output_file: Path,
     raw_response_file: Path,
     prompt_character_count: int,
     response_character_count: int,
     finish_reason: str | None,
     status: str,
+    warnings: list[str],
+    context_character_count: int | None,
+    source_files_used: list[Path],
     next_action: str,
 ) -> None:
     metadata = {
@@ -440,13 +608,14 @@ def write_local_agent_draft_metadata(
         "agent": agent,
         "model_label": model_label,
         "configured_model": configured_model,
-        "prompt_file": str(prompt_file),
+        "prompt_mode": prompt_mode,
         "output_file": str(output_file),
         "raw_response_file": str(raw_response_file),
         "prompt_character_count": prompt_character_count,
         "response_character_count": response_character_count,
         "finish_reason": finish_reason,
         "status": status,
+        "warnings": warnings,
         "applied_to_source": False,
         "executed_model_output": False,
         "called_cloud_models": False,
@@ -455,7 +624,30 @@ def write_local_agent_draft_metadata(
         "deployed": False,
         "next_action": next_action,
     }
+    if prompt_file is not None:
+        metadata["prompt_file"] = str(prompt_file)
+    if context_file is not None:
+        metadata["context_file"] = str(context_file)
+    if context_character_count is not None:
+        metadata["context_character_count"] = context_character_count
+    if source_files_used:
+        metadata["source_files_used"] = [str(path) for path in source_files_used]
     metadata_file.write_text(yaml.safe_dump(metadata, sort_keys=False), encoding="utf-8")
+
+
+def truncation_warnings(finish_reason: str | None) -> list[str]:
+    if finish_reason == "length":
+        return ["model output may be truncated"]
+    return []
+
+
+def empty_response_warnings(finish_reason: str | None) -> list[str]:
+    if finish_reason == "length":
+        return [
+            "model output may be truncated",
+            "local model returned hidden/internal reasoning or no visible final content",
+        ]
+    return []
 
 
 def raw_response_path_for_output(output_file: Path) -> Path:

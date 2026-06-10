@@ -87,6 +87,29 @@ def create_story_prompt_pack(project_path: Path, story: str = "story_045_demo") 
     return prompt_pack_path
 
 
+def create_story_context(project_path: Path, story: str = "story_047_demo") -> Path:
+    story_path = project_path / "stories" / story
+    story_path.mkdir(parents=True, exist_ok=True)
+    (story_path / "story.md").write_text(
+        "# Story 047\n\nSlim prompt story content.",
+        encoding="utf-8",
+    )
+    (story_path / "status.yaml").write_text("status: in_progress\n", encoding="utf-8")
+    (story_path / "test_plan.yaml").write_text("unit_tests: true\n", encoding="utf-8")
+    (story_path / "monitoring_plan.yaml").write_text(
+        "watch_for:\n  - truncated_local_model_output\n",
+        encoding="utf-8",
+    )
+    (story_path / "agent_plan.yaml").write_text(
+        "assigned_agents:\n  - name: docs_agent\n",
+        encoding="utf-8",
+    )
+    instructions_path = story_path / "instructions" / "docs_agent.md"
+    instructions_path.parent.mkdir(parents=True, exist_ok=True)
+    instructions_path.write_text("Docs agent instruction content.", encoding="utf-8")
+    return story_path
+
+
 def test_local_model_config_validation_passes_for_valid_config(tmp_path: Path) -> None:
     config_path = write_runtime_config(tmp_path, valid_local_model_runtime_config())
 
@@ -291,6 +314,7 @@ def test_local_agent_draft_maps_supported_agents_to_prompt_files(
         "story_045_demo",
         agent,
         model_label="gemma-4-26b",
+        prompt_mode="full",
         http_client=fake_client,
     )
 
@@ -298,6 +322,104 @@ def test_local_agent_draft_maps_supported_agents_to_prompt_files(
     assert fake_client.calls[0]["payload"]["messages"] == [
         {"role": "user", "content": f"Prompt file {prompt_filename}"},
     ]
+
+
+def test_local_agent_draft_defaults_to_slim_prompt_mode(tmp_path: Path) -> None:
+    write_runtime_config(tmp_path, valid_local_model_runtime_config())
+    create_story_context(tmp_path)
+    fake_client = FakeLocalModelHttpClient("draft response")
+
+    result = run_local_agent_draft(
+        tmp_path,
+        "story_047_demo",
+        "docs_agent",
+        model_label="gemma-4-26b",
+        http_client=fake_client,
+    )
+
+    prompt = fake_client.calls[0]["payload"]["messages"][0]["content"]
+    assert result.prompt_mode == "slim"
+    assert result.context_file == result.prompt_file
+    assert result.context_file == (
+        tmp_path.resolve()
+        / "stories"
+        / "story_047_demo"
+        / "reports"
+        / "local_agent_context"
+        / "docs_agent_gemma-4-26b_context.md"
+    )
+    assert result.context_file.exists()
+    assert "Slim prompt story content." in prompt
+
+
+def test_local_agent_draft_prompt_file_uses_custom_prompt_mode(tmp_path: Path) -> None:
+    write_runtime_config(tmp_path, valid_local_model_runtime_config())
+    create_story_context(tmp_path)
+    prompt_file = tmp_path / "custom_prompt.md"
+    prompt_file.write_text("Custom prompt content.", encoding="utf-8")
+    fake_client = FakeLocalModelHttpClient("custom draft")
+
+    result = run_local_agent_draft(
+        tmp_path,
+        "story_047_demo",
+        "docs_agent",
+        prompt_file=prompt_file,
+        model_label="gemma-4-26b",
+        prompt_mode="full",
+        http_client=fake_client,
+    )
+
+    metadata = yaml.safe_load(result.metadata_file.read_text(encoding="utf-8"))
+    assert result.prompt_mode == "custom"
+    assert metadata["prompt_mode"] == "custom"
+    assert metadata["prompt_file"] == str(prompt_file.resolve())
+    assert "context_file" not in metadata
+    assert fake_client.calls[0]["payload"]["messages"] == [
+        {"role": "user", "content": "Custom prompt content."},
+    ]
+
+
+def test_local_agent_draft_slim_mode_creates_context_packet_with_allowed_sources(
+    tmp_path: Path,
+) -> None:
+    write_runtime_config(tmp_path, valid_local_model_runtime_config())
+    story_path = create_story_context(tmp_path)
+    review_bundle_file = story_path / "review_bundle" / "handoff.md"
+    review_bundle_file.parent.mkdir(parents=True)
+    review_bundle_file.write_text("review bundle content must be excluded", encoding="utf-8")
+    cloud_packet_file = story_path / "cloud_review_packet" / "cloud_review_export.md"
+    cloud_packet_file.parent.mkdir(parents=True)
+    cloud_packet_file.write_text("cloud packet content must be excluded", encoding="utf-8")
+    fake_client = FakeLocalModelHttpClient("draft response")
+
+    result = run_local_agent_draft(
+        tmp_path,
+        "story_047_demo",
+        "docs_agent",
+        model_label="gemma-4-26b",
+        prompt_mode="slim",
+        http_client=fake_client,
+    )
+
+    assert result.context_file is not None
+    context = result.context_file.read_text(encoding="utf-8")
+    metadata = yaml.safe_load(result.metadata_file.read_text(encoding="utf-8"))
+    assert "# Local Agent Slim Context Packet" in context
+    assert "Slim prompt story content." in context
+    assert "Docs agent instruction content." in context
+    assert "Return final answer only in the visible assistant message content." in context
+    assert "Do not use hidden/internal reasoning as the answer." in context
+    assert "Keep response under 1200 words unless asked otherwise." in context
+    assert "Do not wrap the entire answer in a Markdown code fence." in context
+    assert "Use the requested headings exactly." in context
+    assert "review bundle content must be excluded" not in context
+    assert "cloud packet content must be excluded" not in context
+    assert metadata["prompt_mode"] == "slim"
+    assert metadata["context_file"] == str(result.context_file)
+    assert metadata["context_character_count"] == len(context)
+    assert str(story_path / "story.md") in metadata["source_files_used"]
+    assert str(story_path / "instructions" / "docs_agent.md") in metadata["source_files_used"]
+    assert "prompt_file" not in metadata
 
 
 def test_local_agent_draft_raises_clear_error_for_missing_story(tmp_path: Path) -> None:
@@ -324,6 +446,7 @@ def test_local_agent_draft_raises_clear_error_for_missing_prompt_file(tmp_path: 
             "story_045_demo",
             "docs_agent",
             model_label="gemma-4-26b",
+            prompt_mode="full",
             http_client=FakeLocalModelHttpClient(),
         )
 
@@ -341,6 +464,7 @@ def test_local_agent_draft_refuses_when_local_runtime_disabled(tmp_path: Path) -
             "story_045_demo",
             "docs_agent",
             model_label="gemma-4-26b",
+            prompt_mode="full",
             http_client=fake_client,
         )
 
@@ -357,6 +481,7 @@ def test_local_agent_draft_saves_markdown_output_and_metadata_yaml(tmp_path: Pat
         "story_045_demo",
         "docs_agent",
         model_label="gemma-4-26b",
+        prompt_mode="full",
         http_client=fake_client,
     )
 
@@ -383,13 +508,16 @@ def test_local_agent_draft_saves_markdown_output_and_metadata_yaml(tmp_path: Pat
     assert metadata["agent"] == "docs_agent"
     assert metadata["model_label"] == "gemma-4-26b"
     assert metadata["configured_model"] == "qwen3-coder-30b-a3b-instruct"
+    assert metadata["prompt_mode"] == "full"
     assert metadata["prompt_file"] == str(result.prompt_file)
+    assert "context_file" not in metadata
     assert metadata["output_file"] == str(result.output_file)
     assert metadata["raw_response_file"] == str(result.raw_response_file)
     assert metadata["prompt_character_count"] == len("Prompt file 05_docs_agent_prompt.md")
     assert metadata["response_character_count"] == len("## Draft\n\nUse this after review.")
     assert metadata["finish_reason"] == "stop"
     assert metadata["status"] == "draft_saved"
+    assert metadata["warnings"] == []
     assert metadata["applied_to_source"] is False
     assert metadata["executed_model_output"] is False
     assert metadata["called_cloud_models"] is False
@@ -414,6 +542,7 @@ def test_local_agent_draft_treats_empty_or_whitespace_response_as_failure(
             "story_045_demo",
             "docs_agent",
             model_label="gemma-4-26b",
+            prompt_mode="full",
             http_client=fake_client,
         )
 
@@ -444,6 +573,84 @@ def test_local_agent_draft_treats_empty_or_whitespace_response_as_failure(
     assert "draft_saved" not in metadata["status"]
 
 
+def test_local_agent_draft_saves_nonempty_length_response_with_warning(tmp_path: Path) -> None:
+    write_runtime_config(tmp_path, valid_local_model_runtime_config())
+    create_story_context(tmp_path)
+    fake_client = FakeLocalModelHttpClient(
+        raw_response={
+            "choices": [
+                {
+                    "finish_reason": "length",
+                    "message": {"content": "Partial draft content."},
+                },
+            ],
+        },
+    )
+
+    result = run_local_agent_draft(
+        tmp_path,
+        "story_047_demo",
+        "docs_agent",
+        model_label="gemma-4-26b",
+        http_client=fake_client,
+    )
+
+    metadata = yaml.safe_load(result.metadata_file.read_text(encoding="utf-8"))
+    assert result.output_file.read_text(encoding="utf-8") == "Partial draft content."
+    assert result.raw_response_file.exists()
+    assert result.status == "draft_saved_with_warning"
+    assert result.warnings == ["model output may be truncated"]
+    assert metadata["status"] == "draft_saved_with_warning"
+    assert metadata["warnings"] == ["model output may be truncated"]
+    assert metadata["finish_reason"] == "length"
+    assert metadata["response_character_count"] == len("Partial draft content.")
+    assert metadata["next_action"] == (
+        "Review draft carefully or retry with slim prompt / higher output token limit."
+    )
+
+
+def test_local_agent_draft_empty_length_response_fails_as_empty_model_response(
+    tmp_path: Path,
+) -> None:
+    write_runtime_config(tmp_path, valid_local_model_runtime_config())
+    create_story_context(tmp_path)
+    fake_client = FakeLocalModelHttpClient(
+        raw_response={
+            "choices": [
+                {
+                    "finish_reason": "length",
+                    "message": {"content": ""},
+                },
+            ],
+        },
+    )
+
+    with pytest.raises(ValueError, match="Local model returned an empty response"):
+        run_local_agent_draft(
+            tmp_path,
+            "story_047_demo",
+            "docs_agent",
+            model_label="gemma-4-26b",
+            http_client=fake_client,
+        )
+
+    metadata_path = (
+        tmp_path.resolve()
+        / "stories"
+        / "story_047_demo"
+        / "reports"
+        / "local_agent_drafts"
+        / "docs_agent_gemma-4-26b_draft.yaml"
+    )
+    raw_response_path = metadata_path.with_name("docs_agent_gemma-4-26b_raw_response.json")
+    metadata = yaml.safe_load(metadata_path.read_text(encoding="utf-8"))
+    assert raw_response_path.exists()
+    assert metadata["status"] == "empty_model_response"
+    assert metadata["finish_reason"] == "length"
+    assert metadata["response_character_count"] == 0
+    assert "model output may be truncated" in metadata["warnings"]
+
+
 def test_local_agent_draft_does_not_edit_source_or_execute_model_output(tmp_path: Path) -> None:
     write_runtime_config(tmp_path, valid_local_model_runtime_config())
     create_story_prompt_pack(tmp_path)
@@ -461,6 +668,7 @@ def test_local_agent_draft_does_not_edit_source_or_execute_model_output(tmp_path
         "story_045_demo",
         "developer_agent",
         model_label="devstral",
+        prompt_mode="full",
         http_client=fake_client,
     )
 
@@ -477,6 +685,7 @@ def test_local_agent_draft_does_not_overwrite_without_force(tmp_path: Path) -> N
         "story_045_demo",
         "docs_agent",
         model_label="gemma-4-26b",
+        prompt_mode="full",
         http_client=FakeLocalModelHttpClient("first"),
     )
 
@@ -486,6 +695,7 @@ def test_local_agent_draft_does_not_overwrite_without_force(tmp_path: Path) -> N
             "story_045_demo",
             "docs_agent",
             model_label="gemma-4-26b",
+            prompt_mode="full",
             http_client=FakeLocalModelHttpClient("second"),
         )
 
@@ -498,6 +708,7 @@ def test_local_agent_draft_force_overwrites_existing_output(tmp_path: Path) -> N
         "story_045_demo",
         "docs_agent",
         model_label="gemma-4-26b",
+        prompt_mode="full",
         http_client=FakeLocalModelHttpClient("first"),
     )
 
@@ -506,6 +717,7 @@ def test_local_agent_draft_force_overwrites_existing_output(tmp_path: Path) -> N
         "story_045_demo",
         "docs_agent",
         model_label="gemma-4-26b",
+        prompt_mode="full",
         force=True,
         http_client=FakeLocalModelHttpClient("second"),
     )
@@ -527,6 +739,7 @@ def test_cli_local_agent_draft_defaults_project_to_current_directory(
         assert kwargs["project_path"] == Path.cwd()
         assert kwargs["story"] == "story_045_demo"
         assert kwargs["agent"] == "docs_agent"
+        assert kwargs["prompt_mode"] == "slim"
         output_file.write_text("fake draft", encoding="utf-8")
         metadata_file = tmp_path / "draft.yaml"
         metadata_file.write_text("status: draft_saved\n", encoding="utf-8")
@@ -537,6 +750,10 @@ def test_cli_local_agent_draft_defaults_project_to_current_directory(
                 "output_file": output_file,
                 "metadata_file": metadata_file,
                 "raw_response_file": tmp_path / "draft_raw_response.json",
+                "context_file": tmp_path / "context.md",
+                "status": "draft_saved",
+                "prompt_mode": "slim",
+                "warnings": [],
             },
         )()
 
@@ -559,6 +776,7 @@ def test_cli_local_agent_draft_defaults_project_to_current_directory(
 
     captured = capsys.readouterr()
     assert "Local agent draft saved." in captured.out
+    assert "Prompt mode: slim" in captured.out
     assert "Safety: draft output was saved only" in captured.out
 
 
@@ -623,9 +841,32 @@ def test_local_models_doc_mentions_tools_models_and_safety_boundaries() -> None:
 def test_readme_or_docs_link_to_local_agent_drafts_doc() -> None:
     readme = Path("README.md").read_text(encoding="utf-8")
     local_models = Path("docs/local_models.md").read_text(encoding="utf-8")
+    local_agent_drafts = Path("docs/local_agent_drafts.md").read_text(encoding="utf-8")
 
     assert "docs/local_agent_drafts.md" in readme
     assert "docs/local_agent_drafts.md" in local_models
+    assert "docs/local_agent_context_packets.md" in readme
+    assert "docs/local_agent_context_packets.md" in local_models
+    assert "docs/local_agent_context_packets.md" in local_agent_drafts
+
+
+def test_local_agent_context_packets_doc_explains_slim_mode_and_truncation() -> None:
+    guide = Path("docs/local_agent_context_packets.md").read_text(encoding="utf-8")
+
+    required_phrases = [
+        "one-page work orders",
+        "prompt_mode: slim",
+        "Gemma",
+        "reasoning_content",
+        "finish_reason: length",
+        "draft_saved_with_warning",
+        "empty_model_response",
+        "Human/Codex review",
+        "does not execute model output",
+    ]
+
+    for phrase in required_phrases:
+        assert phrase in guide
 
 
 def test_local_agent_drafts_doc_mentions_models_tools_and_review_boundaries() -> None:
@@ -648,6 +889,9 @@ def test_local_agent_drafts_doc_mentions_models_tools_and_review_boundaries() ->
         "prompt too large",
         "unsupported response shape",
         "model refuses to produce final content",
+        "--prompt-mode slim",
+        "draft_saved_with_warning",
+        "model output may be truncated",
     ]
 
     for phrase in required_phrases:

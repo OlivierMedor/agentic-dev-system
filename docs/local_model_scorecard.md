@@ -44,7 +44,7 @@ docker compose run --rm -e LOCAL_MODEL_API_KEY=lm-studio dev agentic local-model
 ```
 
 Run the prompts against the currently configured local model and save the
-responses under `.agentic/local_model_scorecard/results/<model-label>/`:
+responses under `.agentic/local_model_scorecard/results/MODEL_LABEL/`:
 
 ```powershell
 docker compose run --rm -e LOCAL_MODEL_API_KEY=lm-studio dev agentic local-model scorecard-run --model-label qwen3-coder-30b
