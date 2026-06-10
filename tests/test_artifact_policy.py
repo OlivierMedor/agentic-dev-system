@@ -22,6 +22,7 @@ def test_allowed_project_paths_do_not_violate_artifact_policy() -> None:
         ".agentic/local_model_scorecard/scorecard_template.yaml",
         ".agentic/local_model_scorecard/results/.gitkeep",
         "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/.gitkeep",
+        "stories/story_047_local_agent_prompt_slimming/reports/local_agent_context/.gitkeep",
         ".agentic/improvement_queue/pending/.gitkeep",
         ".agentic/maintenance_queue/pending/.gitkeep",
         ".agentic/feature_queue/pending/.gitkeep",
@@ -121,10 +122,25 @@ def test_local_agent_draft_outputs_are_blocked_except_gitkeep() -> None:
     ) == blocked_paths
 
 
+def test_local_agent_context_packets_are_blocked_except_gitkeep() -> None:
+    blocked_paths = [
+        "stories/story_047_local_agent_prompt_slimming/reports/local_agent_context/docs_agent_gemma-4-26b_context.md",
+        "stories/story_047_local_agent_prompt_slimming/reports/local_agent_context/test_agent_devstral_context.md",
+    ]
+
+    assert violation_paths(
+        [
+            *blocked_paths,
+            "stories/story_047_local_agent_prompt_slimming/reports/local_agent_context/.gitkeep",
+        ],
+    ) == blocked_paths
+
+
 def test_local_model_raw_response_files_are_blocked() -> None:
     blocked_paths = [
         "reports/debug_docs_agent_prompt_raw_response.json",
         "reports/nested/debug_docs_agent_prompt_raw_response.json",
+        "stories/story_047_local_agent_prompt_slimming/reports/local_agent_context/docs_agent_gemma_raw_response.json",
     ]
 
     assert violation_paths(blocked_paths) == blocked_paths

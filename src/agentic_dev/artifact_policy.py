@@ -107,6 +107,15 @@ def find_artifact_policy_violations(tracked_files: list[str]) -> list[ArtifactPo
             )
             continue
 
+        if is_local_agent_context_output_path(parts, filename):
+            violations.append(
+                ArtifactPolicyViolation(
+                    path=normalized_path,
+                    reason="local agent context packet file is tracked",
+                ),
+            )
+            continue
+
         if is_local_model_raw_response_path(parts, filename):
             violations.append(
                 ArtifactPolicyViolation(
@@ -235,12 +244,20 @@ def is_local_agent_draft_output_path(parts: list[str], filename: str) -> bool:
     )
 
 
-def is_local_model_raw_response_path(parts: list[str], filename: str) -> bool:
+def is_local_agent_context_output_path(parts: list[str], filename: str) -> bool:
+    if filename == ".gitkeep":
+        return False
+
     return (
-        len(parts) >= 2
-        and parts[0] == "reports"
-        and filename.endswith("_raw_response.json")
+        len(parts) >= 5
+        and parts[0] == "stories"
+        and parts[2] == "reports"
+        and parts[3] == "local_agent_context"
     )
+
+
+def is_local_model_raw_response_path(parts: list[str], filename: str) -> bool:
+    return filename.endswith("_raw_response.json")
 
 
 def is_local_model_scorecard_scoring_artifact_path(normalized_path: str) -> bool:

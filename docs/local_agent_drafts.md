@@ -1,6 +1,6 @@
 # Local Agent Drafts
 
-Local agent drafts send one story prompt-pack file to the configured local
+Local agent drafts send story context to the configured local
 OpenAI-compatible model and save the model response as a draft report. The
 command is intentionally save-only: it does not edit source files, execute model
 output, call cloud models, call GitHub APIs, commit, push, merge, or deploy.
@@ -54,7 +54,7 @@ local_model_runtime:
 ## Run A Draft
 
 ```powershell
-docker compose run --rm -e LOCAL_MODEL_API_KEY=lm-studio dev agentic local-agent draft --story <story> --agent docs_agent --model-label gemma-4-26b
+docker compose run --rm -e LOCAL_MODEL_API_KEY=lm-studio dev agentic local-agent draft --story story_045_local_agent_draft_runner --agent docs_agent --model-label gemma-4-26b --prompt-mode slim --force
 ```
 
 Supported agents:
@@ -65,7 +65,18 @@ Supported agents:
 - `reviewer_agent`
 - `maintenance_agent`
 
-Default prompt files:
+Prompt modes:
+
+- `--prompt-mode slim` is the default. It builds a local-model-friendly context
+  packet from `story.md`, status/test/monitoring/agent plans when present, the
+  matching agent instruction file, safety rules, and the expected draft output
+  path.
+- `--prompt-mode full` uses the existing story `prompt_pack` file for the
+  selected agent.
+- `--prompt-file <path>` uses that file directly and records
+  `prompt_mode: custom` in metadata.
+
+Full-mode prompt files:
 
 - `developer_agent`: `prompt_pack/03_developer_agent_prompt.md`
 - `test_agent`: `prompt_pack/04_test_agent_prompt.md`
@@ -73,21 +84,27 @@ Default prompt files:
 - `reviewer_agent`: `prompt_pack/07_local_reviewer_agent_prompt.md`
 - `maintenance_agent`: `prompt_pack/07_local_reviewer_agent_prompt.md`
 
-Use `--prompt-file` to override the prompt path and `--output-file` to override
-the saved draft path. Existing output is not overwritten unless `--force` is
-used.
+Use `--output-file` to override the saved draft path. Existing output,
+metadata, raw response JSON, and slim context packets are not overwritten unless
+`--force` is used.
 
 The command writes:
 
 - `stories/<story>/reports/local_agent_drafts/<agent>_<model-label>_draft.md`
 - `stories/<story>/reports/local_agent_drafts/<agent>_<model-label>_draft.yaml`
 - `stories/<story>/reports/local_agent_drafts/<agent>_<model-label>_raw_response.json`
+- `stories/<story>/reports/local_agent_context/<agent>_<model-label>_context.md`
+  in slim mode
 
 The metadata YAML records the story, agent, model label, configured model,
-prompt file, output file, raw response file, prompt character count, response
-character count, finish reason, status, and safety flags showing that no source
-edits, shell execution, cloud calls, GitHub API calls, commits, merges, or
-deployments were performed.
+prompt mode, prompt file for full/custom mode, context file for slim mode,
+context character count, source files used, output file, raw response file,
+prompt character count, response character count, finish reason, warnings,
+status, and safety flags showing that no source edits, shell execution, cloud
+calls, GitHub API calls, commits, merges, or deployments were performed.
+
+See `docs/local_agent_context_packets.md` for the slim context packet format and
+local-model troubleshooting notes.
 
 ## Empty Responses
 
@@ -109,6 +126,20 @@ Common causes include:
 - The response contains only hidden/internal reasoning and no final answer.
 
 Inspect the raw response JSON and `.agentic/agent_runtime.yaml` before rerunning.
+
+## Truncated Responses
+
+When the local server returns `finish_reason: length`, visible output may be
+truncated.
+
+If visible content is empty, the command fails with
+`status: empty_model_response`, saves metadata and raw response JSON, and exits
+nonzero.
+
+If visible content is non-empty, the command saves the draft with
+`status: draft_saved_with_warning`, records `model output may be truncated`, and
+sets the next action to review the draft carefully or retry with a slim prompt
+or higher output token limit.
 
 ## Prompt Safety
 

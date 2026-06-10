@@ -783,7 +783,7 @@ def main() -> None:
 
     local_agent_draft_parser = local_agent_subparsers.add_parser(
         "draft",
-        help="Send a story prompt-pack file to the local model and save a draft report.",
+        help="Send story context to the local model and save a draft report.",
     )
     local_agent_draft_parser.add_argument(
         "--story",
@@ -812,6 +812,16 @@ def main() -> None:
         "--prompt-file",
         type=Path,
         help="Optional prompt file override. Relative paths are resolved from the project root.",
+    )
+    local_agent_draft_parser.add_argument(
+        "--prompt-mode",
+        choices=["full", "slim"],
+        default="slim",
+        help=(
+            "Prompt mode for local-agent drafts. slim builds a local-model-friendly context "
+            "packet and is the default. full uses the story prompt_pack file. Ignored when "
+            "--prompt-file is provided."
+        ),
     )
     local_agent_draft_parser.add_argument(
         "--output-file",
@@ -1485,12 +1495,19 @@ def main() -> None:
                     prompt_file=args.prompt_file,
                     output_file=args.output_file,
                     model_label=args.model_label,
+                    prompt_mode=args.prompt_mode,
                     force=args.force,
                 )
                 print("Local agent draft saved.")
+                print(f"Status: {result.status}")
+                print(f"Prompt mode: {result.prompt_mode}")
                 print(f"Draft output: {result.output_file}")
                 print(f"Metadata: {result.metadata_file}")
                 print(f"Raw response: {result.raw_response_file}")
+                if result.context_file is not None:
+                    print(f"Context packet: {result.context_file}")
+                for warning in result.warnings:
+                    print(f"Warning: {warning}")
                 print(
                     "Safety: draft output was saved only; no source files were edited, no model "
                     "output was executed, and no cloud, GitHub, commit, merge, or deploy actions "
