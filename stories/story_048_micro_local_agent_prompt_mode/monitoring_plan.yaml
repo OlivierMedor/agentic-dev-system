@@ -1,0 +1,14 @@
+logs_required: true
+watch_for:
+- empty_model_response
+- hidden_reasoning_without_visible_content
+- oversized_micro_local_agent_prompt
+- truncated_local_model_output
+- missing_local_agent_context_packet
+- committed_local_agent_context
+- committed_local_agent_draft
+- committed_raw_response
+- accidental_source_edit_from_model_output
+- model_output_executed
+- secret_exposure
+- cloud_model_call

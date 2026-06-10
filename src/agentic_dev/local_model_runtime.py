@@ -19,7 +19,8 @@ DEFAULT_DRY_RUN_PROMPT = "Reply with LOCAL_MODEL_OK only."
 DRY_RUN_REPORT_RELATIVE_PATH = Path("reports") / "local_model_dry_run_report.md"
 LOCAL_AGENT_DRAFTS_FOLDER = Path("reports") / "local_agent_drafts"
 LOCAL_AGENT_CONTEXT_FOLDER = Path("reports") / "local_agent_context"
-LOCAL_AGENT_PROMPT_MODES = {"full", "slim"}
+LOCAL_AGENT_PROMPT_MODES = {"full", "micro", "slim"}
+MICRO_CONTEXT_TARGET_CHARACTERS = 2000
 LOCAL_AGENT_DRAFT_PROMPT_FILES = {
     "developer_agent": Path("prompt_pack") / "03_developer_agent_prompt.md",
     "test_agent": Path("prompt_pack") / "04_test_agent_prompt.md",
@@ -305,7 +306,7 @@ def run_local_agent_draft(
         raise ValueError(f"Unsupported local draft agent: {agent}. Supported agents: {supported}")
 
     if prompt_mode not in LOCAL_AGENT_PROMPT_MODES:
-        raise ValueError("--prompt-mode must be one of: full, slim.")
+        raise ValueError("--prompt-mode must be one of: full, micro, slim.")
 
     config_path, config = load_local_model_runtime_config(resolved_project_path)
     safe_model_label = sanitize_local_model_label(model_label or config.model)
@@ -321,7 +322,7 @@ def run_local_agent_draft(
     effective_prompt_mode = "custom" if prompt_file is not None else prompt_mode
     context_file = (
         resolve_local_agent_context_file(story_path, agent, safe_model_label)
-        if effective_prompt_mode == "slim"
+        if effective_prompt_mode in {"micro", "slim"}
         else None
     )
 
@@ -333,15 +334,24 @@ def run_local_agent_draft(
 
     prompt_file_for_metadata: Path | None = None
     source_files_used: list[Path] = []
-    if effective_prompt_mode == "slim":
+    if effective_prompt_mode in {"micro", "slim"}:
         assert context_file is not None
-        prompt, source_files_used = build_slim_local_agent_prompt(
-            project_path=resolved_project_path,
-            story_path=story_path,
-            story=story,
-            agent=agent,
-            output_file=resolved_output_file,
-        )
+        if effective_prompt_mode == "micro":
+            prompt, source_files_used = build_micro_local_agent_prompt(
+                project_path=resolved_project_path,
+                story_path=story_path,
+                story=story,
+                agent=agent,
+                output_file=resolved_output_file,
+            )
+        else:
+            prompt, source_files_used = build_slim_local_agent_prompt(
+                project_path=resolved_project_path,
+                story_path=story_path,
+                story=story,
+                agent=agent,
+                output_file=resolved_output_file,
+            )
         context_file.parent.mkdir(parents=True, exist_ok=True)
         context_file.write_text(prompt, encoding="utf-8")
         resolved_prompt_file = context_file
@@ -362,8 +372,10 @@ def run_local_agent_draft(
     write_raw_response(raw_response_file, raw_response)
     response_text = extract_response_text(raw_response)
     finish_reason = extract_finish_reason(raw_response)
+    warnings = context_warnings(effective_prompt_mode, len(prompt))
 
     if not response_text.strip():
+        warnings.extend(empty_response_warnings(finish_reason))
         resolved_output_file.parent.mkdir(parents=True, exist_ok=True)
         write_local_agent_draft_metadata(
             metadata_file=metadata_file,
@@ -380,8 +392,10 @@ def run_local_agent_draft(
             response_character_count=0,
             finish_reason=finish_reason,
             status="empty_model_response",
-            warnings=empty_response_warnings(finish_reason),
-            context_character_count=len(prompt) if effective_prompt_mode == "slim" else None,
+            warnings=warnings,
+            context_character_count=(
+                len(prompt) if effective_prompt_mode in {"micro", "slim"} else None
+            ),
             source_files_used=source_files_used,
             next_action=(
                 "Inspect the raw response JSON and local model/server config. Common causes "
@@ -396,7 +410,7 @@ def run_local_agent_draft(
 
     resolved_output_file.parent.mkdir(parents=True, exist_ok=True)
     resolved_output_file.write_text(response_text, encoding="utf-8")
-    warnings = truncation_warnings(finish_reason)
+    warnings.extend(truncation_warnings(finish_reason))
     status = "draft_saved_with_warning" if warnings else "draft_saved"
     next_action = (
         "Review draft carefully or retry with slim prompt / higher output token limit."
@@ -419,7 +433,9 @@ def run_local_agent_draft(
         finish_reason=finish_reason,
         status=status,
         warnings=warnings,
-        context_character_count=len(prompt) if effective_prompt_mode == "slim" else None,
+        context_character_count=(
+            len(prompt) if effective_prompt_mode in {"micro", "slim"} else None
+        ),
         source_files_used=source_files_used,
         next_action=next_action,
     )
@@ -564,12 +580,159 @@ def build_slim_local_agent_prompt(
     return "\n".join(sections), used_files
 
 
+def build_micro_local_agent_prompt(
+    project_path: Path,
+    story_path: Path,
+    story: str,
+    agent: str,
+    output_file: Path,
+) -> tuple[str, list[Path]]:
+    story_file = story_path / "story.md"
+    agent_plan_file = story_path / "agent_plan.yaml"
+    instruction_file = story_path / LOCAL_AGENT_INSTRUCTION_FILES[agent]
+    used_files: list[Path] = []
+
+    story_text = ""
+    if story_file.exists() and story_file.is_file():
+        story_text = story_file.read_text(encoding="utf-8")
+        used_files.append(story_file)
+
+    goal = first_nonempty_line(markdown_section(story_text, "Goal")) or "Not specified."
+    acceptance_criteria = markdown_bullets(markdown_section(story_text, "Acceptance Criteria"))[:5]
+    if not acceptance_criteria:
+        acceptance_criteria = ["Not specified."]
+
+    agent_responsibility = ""
+    agent_expected_output = ""
+    if agent_plan_file.exists() and agent_plan_file.is_file():
+        used_files.append(agent_plan_file)
+        agent_responsibility, agent_expected_output = agent_details_from_plan(
+            agent_plan_file,
+            agent,
+        )
+
+    if not agent_responsibility and instruction_file.exists() and instruction_file.is_file():
+        used_files.append(instruction_file)
+        instruction_text = instruction_file.read_text(encoding="utf-8")
+        agent_responsibility = first_nonempty_line(markdown_section(instruction_text, "Role"))
+
+    if not agent_responsibility:
+        agent_responsibility = "Produce a bounded local draft for this story."
+
+    expected_output = str(output_file)
+    if agent_expected_output:
+        expected_output = f"{output_file} (agent report target: {agent_expected_output})"
+
+    sections = [
+        "# Local Agent Micro Context Packet",
+        "",
+        "prompt_mode: micro",
+        f"story: {story}",
+        f"agent: {agent}",
+        f"agent_responsibility: {one_line(agent_responsibility, 180)}",
+        f"story_goal: {one_line(goal, 240)}",
+        "",
+        "top_acceptance_criteria:",
+    ]
+    sections.extend(f"- {one_line(item, 180)}" for item in acceptance_criteria)
+    sections.extend(
+        [
+            "",
+            f"expected_output_path: {expected_output}",
+            "",
+            "safety_boundary: Save a draft only. Do not edit source files, execute commands or "
+            "model output, call cloud models, call GitHub APIs, commit, push, merge, or deploy.",
+            "",
+            "Return only the final visible answer in message.content. Do not put the answer only "
+            "in reasoning_content. Do not include hidden reasoning. If you cannot complete the "
+            "task, return a short visible explanation.",
+        ],
+    )
+
+    return "\n".join(sections), used_files
+
+
 def source_files_for_slim_prompt(story_path: Path, agent: str) -> list[Path]:
     source_files = [story_path / relative_path for relative_path in SLIM_CONTEXT_SOURCE_FILES]
     instruction_file = LOCAL_AGENT_INSTRUCTION_FILES.get(agent)
     if instruction_file is not None:
         source_files.append(story_path / instruction_file)
     return source_files
+
+
+def markdown_section(markdown: str, heading: str) -> str:
+    target = f"## {heading}".casefold()
+    lines = markdown.splitlines()
+    in_section = False
+    section_lines: list[str] = []
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("## "):
+            if in_section:
+                break
+            in_section = stripped.casefold() == target
+            continue
+        if in_section:
+            section_lines.append(line)
+
+    return "\n".join(section_lines).strip()
+
+
+def markdown_bullets(markdown: str) -> list[str]:
+    bullets: list[str] = []
+    for line in markdown.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("- "):
+            bullet = stripped[2:].strip()
+            if bullet:
+                bullets.append(bullet)
+    return bullets
+
+
+def first_nonempty_line(text: str) -> str:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return ""
+
+
+def one_line(text: str, limit: int) -> str:
+    collapsed = " ".join(text.split())
+    if len(collapsed) <= limit:
+        return collapsed
+    return collapsed[: limit - 3].rstrip() + "..."
+
+
+def agent_details_from_plan(agent_plan_file: Path, agent: str) -> tuple[str, str]:
+    try:
+        loaded = yaml.safe_load(agent_plan_file.read_text(encoding="utf-8"))
+    except yaml.YAMLError:
+        return "", ""
+
+    if not isinstance(loaded, dict):
+        return "", ""
+
+    assigned_agents = loaded.get("assigned_agents")
+    if not isinstance(assigned_agents, list):
+        return "", ""
+
+    agent_ids = {agent}
+    if agent == "reviewer_agent":
+        agent_ids.add("local_reviewer_agent")
+
+    for entry in assigned_agents:
+        if not isinstance(entry, dict) or entry.get("id") not in agent_ids:
+            continue
+        responsibility = entry.get("responsibility")
+        expected_output = entry.get("expected_output")
+        return (
+            responsibility if isinstance(responsibility, str) else "",
+            expected_output if isinstance(expected_output, str) else "",
+        )
+
+    return "", ""
 
 
 def sanitize_local_model_label(model_label: str) -> str:
@@ -638,6 +801,17 @@ def write_local_agent_draft_metadata(
 def truncation_warnings(finish_reason: str | None) -> list[str]:
     if finish_reason == "length":
         return ["model output may be truncated"]
+    return []
+
+
+def context_warnings(prompt_mode: str, character_count: int) -> list[str]:
+    if prompt_mode == "micro" and character_count > MICRO_CONTEXT_TARGET_CHARACTERS:
+        return [
+            (
+                "micro context exceeded target size "
+                f"({character_count} > {MICRO_CONTEXT_TARGET_CHARACTERS} characters)"
+            ),
+        ]
     return []
 
 

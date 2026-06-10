@@ -102,13 +102,17 @@ docker compose run --rm -e LOCAL_MODEL_API_KEY=lm-studio dev agentic local-agent
 
 `--prompt-mode slim` is the default for local-agent drafts. It saves a smaller
 context packet under `stories/STORY_SLUG/reports/local_agent_context/` before
-calling the local model. Full `prompt_pack` files are often too large for local
-models and should be used only for debugging or stronger models. If a response
+calling the local model. `--prompt-mode micro` saves the smallest
+final-answer-focused context packet for Gemma or other fragile local reasoning
+models that return `reasoning_content` but empty visible `message.content`.
+Full `prompt_pack` files are Codex-style and often too large for local models;
+use `--prompt-mode full` only for debugging or stronger models. If a response
 returns `finish_reason: length`, the saved draft may be truncated and the
-metadata records a warning.
+metadata records a warning. Empty visible content is treated as
+`empty_model_response`, even when hidden reasoning is populated.
 
 See `docs/local_agent_drafts.md` for the save-only draft workflow,
-`docs/local_agent_context_packets.md` for slim context packets, prompt-file
+`docs/local_agent_context_packets.md` for slim and micro context packets, prompt-file
 mapping, runtime artifact policy, and human/cloud review boundary for high-risk
 logic.
 

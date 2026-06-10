@@ -71,8 +71,13 @@ Prompt modes:
   packet from `story.md`, status/test/monitoring/agent plans when present, the
   matching agent instruction file, safety rules, and the expected draft output
   path.
+- `--prompt-mode micro` builds the smallest final-answer-focused context packet
+  for fragile local reasoning models. Use it when Gemma or a similar model
+  returns populated `reasoning_content` but empty visible `message.content` with
+  slim mode.
 - `--prompt-mode full` uses the existing story `prompt_pack` file for the
-  selected agent.
+  selected agent. Full mode is Codex-style and usually too large or too
+  instruction-heavy for local models.
 - `--prompt-file PROMPT_FILE` uses that file directly and records
   `prompt_mode: custom` in metadata.
 
@@ -85,8 +90,8 @@ Full-mode prompt files:
 - `maintenance_agent`: `prompt_pack/07_local_reviewer_agent_prompt.md`
 
 Use `--output-file` to override the saved draft path. Existing output,
-metadata, raw response JSON, and slim context packets are not overwritten unless
-`--force` is used.
+metadata, raw response JSON, and slim/micro context packets are not overwritten
+unless `--force` is used.
 
 The command writes:
 
@@ -94,20 +99,20 @@ The command writes:
 - `stories/STORY_SLUG/reports/local_agent_drafts/AGENT_ID_MODEL_LABEL_draft.yaml`
 - `stories/STORY_SLUG/reports/local_agent_drafts/AGENT_ID_MODEL_LABEL_raw_response.json`
 - `stories/STORY_SLUG/reports/local_agent_context/AGENT_ID_MODEL_LABEL_context.md`
-  in slim mode
+  in slim or micro mode
 
 For example, a docs draft for Story 047 and Gemma writes files such as
 `stories/story_047_local_agent_prompt_slimming/reports/local_agent_drafts/docs_agent_gemma-4-26b_draft.md`.
 
 The metadata YAML records the story, agent, model label, configured model,
-prompt mode, prompt file for full/custom mode, context file for slim mode,
+prompt mode, prompt file for full/custom mode, context file for slim/micro mode,
 context character count, source files used, output file, raw response file,
 prompt character count, response character count, finish reason, warnings,
 status, and safety flags showing that no source edits, shell execution, cloud
 calls, GitHub API calls, commits, merges, or deployments were performed.
 
-See `docs/local_agent_context_packets.md` for the slim context packet format and
-local-model troubleshooting notes.
+See `docs/local_agent_context_packets.md` for the slim and micro context packet
+formats and local-model troubleshooting notes.
 
 ## Empty Responses
 
@@ -129,6 +134,8 @@ Common causes include:
 - The response contains only hidden/internal reasoning and no final answer.
 
 Inspect the raw response JSON and `.agentic/agent_runtime.yaml` before rerunning.
+Empty visible content remains a failure even if `reasoning_content` is
+populated; the CLI does not use hidden reasoning as the final draft by default.
 
 ## Truncated Responses
 
@@ -143,6 +150,9 @@ If visible content is non-empty, the command saves the draft with
 `status: draft_saved_with_warning`, records `model output may be truncated`, and
 sets the next action to review the draft carefully or retry with a slim prompt
 or higher output token limit.
+
+For Gemma, retry with `--prompt-mode micro` if slim mode still returns
+`finish_reason: length` with empty visible content.
 
 ## Prompt Safety
 

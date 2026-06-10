@@ -1,0 +1,32 @@
+test_layers_version: 1
+unit_tests:
+  required: true
+  action: add_or_update
+  frequency: every_commit
+  evidence_or_reason: Add tests for micro prompt mode acceptance, context packet creation,
+    metadata fields, exclusions, required micro prompt content, micro smaller than
+    slim, empty visible response failure, non-empty length warning behavior, prompt-file
+    mode, and continued full and slim modes.
+integration_tests:
+  required: true
+  action: add_or_update
+  frequency: every_pull_request
+  evidence_or_reason: CLI tests cover local-agent draft prompt-mode wiring with fake
+    runtime calls.
+mock_e2e_tests:
+  required: true
+  action: confirm_existing
+  frequency: before_merge
+  evidence_or_reason: Existing mock E2E workflow coverage exercises story workflow;
+    local model calls are unit-tested with fake HTTP clients.
+live_read_only_checks:
+  required: false
+  action: not_applicable_with_reason
+  frequency: manual_only
+  evidence_or_reason: Live local draft calls depend on optional host-side LM Studio
+    or Ollama setup and are not required in automated tests.
+remote_dev_smoke_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: after_remote_dev_deploy
+  evidence_or_reason: This story does not deploy to a remote dev environment.
