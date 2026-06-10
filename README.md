@@ -114,6 +114,7 @@ docker compose run --rm dev ruff check .
 docker compose run --rm dev agentic artifact-policy
 docker compose run --rm dev agentic public-readiness
 docker compose run --rm dev agentic runtime-config validate
+docker compose run --rm dev agentic micro-readiness --story STORY_SLUG
 ```
 
 Local model runtime checks:
@@ -214,6 +215,8 @@ That file is ignored and blocked by policy. The public-safe example is
 - `docs/local_agent_context_packets.md` explains slim local-agent context
   packets, micro final-answer-focused packets, and truncation warnings for local
   models.
+- `docs/micro_readiness.md` explains how to check whether assigned agent tasks
+  are small enough for micro-mode local prompts.
 - `docs/local_model_scorecard.md` explains how to compare local models on the
   same public-safe agent-style prompts before role assignment.
 - `docs/local_model_role_assignment.md` explains manual local model scoring,

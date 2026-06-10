@@ -1,0 +1,14 @@
+logs_required: true
+watch_for:
+- missing_story_folder
+- missing_story_file
+- missing_agent_plan
+- oversized_micro_prompt_estimate
+- vague_story_goal
+- too_many_acceptance_criteria
+- missing_not_in_scope
+- story_should_be_split
+- local_model_call
+- cloud_model_call
+- agent_execution
+- accidental_source_edit_from_model_output
