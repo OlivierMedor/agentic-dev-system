@@ -100,13 +100,13 @@ story.md
 agentic prepare-story
           |
           v
-stories/<story>/prompt_pack/
+stories/STORY_SLUG/prompt_pack/
           |
           v
 operator runs configured agents
           |
           v
-stories/<story>/reports/
+stories/STORY_SLUG/reports/
 ```
 
 Prompt packs are generated local instructions for the assigned agent roles. The
@@ -148,13 +148,13 @@ finalize-story ready_for_review: true
 agentic workflow-run --phase cloud-review-prep --execute
   |
   v
-stories/<story>/cloud_review_packet/cloud_review_export.md
+stories/STORY_SLUG/cloud_review_packet/cloud_review_export.md
   |
   v
 human sends export to cloud model manually
   |
   v
-agentic record-cloud-review --result-file <path>
+agentic record-cloud-review --result-file OUTPUT_FILE
   |
   v
 agentic merge-readiness

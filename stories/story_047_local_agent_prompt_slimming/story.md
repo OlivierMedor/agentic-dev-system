@@ -17,7 +17,7 @@ Local models such as Gemma can fail on full Codex-style prompt packs by returnin
 - --prompt-file uses that file directly and records prompt_mode custom.
 - slim mode creates a smaller local-model-friendly context packet from story.md, status.yaml, test_plan.yaml, monitoring_plan.yaml, agent_plan.yaml, relevant agent instructions, short safety rules, and the expected output path.
 - slim mode excludes review bundles, cloud review packets, unrelated story files, generated runtime artifacts, draft outputs, and raw model responses.
-- slim context packets are saved under stories/<story>/reports/local_agent_context/<agent>_<model-label>_context.md.
+- slim context packets are saved under stories/STORY_SLUG/reports/local_agent_context/AGENT_ID_MODEL_LABEL_context.md, for example stories/story_047_local_agent_prompt_slimming/reports/local_agent_context/docs_agent_gemma-4-26b_context.md.
 - Draft metadata records story, agent, model_label, configured_model, prompt_mode, prompt_file for full/custom mode, context_file for slim mode, output_file, raw_response_file, prompt_character_count, response_character_count, finish_reason, status, warnings, context_character_count, source_files_used, safety flags, and next_action.
 - If finish_reason is length and visible content is empty, local-agent draft fails with status empty_model_response.
 - If finish_reason is length and visible content is non-empty, local-agent draft saves the draft with status draft_saved_with_warning and warning model output may be truncated.

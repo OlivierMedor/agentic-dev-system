@@ -9,11 +9,32 @@ SYSTEM_MAP_PATH = Path("docs/system_map.md")
 PUBLIC_LAUNCH_CHECKLIST_PATH = Path("docs/public_launch_checklist.md")
 PUBLIC_READINESS_PATH = Path("docs/public_readiness.md")
 GOLDEN_PATH_PATH = Path("docs/golden_path.md")
+LOCAL_AGENT_CONTEXT_PACKETS_PATH = Path("docs/local_agent_context_packets.md")
+LOCAL_AGENT_DRAFTS_PATH = Path("docs/local_agent_drafts.md")
+LOCAL_MODELS_PATH = Path("docs/local_models.md")
+LOCAL_MODEL_SCORECARD_PATH = Path("docs/local_model_scorecard.md")
+TEST_LAYERS_PATH = Path("docs/test_layers.md")
 REPO_SETTINGS_PATH = Path("docs/repo_settings.md")
 GITHUB_METADATA_PATH = Path("docs/github_metadata.md")
 RELEASE_NOTES_V0_1_PATH = Path("docs/release_notes_v0_1.md")
+STORY_047_PATH = Path("stories/story_047_local_agent_prompt_slimming/story.md")
 ARCHITECTURE_EXAMPLE_PATH = Path("blueprints/agentic-architecture.example.md")
 PRIVATE_ARCHITECTURE_PATH = "blueprints/agentic-architecture.md"
+PUBLIC_MARKDOWN_PATHS = [
+    README_PATH,
+    *sorted(Path("docs").glob("*.md")),
+    STORY_047_PATH,
+]
+STORY_PLACEHOLDER_DOCS = [
+    README_PATH,
+    SYSTEM_MAP_PATH,
+    GOLDEN_PATH_PATH,
+    LOCAL_AGENT_CONTEXT_PACKETS_PATH,
+    LOCAL_AGENT_DRAFTS_PATH,
+    LOCAL_MODELS_PATH,
+    TEST_LAYERS_PATH,
+    STORY_047_PATH,
+]
 SUGGESTED_REPO_DESCRIPTION = (
     "A local-first agentic development workflow system with story workspaces, "
     "prompt packs, review bundles, quality gates, CI/CD, and LangGraph-safe "
@@ -27,6 +48,38 @@ def test_public_launch_docs_exist() -> None:
     assert REPO_SETTINGS_PATH.exists()
     assert GITHUB_METADATA_PATH.exists()
     assert RELEASE_NOTES_V0_1_PATH.exists()
+
+
+def test_public_markdown_placeholders_render_visibly() -> None:
+    rendered_empty_patterns = [
+        "stories//",
+        "_ _",
+        "--story  ",
+        "--prompt-file  ",
+    ]
+    hidden_placeholder_patterns = [
+        "<story>",
+        "<agent>",
+        "<model-label>",
+        "<prompt-file>",
+        "<output-file>",
+        "<path>",
+        "<command>",
+    ]
+
+    for path in PUBLIC_MARKDOWN_PATHS:
+        content = path.read_text(encoding="utf-8")
+        for pattern in [*rendered_empty_patterns, *hidden_placeholder_patterns]:
+            assert pattern not in content, f"{path} contains {pattern}"
+
+
+def test_story_placeholder_docs_use_visible_story_values() -> None:
+    for path in STORY_PLACEHOLDER_DOCS:
+        content = path.read_text(encoding="utf-8")
+        assert (
+            "STORY_SLUG" in content
+            or "story_047_local_agent_prompt_slimming" in content
+        )
 
 
 def test_readme_links_to_public_docs() -> None:

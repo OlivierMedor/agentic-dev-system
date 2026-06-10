@@ -22,7 +22,7 @@ Slim mode builds the draft prompt from story-local planning files only:
 - `test_plan.yaml` when present.
 - `monitoring_plan.yaml` when present.
 - `agent_plan.yaml` when present.
-- Matching `instructions/<agent>.md` when present.
+- Matching `instructions/AGENT_ID.md` when present.
 - Short safety rules.
 - The expected draft output file path.
 
@@ -32,7 +32,13 @@ files, generated draft outputs, raw model responses, or other runtime artifacts.
 The context packet is saved to:
 
 ```text
-stories/<story>/reports/local_agent_context/<agent>_<model-label>_context.md
+stories/STORY_SLUG/reports/local_agent_context/AGENT_ID_MODEL_LABEL_context.md
+```
+
+For example:
+
+```text
+stories/story_047_local_agent_prompt_slimming/reports/local_agent_context/docs_agent_gemma-4-26b_context.md
 ```
 
 The draft metadata records `prompt_mode: slim`, the `context_file`,
@@ -41,18 +47,18 @@ The draft metadata records `prompt_mode: slim`, the `context_file`,
 ## Usage
 
 ```powershell
-docker compose run --rm -e LOCAL_MODEL_API_KEY=lm-studio dev agentic local-agent draft --story story_045_local_agent_draft_runner --agent docs_agent --model-label gemma-4-26b --prompt-mode slim --force
+docker compose run --rm -e LOCAL_MODEL_API_KEY=lm-studio dev agentic local-agent draft --story story_047_local_agent_prompt_slimming --agent docs_agent --model-label gemma-4-26b --prompt-mode slim --force
 ```
 
 Use slim mode for local models by default. Use full mode only for debugging or
 for stronger models that can reliably handle full story prompt packs:
 
 ```powershell
-docker compose run --rm dev agentic local-agent draft --story <story> --agent docs_agent --model-label qwen3-coder-30b --prompt-mode full
+docker compose run --rm dev agentic local-agent draft --story STORY_SLUG --agent docs_agent --model-label gemma-4-26b --prompt-mode full
 ```
 
-Use `--prompt-file` for a custom prompt. In that case the metadata records
-`prompt_mode: custom`.
+Use `--prompt-file PROMPT_FILE` for a custom prompt. In that case the metadata
+records `prompt_mode: custom`.
 
 ## Truncation Warnings
 

@@ -6,10 +6,10 @@ README_PATH = Path("README.md")
 
 REQUIRED_COMMANDS = [
     "agentic generate-stories",
-    "agentic workflow-run --story <story> --phase prepare --execute",
-    "agentic workflow-run --story <story> --phase local-finalize --execute",
-    "agentic workflow-run --story <story> --phase cloud-review-prep --execute",
-    "agentic next-step --story <story>",
+    "agentic workflow-run --story STORY_SLUG --phase prepare --execute",
+    "agentic workflow-run --story STORY_SLUG --phase local-finalize --execute",
+    "agentic workflow-run --story STORY_SLUG --phase cloud-review-prep --execute",
+    "agentic next-step --story STORY_SLUG",
     "agentic project-status",
     "agentic record-cloud-review",
     "agentic merge-readiness",

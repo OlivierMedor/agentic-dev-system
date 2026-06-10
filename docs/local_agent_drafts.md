@@ -17,7 +17,7 @@ coding runtime, review decision, merge decision, and deployment decision under
 human/Codex control.
 
 Local agent draft outputs are runtime artifacts. They belong under
-`stories/<story>/reports/local_agent_drafts/` and must remain untracked except
+`stories/STORY_SLUG/reports/local_agent_drafts/` and must remain untracked except
 for optional `.gitkeep` files.
 
 ## Load A Model In LM Studio
@@ -54,7 +54,7 @@ local_model_runtime:
 ## Run A Draft
 
 ```powershell
-docker compose run --rm -e LOCAL_MODEL_API_KEY=lm-studio dev agentic local-agent draft --story story_045_local_agent_draft_runner --agent docs_agent --model-label gemma-4-26b --prompt-mode slim --force
+docker compose run --rm -e LOCAL_MODEL_API_KEY=lm-studio dev agentic local-agent draft --story story_047_local_agent_prompt_slimming --agent docs_agent --model-label gemma-4-26b --prompt-mode slim --force
 ```
 
 Supported agents:
@@ -73,7 +73,7 @@ Prompt modes:
   path.
 - `--prompt-mode full` uses the existing story `prompt_pack` file for the
   selected agent.
-- `--prompt-file <path>` uses that file directly and records
+- `--prompt-file PROMPT_FILE` uses that file directly and records
   `prompt_mode: custom` in metadata.
 
 Full-mode prompt files:
@@ -90,11 +90,14 @@ metadata, raw response JSON, and slim context packets are not overwritten unless
 
 The command writes:
 
-- `stories/<story>/reports/local_agent_drafts/<agent>_<model-label>_draft.md`
-- `stories/<story>/reports/local_agent_drafts/<agent>_<model-label>_draft.yaml`
-- `stories/<story>/reports/local_agent_drafts/<agent>_<model-label>_raw_response.json`
-- `stories/<story>/reports/local_agent_context/<agent>_<model-label>_context.md`
+- `stories/STORY_SLUG/reports/local_agent_drafts/AGENT_ID_MODEL_LABEL_draft.md`
+- `stories/STORY_SLUG/reports/local_agent_drafts/AGENT_ID_MODEL_LABEL_draft.yaml`
+- `stories/STORY_SLUG/reports/local_agent_drafts/AGENT_ID_MODEL_LABEL_raw_response.json`
+- `stories/STORY_SLUG/reports/local_agent_context/AGENT_ID_MODEL_LABEL_context.md`
   in slim mode
+
+For example, a docs draft for Story 047 and Gemma writes files such as
+`stories/story_047_local_agent_prompt_slimming/reports/local_agent_drafts/docs_agent_gemma-4-26b_draft.md`.
 
 The metadata YAML records the story, agent, model label, configured model,
 prompt mode, prompt file for full/custom mode, context file for slim mode,

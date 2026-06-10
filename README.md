@@ -89,19 +89,19 @@ must stay local.
 Run commands from the repo root through Docker:
 
 ```powershell
-docker compose run --rm dev agentic <command>
+docker compose run --rm dev agentic COMMAND
 ```
 
 Common workflow commands:
 
 ```powershell
 docker compose run --rm dev agentic generate-stories
-docker compose run --rm dev agentic workflow-run --story <story> --phase prepare --execute
-docker compose run --rm dev agentic next-step --story <story>
-docker compose run --rm dev agentic workflow-run --story <story> --phase local-finalize --execute
-docker compose run --rm dev agentic workflow-run --story <story> --phase cloud-review-prep --execute
-docker compose run --rm dev agentic record-cloud-review --story <story> --result-file <path>
-docker compose run --rm dev agentic merge-readiness --story <story>
+docker compose run --rm dev agentic workflow-run --story STORY_SLUG --phase prepare --execute
+docker compose run --rm dev agentic next-step --story STORY_SLUG
+docker compose run --rm dev agentic workflow-run --story STORY_SLUG --phase local-finalize --execute
+docker compose run --rm dev agentic workflow-run --story STORY_SLUG --phase cloud-review-prep --execute
+docker compose run --rm dev agentic record-cloud-review --story STORY_SLUG --result-file OUTPUT_FILE
+docker compose run --rm dev agentic merge-readiness --story STORY_SLUG
 docker compose run --rm dev agentic project-status
 ```
 
