@@ -1,33 +1,33 @@
 agents:
   research_agent:
     provider: codex
-    model: gpt-5.5
+    model: gpt-5.4-mini
     approval_mode: workspace_write_no_prompt
     fallback_provider: manual_cloud_model
 
   planner_agent:
     provider: codex
-    model: gpt-5.5
+    model: gpt-5.4
     approval_mode: workspace_write_no_prompt
     fallback_provider: manual_cloud_model
 
   developer_agent:
     provider: codex
-    model: gpt-5.5
+    model: gpt-5.4
     approval_mode: workspace_write_no_prompt
     fallback_provider: manual_cloud_model
 
   test_agent:
     provider: codex
-    model: gpt-5.5
+    model: gpt-5.4
     approval_mode: workspace_write_no_prompt
     fallback_provider: manual_cloud_model
 
   docs_agent:
-    provider: local_model_optional
-    model: qwen_coder_or_codex_fallback
+    provider: codex
+    model: gpt-5.4-mini
     approval_mode: workspace_write_no_prompt
-    fallback_provider: codex
+    fallback_provider: manual_cloud_model
 
   security_quality_agent:
     provider: codex
@@ -47,17 +47,31 @@ agents:
     approval_mode: manual_only
     fallback_provider: human_owner
 
+  local_model_helper:
+    provider: local_model_optional
+    model: gemma-4-26b
+    prompt_mode: micro
+    approval_mode: workspace_write_no_prompt
+    fallback_provider: codex
+
 command_policy:
   allowed_without_approval:
+    - docker compose build
     - docker compose run --rm dev pytest
     - docker compose run --rm dev ruff check .
     - docker compose run --rm dev agentic generate-stories
     - docker compose run --rm dev agentic prepare-story
+    - docker compose run --rm dev agentic build-context
+    - docker compose run --rm dev agentic codex-task create
+    - docker compose run --rm dev agentic workflow-run
     - docker compose run --rm dev agentic review-bundle
     - docker compose run --rm dev agentic quality-gate
     - docker compose run --rm dev agentic test-layers
     - docker compose run --rm dev agentic finalize-story
     - docker compose run --rm dev agentic artifact-policy
+    - docker compose run --rm dev agentic public-readiness
+    - docker compose run --rm dev agentic runtime-config validate
+    - docker compose run --rm dev agentic project-status
 
   requires_human_approval:
     - git push
