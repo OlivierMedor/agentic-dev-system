@@ -154,6 +154,21 @@ generated prompts should be run in micro mode, slim mode, or with a stronger
 configured agent runtime. Warnings are guidance for story sizing and local model
 fit; they are not automatic merge, deploy, or workflow blockers.
 
+## Manual Codex Task Files
+
+After prepare, operators can build focused role context packets and create
+Codex task files for manual role passes:
+
+```powershell
+agentic build-context --story STORY_SLUG --all --force
+agentic codex-task create --story STORY_SLUG --all --force
+```
+
+Open one generated file from `stories/STORY_SLUG/reports/codex_tasks/` in Codex
+at a time. Run Developer before Test, and run Local Reviewer last. Generated
+`role_context` and `codex_tasks` files are runtime artifacts and should not be
+committed. For the full beginner guide, see `docs/codex_task_execution.md`.
+
 ## Queue differences
 
 Use queues to capture work without expanding the active story.

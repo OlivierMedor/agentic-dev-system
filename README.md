@@ -189,6 +189,8 @@ Use `docs/role_context_builder.md` to build focused context packets for each
 assigned agent before handing work to a configured runtime.
 Use `docs/codex_runtime.md` to create Codex-ready task files from those role
 context packets without invoking Codex automatically.
+Use `docs/codex_task_execution.md` to run generated Codex task files manually,
+one role at a time, without committing generated runtime artifacts.
 
 For release and repository hygiene, use `docs/public_launch_checklist.md`,
 `docs/release_process.md`, `docs/v0_1_release_checklist.md`,
@@ -239,6 +241,8 @@ That file is ignored and blocked by policy. The public-safe example is
   assigned story agents.
 - `docs/codex_runtime.md` explains Codex-ready task files generated from role
   context packets.
+- `docs/codex_task_execution.md` explains safe manual execution of generated
+  Codex task files, one role at a time.
 - `docs/local_model_scorecard.md` explains how to compare local models on the
   same public-safe agent-style prompts before role assignment.
 - `docs/local_model_role_assignment.md` explains manual local model scoring,
