@@ -1,0 +1,126 @@
+story: story_053_codex_task_execution_guide
+agents_built:
+- research_agent
+- planner_agent
+- developer_agent
+- test_agent
+- docs_agent
+- security_quality_agent
+- local_reviewer_agent
+target_characters: 8000
+status: CONTEXT_READY
+context_packets:
+- agent: research_agent
+  path: stories/story_053_codex_task_execution_guide/reports/role_context/research_agent_context.md
+  status: written
+  estimated_character_count: 5766
+  included_files:
+  - stories/story_053_codex_task_execution_guide/story.md
+  - stories/story_053_codex_task_execution_guide/status.yaml
+  - stories/story_053_codex_task_execution_guide/agent_plan.yaml
+  - stories/story_053_codex_task_execution_guide/instructions/research_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  skipped_files: []
+  warnings: []
+- agent: planner_agent
+  path: stories/story_053_codex_task_execution_guide/reports/role_context/planner_agent_context.md
+  status: written
+  estimated_character_count: 6766
+  included_files:
+  - stories/story_053_codex_task_execution_guide/story.md
+  - stories/story_053_codex_task_execution_guide/status.yaml
+  - stories/story_053_codex_task_execution_guide/agent_plan.yaml
+  - stories/story_053_codex_task_execution_guide/instructions/planner_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  skipped_files: []
+  warnings: []
+- agent: developer_agent
+  path: stories/story_053_codex_task_execution_guide/reports/role_context/developer_agent_context.md
+  status: written
+  estimated_character_count: 7469
+  included_files:
+  - stories/story_053_codex_task_execution_guide/story.md
+  - stories/story_053_codex_task_execution_guide/status.yaml
+  - stories/story_053_codex_task_execution_guide/agent_plan.yaml
+  - stories/story_053_codex_task_execution_guide/instructions/developer_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  - stories/story_053_codex_task_execution_guide/story_runbook.md
+  skipped_files:
+  - stories/story_053_codex_task_execution_guide/reports/planner_report.md
+  - stories/story_053_codex_task_execution_guide/reports/research_report.md
+  - stories/story_053_codex_task_execution_guide/review_bundle/*
+  warnings: []
+- agent: test_agent
+  path: stories/story_053_codex_task_execution_guide/reports/role_context/test_agent_context.md
+  status: written
+  estimated_character_count: 6383
+  included_files:
+  - stories/story_053_codex_task_execution_guide/story.md
+  - stories/story_053_codex_task_execution_guide/status.yaml
+  - stories/story_053_codex_task_execution_guide/agent_plan.yaml
+  - stories/story_053_codex_task_execution_guide/instructions/test_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  - stories/story_053_codex_task_execution_guide/test_plan.yaml
+  skipped_files:
+  - stories/story_053_codex_task_execution_guide/reports/developer_report.md
+  warnings: []
+- agent: docs_agent
+  path: stories/story_053_codex_task_execution_guide/reports/role_context/docs_agent_context.md
+  status: written
+  estimated_character_count: 5892
+  included_files:
+  - stories/story_053_codex_task_execution_guide/story.md
+  - stories/story_053_codex_task_execution_guide/status.yaml
+  - stories/story_053_codex_task_execution_guide/agent_plan.yaml
+  - stories/story_053_codex_task_execution_guide/instructions/docs_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  skipped_files: []
+  warnings: []
+- agent: security_quality_agent
+  path: stories/story_053_codex_task_execution_guide/reports/role_context/security_quality_agent_context.md
+  status: written
+  estimated_character_count: 6434
+  included_files:
+  - stories/story_053_codex_task_execution_guide/story.md
+  - stories/story_053_codex_task_execution_guide/status.yaml
+  - stories/story_053_codex_task_execution_guide/agent_plan.yaml
+  - stories/story_053_codex_task_execution_guide/instructions/security_quality_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  - .gitignore
+  skipped_files:
+  - stories/story_053_codex_task_execution_guide/reports/quality_gate_result.yaml
+  - stories/story_053_codex_task_execution_guide/reports/finalize_story_result.yaml
+  warnings: []
+- agent: local_reviewer_agent
+  path: stories/story_053_codex_task_execution_guide/reports/role_context/local_reviewer_agent_context.md
+  status: written
+  estimated_character_count: 6484
+  included_files:
+  - stories/story_053_codex_task_execution_guide/story.md
+  - stories/story_053_codex_task_execution_guide/status.yaml
+  - stories/story_053_codex_task_execution_guide/agent_plan.yaml
+  - stories/story_053_codex_task_execution_guide/instructions/local_reviewer_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  skipped_files:
+  - stories/story_053_codex_task_execution_guide/reports/developer_report.md
+  - stories/story_053_codex_task_execution_guide/reports/test_report.md
+  - stories/story_053_codex_task_execution_guide/reports/test_layer_result.yaml
+  - stories/story_053_codex_task_execution_guide/reports/quality_gate_result.yaml
+  - stories/story_053_codex_task_execution_guide/reports/finalize_story_result.yaml
+  - stories/story_053_codex_task_execution_guide/review_bundle/handoff.md
+  warnings: []
+warnings: []
+failed_checks: []
+safety_flags:
+  called_cloud_models: false
+  called_local_models: false
+  executed_agents: false
+  committed_or_merged: false
+  deployed: false

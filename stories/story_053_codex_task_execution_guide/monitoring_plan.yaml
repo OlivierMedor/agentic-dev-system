@@ -1,0 +1,12 @@
+logs_required: true
+watch_for:
+- missing_codex_task_execution_doc
+- missing_readme_link
+- missing_codex_runtime_link
+- unclear_manual_execution_order
+- automatic_codex_execution_claim
+- cloud_model_call
+- committed_codex_task_file
+- committed_role_context_packet
+- automatic_commit_or_merge
+- deployment_call

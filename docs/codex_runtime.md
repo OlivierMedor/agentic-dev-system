@@ -4,6 +4,9 @@ Codex is the primary configured runtime for code-changing work in this project.
 Role context packets keep each agent handoff focused, and Codex task files turn
 those packets into copy/paste-ready instructions.
 
+For the manual operator flow that runs those files safely one role at a time,
+see `docs/codex_task_execution.md`.
+
 ## Command
 
 ```powershell

@@ -1,0 +1,30 @@
+test_layers_version: 1
+unit_tests:
+  required: true
+  action: add_or_update
+  frequency: every_commit
+  evidence_or_reason: Add deterministic docs tests for guide existence, README and
+    codex runtime links, required command mentions, and safety language.
+integration_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: every_pull_request
+  evidence_or_reason: This story changes documentation and doc presence tests only;
+    no runtime command behavior changes.
+mock_e2e_tests:
+  required: true
+  action: confirm_existing
+  frequency: before_merge
+  evidence_or_reason: Existing workflow-run coverage exercises generated story workspaces;
+    this story adds operator documentation only.
+live_read_only_checks:
+  required: false
+  action: not_applicable_with_reason
+  frequency: manual_only
+  evidence_or_reason: The guide describes local files and commands only and does not
+    require live services.
+remote_dev_smoke_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: after_remote_dev_deploy
+  evidence_or_reason: This story does not deploy to a remote dev environment.

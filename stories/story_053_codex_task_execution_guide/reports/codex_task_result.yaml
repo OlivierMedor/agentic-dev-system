@@ -1,0 +1,91 @@
+story: story_053_codex_task_execution_guide
+status: CODEX_TASKS_READY
+generated_files:
+- stories/story_053_codex_task_execution_guide/reports/codex_tasks/research_agent_codex_task.md
+- stories/story_053_codex_task_execution_guide/reports/codex_tasks/planner_agent_codex_task.md
+- stories/story_053_codex_task_execution_guide/reports/codex_tasks/developer_agent_codex_task.md
+- stories/story_053_codex_task_execution_guide/reports/codex_tasks/test_agent_codex_task.md
+- stories/story_053_codex_task_execution_guide/reports/codex_tasks/docs_agent_codex_task.md
+- stories/story_053_codex_task_execution_guide/reports/codex_tasks/security_quality_agent_codex_task.md
+- stories/story_053_codex_task_execution_guide/reports/codex_tasks/local_reviewer_agent_codex_task.md
+skipped_files: []
+warnings: []
+recommended_execution_order:
+- research_agent
+- planner_agent
+- developer_agent
+- test_agent
+- docs_agent
+- security_quality_agent
+- local_reviewer_agent
+tasks:
+- agent: research_agent
+  path: stories/story_053_codex_task_execution_guide/reports/codex_tasks/research_agent_codex_task.md
+  status: written
+  model_recommendation: gpt-5.5 (codex)
+  required_output_report_path: reports/research_report.md
+  execution_position: 1
+  previous_agent: null
+  next_agent: planner_agent
+  warnings: []
+- agent: planner_agent
+  path: stories/story_053_codex_task_execution_guide/reports/codex_tasks/planner_agent_codex_task.md
+  status: written
+  model_recommendation: gpt-5.5 (codex)
+  required_output_report_path: reports/planner_report.md
+  execution_position: 2
+  previous_agent: research_agent
+  next_agent: developer_agent
+  warnings: []
+- agent: developer_agent
+  path: stories/story_053_codex_task_execution_guide/reports/codex_tasks/developer_agent_codex_task.md
+  status: written
+  model_recommendation: gpt-5.5 (codex)
+  required_output_report_path: reports/developer_report.md
+  execution_position: 3
+  previous_agent: planner_agent
+  next_agent: test_agent
+  warnings: []
+- agent: test_agent
+  path: stories/story_053_codex_task_execution_guide/reports/codex_tasks/test_agent_codex_task.md
+  status: written
+  model_recommendation: gpt-5.5 (codex)
+  required_output_report_path: reports/test_report.md
+  execution_position: 4
+  previous_agent: developer_agent
+  next_agent: docs_agent
+  warnings: []
+- agent: docs_agent
+  path: stories/story_053_codex_task_execution_guide/reports/codex_tasks/docs_agent_codex_task.md
+  status: written
+  model_recommendation: qwen_coder_or_codex_fallback (local_model_optional)
+  required_output_report_path: reports/docs_report.md
+  execution_position: 5
+  previous_agent: test_agent
+  next_agent: security_quality_agent
+  warnings: []
+- agent: security_quality_agent
+  path: stories/story_053_codex_task_execution_guide/reports/codex_tasks/security_quality_agent_codex_task.md
+  status: written
+  model_recommendation: gpt-5.5 (codex)
+  required_output_report_path: reports/security_quality_report.md
+  execution_position: 6
+  previous_agent: docs_agent
+  next_agent: local_reviewer_agent
+  warnings: []
+- agent: local_reviewer_agent
+  path: stories/story_053_codex_task_execution_guide/reports/codex_tasks/local_reviewer_agent_codex_task.md
+  status: written
+  model_recommendation: gpt-5.5 (codex)
+  required_output_report_path: reports/local_review_report.md
+  execution_position: 7
+  previous_agent: security_quality_agent
+  next_agent: null
+  warnings: []
+safety_flags:
+  called_codex: false
+  called_cloud_models: false
+  executed_agents: false
+  called_github_apis: false
+  committed_or_merged: false
+  deployed: false
