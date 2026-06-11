@@ -65,6 +65,10 @@ from agentic_dev.remote_dev_validation import (
     create_remote_dev_packet,
     record_remote_dev_validation,
 )
+from agentic_dev.role_context import (
+    DEFAULT_ROLE_CONTEXT_TARGET_CHARACTERS,
+    build_role_context,
+)
 from agentic_dev.runtime_config import show_runtime_config, validate_runtime_config
 from agentic_dev.scaffolding import init_project
 from agentic_dev.story_generator import generate_stories
@@ -591,6 +595,42 @@ def main() -> None:
         type=int,
         default=DEFAULT_TARGET_CHARACTERS,
         help="Target maximum characters per estimated agent micro prompt. Defaults to 2000.",
+    )
+
+    build_context_parser = subparsers.add_parser(
+        "build-context",
+        help="Build role-specific context packets for assigned story agents.",
+    )
+    build_context_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    build_context_parser.add_argument(
+        "--story",
+        required=True,
+        help="Story folder name under the project's stories folder.",
+    )
+    build_context_parser.add_argument(
+        "--agent",
+        help="Build context for one assigned agent ID.",
+    )
+    build_context_parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Build context for every assigned agent. Defaults to all when --agent is omitted.",
+    )
+    build_context_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing role context packets.",
+    )
+    build_context_parser.add_argument(
+        "--target-chars",
+        type=int,
+        default=DEFAULT_ROLE_CONTEXT_TARGET_CHARACTERS,
+        help="Target maximum characters per context packet. Defaults to 8000.",
     )
 
     project_status_parser = subparsers.add_parser(
@@ -1411,6 +1451,17 @@ def main() -> None:
 
         if args.command == "micro-readiness":
             result = run_micro_readiness(args.project, args.story, args.target_chars)
+            print(result.terminal_summary)
+
+        if args.command == "build-context":
+            result = build_role_context(
+                args.project,
+                args.story,
+                agent=args.agent,
+                all_agents=args.all,
+                force=args.force,
+                target_chars=args.target_chars,
+            )
             print(result.terminal_summary)
 
         if args.command == "project-status":

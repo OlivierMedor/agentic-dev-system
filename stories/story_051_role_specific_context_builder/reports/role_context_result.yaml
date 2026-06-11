@@ -1,0 +1,133 @@
+story: story_051_role_specific_context_builder
+agents_built:
+- research_agent
+- planner_agent
+- developer_agent
+- test_agent
+- docs_agent
+- security_quality_agent
+- local_reviewer_agent
+target_characters: 8000
+status: CONTEXT_READY
+context_packets:
+- agent: research_agent
+  path: stories/story_051_role_specific_context_builder/reports/role_context/research_agent_context.md
+  status: written
+  estimated_character_count: 5837
+  included_files:
+  - stories/story_051_role_specific_context_builder/story.md
+  - stories/story_051_role_specific_context_builder/status.yaml
+  - stories/story_051_role_specific_context_builder/agent_plan.yaml
+  - stories/story_051_role_specific_context_builder/instructions/research_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  skipped_files:
+  - stories/story_051_role_specific_context_builder/cloud_review_packet/*
+  warnings: []
+- agent: planner_agent
+  path: stories/story_051_role_specific_context_builder/reports/role_context/planner_agent_context.md
+  status: written
+  estimated_character_count: 7254
+  included_files:
+  - stories/story_051_role_specific_context_builder/story.md
+  - stories/story_051_role_specific_context_builder/status.yaml
+  - stories/story_051_role_specific_context_builder/agent_plan.yaml
+  - stories/story_051_role_specific_context_builder/instructions/planner_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  skipped_files:
+  - stories/story_051_role_specific_context_builder/cloud_review_packet/*
+  warnings: []
+- agent: developer_agent
+  path: stories/story_051_role_specific_context_builder/reports/role_context/developer_agent_context.md
+  status: written
+  estimated_character_count: 7513
+  included_files:
+  - stories/story_051_role_specific_context_builder/story.md
+  - stories/story_051_role_specific_context_builder/status.yaml
+  - stories/story_051_role_specific_context_builder/agent_plan.yaml
+  - stories/story_051_role_specific_context_builder/instructions/developer_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  - stories/story_051_role_specific_context_builder/story_runbook.md
+  skipped_files:
+  - stories/story_051_role_specific_context_builder/reports/planner_report.md
+  - stories/story_051_role_specific_context_builder/reports/research_report.md
+  - stories/story_051_role_specific_context_builder/cloud_review_packet/*
+  - stories/story_051_role_specific_context_builder/review_bundle/*
+  warnings: []
+- agent: test_agent
+  path: stories/story_051_role_specific_context_builder/reports/role_context/test_agent_context.md
+  status: written
+  estimated_character_count: 7133
+  included_files:
+  - stories/story_051_role_specific_context_builder/story.md
+  - stories/story_051_role_specific_context_builder/status.yaml
+  - stories/story_051_role_specific_context_builder/agent_plan.yaml
+  - stories/story_051_role_specific_context_builder/instructions/test_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  - stories/story_051_role_specific_context_builder/test_plan.yaml
+  - stories/story_051_role_specific_context_builder/reports/developer_report.md
+  skipped_files:
+  - stories/story_051_role_specific_context_builder/cloud_review_packet/*
+  warnings: []
+- agent: docs_agent
+  path: stories/story_051_role_specific_context_builder/reports/role_context/docs_agent_context.md
+  status: written
+  estimated_character_count: 5351
+  included_files:
+  - stories/story_051_role_specific_context_builder/story.md
+  - stories/story_051_role_specific_context_builder/status.yaml
+  - stories/story_051_role_specific_context_builder/agent_plan.yaml
+  - stories/story_051_role_specific_context_builder/instructions/docs_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  skipped_files:
+  - stories/story_051_role_specific_context_builder/cloud_review_packet/*
+  warnings: []
+- agent: security_quality_agent
+  path: stories/story_051_role_specific_context_builder/reports/role_context/security_quality_agent_context.md
+  status: written
+  estimated_character_count: 7120
+  included_files:
+  - stories/story_051_role_specific_context_builder/story.md
+  - stories/story_051_role_specific_context_builder/status.yaml
+  - stories/story_051_role_specific_context_builder/agent_plan.yaml
+  - stories/story_051_role_specific_context_builder/instructions/security_quality_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  - stories/story_051_role_specific_context_builder/reports/quality_gate_result.yaml
+  - stories/story_051_role_specific_context_builder/reports/finalize_story_result.yaml
+  - .gitignore
+  skipped_files:
+  - stories/story_051_role_specific_context_builder/cloud_review_packet/*
+  warnings: []
+- agent: local_reviewer_agent
+  path: stories/story_051_role_specific_context_builder/reports/role_context/local_reviewer_agent_context.md
+  status: written
+  estimated_character_count: 7968
+  included_files:
+  - stories/story_051_role_specific_context_builder/story.md
+  - stories/story_051_role_specific_context_builder/status.yaml
+  - stories/story_051_role_specific_context_builder/agent_plan.yaml
+  - stories/story_051_role_specific_context_builder/instructions/local_reviewer_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  - stories/story_051_role_specific_context_builder/reports/developer_report.md
+  - stories/story_051_role_specific_context_builder/reports/test_report.md
+  - stories/story_051_role_specific_context_builder/reports/test_layer_result.yaml
+  - stories/story_051_role_specific_context_builder/reports/quality_gate_result.yaml
+  - stories/story_051_role_specific_context_builder/reports/finalize_story_result.yaml
+  - stories/story_051_role_specific_context_builder/review_bundle/handoff.md
+  skipped_files:
+  - stories/story_051_role_specific_context_builder/cloud_review_packet/*
+  warnings: []
+warnings: []
+failed_checks: []
+safety_flags:
+  called_cloud_models: false
+  called_local_models: false
+  executed_agents: false
+  committed_or_merged: false
+  deployed: false

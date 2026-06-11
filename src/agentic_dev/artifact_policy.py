@@ -116,6 +116,15 @@ def find_artifact_policy_violations(tracked_files: list[str]) -> list[ArtifactPo
             )
             continue
 
+        if is_role_context_output_path(parts, filename):
+            violations.append(
+                ArtifactPolicyViolation(
+                    path=normalized_path,
+                    reason="role context packet file is tracked",
+                ),
+            )
+            continue
+
         if is_local_model_raw_response_path(parts, filename):
             violations.append(
                 ArtifactPolicyViolation(
@@ -253,6 +262,18 @@ def is_local_agent_context_output_path(parts: list[str], filename: str) -> bool:
         and parts[0] == "stories"
         and parts[2] == "reports"
         and parts[3] == "local_agent_context"
+    )
+
+
+def is_role_context_output_path(parts: list[str], filename: str) -> bool:
+    if filename == ".gitkeep":
+        return False
+
+    return (
+        len(parts) >= 5
+        and parts[0] == "stories"
+        and parts[2] == "reports"
+        and parts[3] == "role_context"
     )
 
 

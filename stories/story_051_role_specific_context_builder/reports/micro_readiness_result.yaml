@@ -1,0 +1,86 @@
+story: story_051_role_specific_context_builder
+status: TOO_LARGE_FOR_MICRO
+target_characters: 2000
+passed_checks:
+- Story goal is present.
+- Not-in-scope boundaries are present.
+- Definition of Done is present.
+- agent_plan.yaml exists and lists assigned agents.
+- Most assigned agent prompts fit within the target character count.
+warnings: []
+failed_checks:
+- More than 15 acceptance criteria usually means the story is too large.
+- Story appears to touch many unrelated modules or workflow areas.
+agent_estimates:
+- agent_id: research_agent
+  responsibility: Research story scope, risks, best practices, and useful references.
+  expected_output: reports/research_report.md
+  estimated_characters: 1096
+  target_characters: 2000
+  fits_target: true
+  source_files:
+  - story.md
+  - agent_plan.yaml
+  warnings: []
+- agent_id: planner_agent
+  responsibility: Create a practical implementation plan for this story.
+  expected_output: reports/planner_report.md
+  estimated_characters: 1081
+  target_characters: 2000
+  fits_target: true
+  source_files:
+  - story.md
+  - agent_plan.yaml
+  warnings: []
+- agent_id: developer_agent
+  responsibility: Implement only the approved story scope. Do not write tests.
+  expected_output: reports/developer_report.md
+  estimated_characters: 1091
+  target_characters: 2000
+  fits_target: true
+  source_files:
+  - story.md
+  - agent_plan.yaml
+  warnings: []
+- agent_id: test_agent
+  responsibility: Write independent tests based on the story acceptance criteria.
+  expected_output: reports/test_report.md
+  estimated_characters: 1084
+  target_characters: 2000
+  fits_target: true
+  source_files:
+  - story.md
+  - agent_plan.yaml
+  warnings: []
+- agent_id: docs_agent
+  responsibility: Update documentation related to this story.
+  expected_output: reports/docs_report.md
+  estimated_characters: 1064
+  target_characters: 2000
+  fits_target: true
+  source_files:
+  - story.md
+  - agent_plan.yaml
+  warnings: []
+- agent_id: security_quality_agent
+  responsibility: Check for secrets, unsafe behavior, bad patterns, and quality risks.
+  expected_output: reports/security_quality_report.md
+  estimated_characters: 1113
+  target_characters: 2000
+  fits_target: true
+  source_files:
+  - story.md
+  - agent_plan.yaml
+  warnings: []
+- agent_id: local_reviewer_agent
+  responsibility: Review all work and decide whether it is ready for cloud/human review.
+  expected_output: reports/local_review_report.md
+  estimated_characters: 1109
+  target_characters: 2000
+  fits_target: true
+  source_files:
+  - story.md
+  - agent_plan.yaml
+  warnings: []
+recommended_action: Split or narrow the story before relying on agent-specific micro
+  prompts.
