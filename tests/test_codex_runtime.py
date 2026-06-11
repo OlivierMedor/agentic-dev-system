@@ -53,10 +53,10 @@ def create_codex_task_story(
         """agents:
   developer_agent:
     provider: codex
-    model: gpt-5.5
+    model: gpt-5.4
   test_agent:
     provider: codex
-    model: gpt-5.5-mini
+    model: gpt-5.4
 """,
         encoding="utf-8",
     )
@@ -136,7 +136,7 @@ def test_creates_one_codex_task_file_for_one_agent(tmp_path: Path) -> None:
     assert task_path.exists()
     assert result.generated_files == [task_path]
     assert not (story_path / "reports" / "codex_tasks" / "test_agent_codex_task.md").exists()
-    assert "gpt-5.5 (codex)" in task_path.read_text(encoding="utf-8")
+    assert "gpt-5.4 (codex)" in task_path.read_text(encoding="utf-8")
 
 
 def test_creates_all_codex_task_files_with_all(tmp_path: Path) -> None:
@@ -233,6 +233,25 @@ def test_result_yaml_is_created_with_false_safety_flags(tmp_path: Path) -> None:
         "committed_or_merged": False,
         "deployed": False,
     }
+
+
+def test_codex_task_outputs_model_recommendation_from_runtime_config(tmp_path: Path) -> None:
+    story_path = create_codex_task_story(tmp_path)
+
+    result = create_codex_tasks(tmp_path, STORY, all_agents=True)
+
+    result_yaml = yaml.safe_load(result.result_path.read_text(encoding="utf-8"))
+    report = result.report_path.read_text(encoding="utf-8")
+    developer_task = read_task(story_path, "developer_agent")
+    test_task = read_task(story_path, "test_agent")
+
+    assert result_yaml["tasks"][0]["model_recommendation"] == "gpt-5.4 (codex)"
+    assert result_yaml["tasks"][1]["model_recommendation"] == "gpt-5.4 (codex)"
+    assert "- Model recommendation: gpt-5.4 (codex)" in report
+    assert "## Model Recommendation\n\ngpt-5.4 (codex)" in developer_task
+    assert "## Model Recommendation\n\ngpt-5.4 (codex)" in test_task
+    assert result_yaml["safety_flags"]["called_codex"] is False
+    assert result_yaml["safety_flags"]["called_cloud_models"] is False
 
 
 def test_execution_order_is_read_from_agent_plan(tmp_path: Path) -> None:

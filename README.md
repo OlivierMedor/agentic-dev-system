@@ -187,10 +187,25 @@ local models may need micro mode, slim mode, a stronger configured agent
 runtime, or a story split; they are not automatic workflow failures.
 Use `docs/role_context_builder.md` to build focused context packets for each
 assigned agent before handing work to a configured runtime.
+Use `docs/runtime_config.md` to understand the tiered Codex-first runtime
+defaults and the command approval policy.
 Use `docs/codex_runtime.md` to create Codex-ready task files from those role
 context packets without invoking Codex automatically.
 Use `docs/codex_task_execution.md` to run generated Codex task files manually,
 one role at a time, without committing generated runtime artifacts.
+
+## Tiered Codex Runtime Defaults
+
+`.agentic/agent_runtime.yaml` is the source of truth for agent provider and
+model choices. Blueprints describe the story work; they do not assign models.
+
+Codex is the primary runtime because this workflow is centered on repository
+changes, tests, review evidence, and local safety rules. The default worker tier
+is `gpt-5.4` for planner, developer, and test roles. Lighter research and docs
+roles use `gpt-5.4-mini`. High-risk security, final local review, DeFi,
+risk-sensitive work, and final judgment use `gpt-5.5`. `cloud_reviewer` remains
+a manual handoff to `main_cloud_model`, and Gemma remains available only as an
+optional `local_model_helper` micro-mode draft helper.
 
 For release and repository hygiene, use `docs/public_launch_checklist.md`,
 `docs/release_process.md`, `docs/v0_1_release_checklist.md`,
@@ -239,6 +254,8 @@ That file is ignored and blocked by policy. The public-safe example is
   are small enough for micro-mode local prompts.
 - `docs/role_context_builder.md` explains focused role context packets for
   assigned story agents.
+- `docs/runtime_config.md` explains tiered Codex-first runtime defaults and
+  command approval policy.
 - `docs/codex_runtime.md` explains Codex-ready task files generated from role
   context packets.
 - `docs/codex_task_execution.md` explains safe manual execution of generated

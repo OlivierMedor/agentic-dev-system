@@ -1,0 +1,31 @@
+test_layers_version: 1
+unit_tests:
+  required: true
+  action: add_or_update
+  frequency: every_commit
+  evidence_or_reason: Add deterministic tests that validate runtime-config defaults,
+    required agents, docs_agent provider, role model tiers, optional local helper
+    micro mode, cloud_reviewer manual provider, and Codex task model recommendations.
+integration_tests:
+  required: true
+  action: confirm_existing
+  frequency: every_pull_request
+  evidence_or_reason: Existing runtime-config CLI and codex-task tests exercise config
+    validation and task generation without model calls.
+mock_e2e_tests:
+  required: true
+  action: confirm_existing
+  frequency: before_merge
+  evidence_or_reason: Existing workflow-run and story generation checks exercise generated
+    story workspace behavior without invoking agents or models.
+live_read_only_checks:
+  required: false
+  action: not_applicable_with_reason
+  frequency: manual_only
+  evidence_or_reason: Runtime defaults and docs are local deterministic files and
+    do not need live services.
+remote_dev_smoke_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: after_remote_dev_deploy
+  evidence_or_reason: This story does not deploy to a remote dev environment.

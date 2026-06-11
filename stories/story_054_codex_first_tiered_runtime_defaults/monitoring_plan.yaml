@@ -1,0 +1,14 @@
+logs_required: true
+watch_for:
+- missing_runtime_config_default
+- docs_agent_left_on_local_model_optional
+- wrong_worker_model_tier
+- wrong_high_risk_model_tier
+- missing_optional_gemma_micro_helper
+- missing_codex_task_model_recommendation
+- automatic_codex_execution
+- cloud_model_call
+- local_model_call
+- committed_generated_runtime_artifact
+- automatic_commit_or_merge
+- deployment_call

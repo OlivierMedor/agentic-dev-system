@@ -6,6 +6,7 @@ those packets into copy/paste-ready instructions.
 
 For the manual operator flow that runs those files safely one role at a time,
 see `docs/codex_task_execution.md`.
+For the runtime tier policy, see `docs/runtime_config.md`.
 
 ## Command
 
@@ -21,6 +22,10 @@ Useful options:
 - `--project PATH` points at another project folder.
 - `--force` overwrites existing task files.
 - `--model MODEL_NAME` writes a task-level model recommendation.
+
+Without `--model`, recommendations come from `.agentic/agent_runtime.yaml`.
+Blueprints define story scope; they are not the source of truth for provider or
+model assignment.
 
 The command reads role context packets from:
 
@@ -66,6 +71,26 @@ Each task file includes:
 
 The model recommendation is only written into the task file. The command does
 not switch the active Codex model.
+
+Default model tiers are:
+
+```text
+research_agent           gpt-5.4-mini (codex)
+planner_agent            gpt-5.4 (codex)
+developer_agent          gpt-5.4 (codex)
+test_agent               gpt-5.4 (codex)
+docs_agent               gpt-5.4-mini (codex)
+security_quality_agent   gpt-5.5 (codex)
+local_reviewer_agent     gpt-5.5 (codex)
+cloud_reviewer           main_cloud_model (manual_cloud_model)
+local_model_helper       gemma-4-26b (local_model_optional), prompt_mode micro
+```
+
+`gpt-5.4` is the normal worker tier for planning, implementation, and tests.
+`gpt-5.4-mini` is used for lighter research, documentation, reporting, and
+summarization. `gpt-5.5` is reserved for high-risk security, final local review,
+DeFi, risk-sensitive work, and final judgment. Gemma remains optional for
+micro-mode local draft help only.
 
 Recommended execution order comes from `agent_plan.yaml` when `execution_order`
 is present. If it is missing, the command uses the standard order:

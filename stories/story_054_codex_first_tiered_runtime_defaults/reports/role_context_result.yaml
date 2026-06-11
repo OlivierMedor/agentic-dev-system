@@ -1,0 +1,126 @@
+story: story_054_codex_first_tiered_runtime_defaults
+agents_built:
+- research_agent
+- planner_agent
+- developer_agent
+- test_agent
+- docs_agent
+- security_quality_agent
+- local_reviewer_agent
+target_characters: 8000
+status: CONTEXT_READY
+context_packets:
+- agent: research_agent
+  path: stories/story_054_codex_first_tiered_runtime_defaults/reports/role_context/research_agent_context.md
+  status: written
+  estimated_character_count: 5727
+  included_files:
+  - stories/story_054_codex_first_tiered_runtime_defaults/story.md
+  - stories/story_054_codex_first_tiered_runtime_defaults/status.yaml
+  - stories/story_054_codex_first_tiered_runtime_defaults/agent_plan.yaml
+  - stories/story_054_codex_first_tiered_runtime_defaults/instructions/research_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  skipped_files: []
+  warnings: []
+- agent: planner_agent
+  path: stories/story_054_codex_first_tiered_runtime_defaults/reports/role_context/planner_agent_context.md
+  status: written
+  estimated_character_count: 6580
+  included_files:
+  - stories/story_054_codex_first_tiered_runtime_defaults/story.md
+  - stories/story_054_codex_first_tiered_runtime_defaults/status.yaml
+  - stories/story_054_codex_first_tiered_runtime_defaults/agent_plan.yaml
+  - stories/story_054_codex_first_tiered_runtime_defaults/instructions/planner_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  skipped_files: []
+  warnings: []
+- agent: developer_agent
+  path: stories/story_054_codex_first_tiered_runtime_defaults/reports/role_context/developer_agent_context.md
+  status: written
+  estimated_character_count: 7410
+  included_files:
+  - stories/story_054_codex_first_tiered_runtime_defaults/story.md
+  - stories/story_054_codex_first_tiered_runtime_defaults/status.yaml
+  - stories/story_054_codex_first_tiered_runtime_defaults/agent_plan.yaml
+  - stories/story_054_codex_first_tiered_runtime_defaults/instructions/developer_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  - stories/story_054_codex_first_tiered_runtime_defaults/story_runbook.md
+  skipped_files:
+  - stories/story_054_codex_first_tiered_runtime_defaults/reports/planner_report.md
+  - stories/story_054_codex_first_tiered_runtime_defaults/reports/research_report.md
+  - stories/story_054_codex_first_tiered_runtime_defaults/review_bundle/*
+  warnings: []
+- agent: test_agent
+  path: stories/story_054_codex_first_tiered_runtime_defaults/reports/role_context/test_agent_context.md
+  status: written
+  estimated_character_count: 6998
+  included_files:
+  - stories/story_054_codex_first_tiered_runtime_defaults/story.md
+  - stories/story_054_codex_first_tiered_runtime_defaults/status.yaml
+  - stories/story_054_codex_first_tiered_runtime_defaults/agent_plan.yaml
+  - stories/story_054_codex_first_tiered_runtime_defaults/instructions/test_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  - stories/story_054_codex_first_tiered_runtime_defaults/test_plan.yaml
+  - stories/story_054_codex_first_tiered_runtime_defaults/reports/developer_report.md
+  skipped_files: []
+  warnings: []
+- agent: docs_agent
+  path: stories/story_054_codex_first_tiered_runtime_defaults/reports/role_context/docs_agent_context.md
+  status: written
+  estimated_character_count: 5272
+  included_files:
+  - stories/story_054_codex_first_tiered_runtime_defaults/story.md
+  - stories/story_054_codex_first_tiered_runtime_defaults/status.yaml
+  - stories/story_054_codex_first_tiered_runtime_defaults/agent_plan.yaml
+  - stories/story_054_codex_first_tiered_runtime_defaults/instructions/docs_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  skipped_files: []
+  warnings: []
+- agent: security_quality_agent
+  path: stories/story_054_codex_first_tiered_runtime_defaults/reports/role_context/security_quality_agent_context.md
+  status: written
+  estimated_character_count: 6441
+  included_files:
+  - stories/story_054_codex_first_tiered_runtime_defaults/story.md
+  - stories/story_054_codex_first_tiered_runtime_defaults/status.yaml
+  - stories/story_054_codex_first_tiered_runtime_defaults/agent_plan.yaml
+  - stories/story_054_codex_first_tiered_runtime_defaults/instructions/security_quality_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  - .gitignore
+  skipped_files:
+  - stories/story_054_codex_first_tiered_runtime_defaults/reports/quality_gate_result.yaml
+  - stories/story_054_codex_first_tiered_runtime_defaults/reports/finalize_story_result.yaml
+  warnings: []
+- agent: local_reviewer_agent
+  path: stories/story_054_codex_first_tiered_runtime_defaults/reports/role_context/local_reviewer_agent_context.md
+  status: written
+  estimated_character_count: 6966
+  included_files:
+  - stories/story_054_codex_first_tiered_runtime_defaults/story.md
+  - stories/story_054_codex_first_tiered_runtime_defaults/status.yaml
+  - stories/story_054_codex_first_tiered_runtime_defaults/agent_plan.yaml
+  - stories/story_054_codex_first_tiered_runtime_defaults/instructions/local_reviewer_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  - stories/story_054_codex_first_tiered_runtime_defaults/reports/developer_report.md
+  - stories/story_054_codex_first_tiered_runtime_defaults/reports/test_report.md
+  skipped_files:
+  - stories/story_054_codex_first_tiered_runtime_defaults/reports/test_layer_result.yaml
+  - stories/story_054_codex_first_tiered_runtime_defaults/reports/quality_gate_result.yaml
+  - stories/story_054_codex_first_tiered_runtime_defaults/reports/finalize_story_result.yaml
+  - stories/story_054_codex_first_tiered_runtime_defaults/review_bundle/handoff.md
+  warnings: []
+warnings: []
+failed_checks: []
+safety_flags:
+  called_cloud_models: false
+  called_local_models: false
+  executed_agents: false
+  committed_or_merged: false
+  deployed: false

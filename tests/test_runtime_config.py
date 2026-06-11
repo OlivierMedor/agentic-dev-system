@@ -6,6 +6,7 @@ import yaml
 from agentic_dev.cli import main
 from agentic_dev.prompt_pack import generate_prompt_pack
 from agentic_dev.runtime_config import (
+    REQUIRED_AGENT_IDS,
     default_runtime_config_text,
     show_runtime_config,
     validate_runtime_config,
@@ -105,6 +106,9 @@ def test_init_project_creates_default_runtime_config(tmp_path: Path) -> None:
     assert "cloud_reviewer:" in config_text
     assert "provider: manual_cloud_model" in config_text
     assert "provider: local_model_optional" in config_text
+    config = yaml.safe_load(config_text)
+    assert config["agents"]["docs_agent"]["provider"] == "codex"
+    assert config["agents"]["local_model_helper"]["provider"] == "local_model_optional"
 
 
 def test_validate_runtime_config_passes_for_valid_config(tmp_path: Path) -> None:
@@ -114,6 +118,36 @@ def test_validate_runtime_config_passes_for_valid_config(tmp_path: Path) -> None
 
     assert result.config_path == config_path.resolve()
     assert result.config["agents"]["cloud_reviewer"]["provider"] == "manual_cloud_model"
+
+
+def test_default_runtime_config_uses_codex_first_tiered_defaults(tmp_path: Path) -> None:
+    write_runtime_config(tmp_path)
+
+    result = validate_runtime_config(tmp_path)
+    agents = result.config["agents"]
+
+    for agent_id in REQUIRED_AGENT_IDS:
+        assert agent_id in agents
+
+    assert agents["research_agent"]["provider"] == "codex"
+    assert agents["research_agent"]["model"] == "gpt-5.4-mini"
+    assert agents["planner_agent"]["provider"] == "codex"
+    assert agents["planner_agent"]["model"] == "gpt-5.4"
+    assert agents["developer_agent"]["provider"] == "codex"
+    assert agents["developer_agent"]["model"] == "gpt-5.4"
+    assert agents["test_agent"]["provider"] == "codex"
+    assert agents["test_agent"]["model"] == "gpt-5.4"
+    assert agents["docs_agent"]["provider"] == "codex"
+    assert agents["docs_agent"]["model"] == "gpt-5.4-mini"
+    assert agents["security_quality_agent"]["provider"] == "codex"
+    assert agents["security_quality_agent"]["model"] == "gpt-5.5"
+    assert agents["local_reviewer_agent"]["provider"] == "codex"
+    assert agents["local_reviewer_agent"]["model"] == "gpt-5.5"
+    assert agents["cloud_reviewer"]["provider"] == "manual_cloud_model"
+    assert agents["cloud_reviewer"]["model"] == "main_cloud_model"
+    assert agents["local_model_helper"]["provider"] == "local_model_optional"
+    assert agents["local_model_helper"]["model"] == "gemma-4-26b"
+    assert agents["local_model_helper"]["prompt_mode"] == "micro"
 
 
 def test_validate_runtime_config_fails_for_missing_required_agent(tmp_path: Path) -> None:
