@@ -7,6 +7,7 @@ from agentic_dev.agent_assignment import assign_agents
 from agentic_dev.artifact_policy import check_artifact_policy, format_artifact_policy_report
 from agentic_dev.cloud_review_packet import create_cloud_review_packet
 from agentic_dev.cloud_review_result import record_cloud_review
+from agentic_dev.codex_runtime import create_codex_tasks
 from agentic_dev.finalize_story import finalize_story
 from agentic_dev.feature_scan import create_feature_scan_packet, record_feature_suggestions
 from agentic_dev.improvement_scan import (
@@ -631,6 +632,49 @@ def main() -> None:
         type=int,
         default=DEFAULT_ROLE_CONTEXT_TARGET_CHARACTERS,
         help="Target maximum characters per context packet. Defaults to 8000.",
+    )
+
+    codex_task_parser = subparsers.add_parser(
+        "codex-task",
+        help="Create Codex-ready task files from role context packets.",
+    )
+    codex_task_subparsers = codex_task_parser.add_subparsers(
+        dest="codex_task_command",
+        required=True,
+    )
+
+    codex_task_create_parser = codex_task_subparsers.add_parser(
+        "create",
+        help="Create Codex-ready task files for one or all assigned agents.",
+    )
+    codex_task_create_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    codex_task_create_parser.add_argument(
+        "--story",
+        required=True,
+        help="Story folder name under the project's stories folder.",
+    )
+    codex_task_create_parser.add_argument(
+        "--agent",
+        help="Create a Codex task for one agent ID.",
+    )
+    codex_task_create_parser.add_argument(
+        "--all",
+        action="store_true",
+        help="Create Codex tasks for every role context packet. Defaults to all when --agent is omitted.",
+    )
+    codex_task_create_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing Codex task files.",
+    )
+    codex_task_create_parser.add_argument(
+        "--model",
+        help="Write this model recommendation into the task file instead of reading runtime config.",
     )
 
     project_status_parser = subparsers.add_parser(
@@ -1463,6 +1507,18 @@ def main() -> None:
                 target_chars=args.target_chars,
             )
             print(result.terminal_summary)
+
+        if args.command == "codex-task":
+            if args.codex_task_command == "create":
+                result = create_codex_tasks(
+                    args.project,
+                    args.story,
+                    agent=args.agent,
+                    all_agents=args.all,
+                    force=args.force,
+                    model=args.model,
+                )
+                print(result.terminal_summary)
 
         if args.command == "project-status":
             result = run_project_status(args.project, args.story)

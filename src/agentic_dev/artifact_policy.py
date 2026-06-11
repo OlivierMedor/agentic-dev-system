@@ -125,6 +125,15 @@ def find_artifact_policy_violations(tracked_files: list[str]) -> list[ArtifactPo
             )
             continue
 
+        if is_codex_task_output_path(parts, filename):
+            violations.append(
+                ArtifactPolicyViolation(
+                    path=normalized_path,
+                    reason="Codex task runtime file is tracked",
+                ),
+            )
+            continue
+
         if is_local_model_raw_response_path(parts, filename):
             violations.append(
                 ArtifactPolicyViolation(
@@ -277,6 +286,18 @@ def is_role_context_output_path(parts: list[str], filename: str) -> bool:
     )
 
 
+def is_codex_task_output_path(parts: list[str], filename: str) -> bool:
+    if filename == ".gitkeep":
+        return False
+
+    return (
+        len(parts) >= 5
+        and parts[0] == "stories"
+        and parts[2] == "reports"
+        and parts[3] == "codex_tasks"
+    )
+
+
 def is_local_model_raw_response_path(parts: list[str], filename: str) -> bool:
     return filename.endswith("_raw_response.json")
 
@@ -357,8 +378,9 @@ def format_artifact_policy_report(result: ArtifactPolicyResult) -> str:
         "",
         "Tracked files must not include generated review artifacts, support queue runtime files, "
         "queue runtime files, feature scan runtime files, local model scorecard results, "
-        "local agent draft outputs, local model raw responses, local model scorecard scoring "
-        "artifacts, zip files, environment files, or private operator guidance.",
+        "local agent draft outputs, role context packets, Codex task runtime files, local model "
+        "raw responses, local model scorecard scoring artifacts, zip files, environment files, "
+        "or private operator guidance.",
         "",
         "Violations:",
     ]

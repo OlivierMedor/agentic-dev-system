@@ -1,0 +1,126 @@
+story: story_052_codex_runtime_connector
+agents_built:
+- research_agent
+- planner_agent
+- developer_agent
+- test_agent
+- docs_agent
+- security_quality_agent
+- local_reviewer_agent
+target_characters: 8000
+status: CONTEXT_READY
+context_packets:
+- agent: research_agent
+  path: stories/story_052_codex_runtime_connector/reports/role_context/research_agent_context.md
+  status: written
+  estimated_character_count: 5580
+  included_files:
+  - stories/story_052_codex_runtime_connector/story.md
+  - stories/story_052_codex_runtime_connector/status.yaml
+  - stories/story_052_codex_runtime_connector/agent_plan.yaml
+  - stories/story_052_codex_runtime_connector/instructions/research_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  skipped_files: []
+  warnings: []
+- agent: planner_agent
+  path: stories/story_052_codex_runtime_connector/reports/role_context/planner_agent_context.md
+  status: written
+  estimated_character_count: 7079
+  included_files:
+  - stories/story_052_codex_runtime_connector/story.md
+  - stories/story_052_codex_runtime_connector/status.yaml
+  - stories/story_052_codex_runtime_connector/agent_plan.yaml
+  - stories/story_052_codex_runtime_connector/instructions/planner_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  skipped_files: []
+  warnings: []
+- agent: developer_agent
+  path: stories/story_052_codex_runtime_connector/reports/role_context/developer_agent_context.md
+  status: written
+  estimated_character_count: 7254
+  included_files:
+  - stories/story_052_codex_runtime_connector/story.md
+  - stories/story_052_codex_runtime_connector/status.yaml
+  - stories/story_052_codex_runtime_connector/agent_plan.yaml
+  - stories/story_052_codex_runtime_connector/instructions/developer_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  - stories/story_052_codex_runtime_connector/story_runbook.md
+  skipped_files:
+  - stories/story_052_codex_runtime_connector/reports/planner_report.md
+  - stories/story_052_codex_runtime_connector/reports/research_report.md
+  - stories/story_052_codex_runtime_connector/review_bundle/*
+  warnings: []
+- agent: test_agent
+  path: stories/story_052_codex_runtime_connector/reports/role_context/test_agent_context.md
+  status: written
+  estimated_character_count: 6317
+  included_files:
+  - stories/story_052_codex_runtime_connector/story.md
+  - stories/story_052_codex_runtime_connector/status.yaml
+  - stories/story_052_codex_runtime_connector/agent_plan.yaml
+  - stories/story_052_codex_runtime_connector/instructions/test_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  - stories/story_052_codex_runtime_connector/test_plan.yaml
+  skipped_files:
+  - stories/story_052_codex_runtime_connector/reports/developer_report.md
+  warnings: []
+- agent: docs_agent
+  path: stories/story_052_codex_runtime_connector/reports/role_context/docs_agent_context.md
+  status: written
+  estimated_character_count: 5190
+  included_files:
+  - stories/story_052_codex_runtime_connector/story.md
+  - stories/story_052_codex_runtime_connector/status.yaml
+  - stories/story_052_codex_runtime_connector/agent_plan.yaml
+  - stories/story_052_codex_runtime_connector/instructions/docs_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  skipped_files: []
+  warnings: []
+- agent: security_quality_agent
+  path: stories/story_052_codex_runtime_connector/reports/role_context/security_quality_agent_context.md
+  status: written
+  estimated_character_count: 6368
+  included_files:
+  - stories/story_052_codex_runtime_connector/story.md
+  - stories/story_052_codex_runtime_connector/status.yaml
+  - stories/story_052_codex_runtime_connector/agent_plan.yaml
+  - stories/story_052_codex_runtime_connector/instructions/security_quality_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  - .gitignore
+  skipped_files:
+  - stories/story_052_codex_runtime_connector/reports/quality_gate_result.yaml
+  - stories/story_052_codex_runtime_connector/reports/finalize_story_result.yaml
+  warnings: []
+- agent: local_reviewer_agent
+  path: stories/story_052_codex_runtime_connector/reports/role_context/local_reviewer_agent_context.md
+  status: written
+  estimated_character_count: 6406
+  included_files:
+  - stories/story_052_codex_runtime_connector/story.md
+  - stories/story_052_codex_runtime_connector/status.yaml
+  - stories/story_052_codex_runtime_connector/agent_plan.yaml
+  - stories/story_052_codex_runtime_connector/instructions/local_reviewer_agent.md
+  - .agentic/rules.yaml
+  - .agentic/agent_runtime.yaml
+  skipped_files:
+  - stories/story_052_codex_runtime_connector/reports/developer_report.md
+  - stories/story_052_codex_runtime_connector/reports/test_report.md
+  - stories/story_052_codex_runtime_connector/reports/test_layer_result.yaml
+  - stories/story_052_codex_runtime_connector/reports/quality_gate_result.yaml
+  - stories/story_052_codex_runtime_connector/reports/finalize_story_result.yaml
+  - stories/story_052_codex_runtime_connector/review_bundle/handoff.md
+  warnings: []
+warnings: []
+failed_checks: []
+safety_flags:
+  called_cloud_models: false
+  called_local_models: false
+  executed_agents: false
+  committed_or_merged: false
+  deployed: false

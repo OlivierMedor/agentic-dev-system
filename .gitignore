@@ -34,6 +34,8 @@ stories/**/reports/local_agent_context/*
 !stories/**/reports/local_agent_context/.gitkeep
 stories/**/reports/role_context/*
 !stories/**/reports/role_context/.gitkeep
+stories/**/reports/codex_tasks/*
+!stories/**/reports/codex_tasks/.gitkeep
 .agentic/support_queue/**/*.yaml
 .agentic/support_queue/**/*.md
 !.agentic/support_queue/**/.gitkeep

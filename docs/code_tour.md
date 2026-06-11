@@ -97,6 +97,8 @@ Important pieces:
   check review evidence.
 - `role_context.py` builds focused role-specific context packets from story
   files, agent plans, rules, and local evidence.
+- `codex_runtime.py` turns role context packets into Codex-ready task files
+  without invoking Codex.
 - Queue modules such as `support_queue.py` and `queue_management.py` manage
   local follow-up work.
 
@@ -117,6 +119,8 @@ A typical story contains:
 - `reports/` for developer, test, finalize, and review evidence.
 - `reports/role_context/` for generated role-specific context packets that
   normally keep only `.gitkeep` tracked.
+- `reports/codex_tasks/` for generated Codex task files that normally keep
+  only `.gitkeep` tracked.
 - `review_bundle/`, `cloud_review_packet/`, and `remote_dev_validation/` as
   generated artifact folders that normally keep only `.gitkeep` tracked.
 

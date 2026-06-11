@@ -102,6 +102,7 @@ docker compose run --rm dev agentic generate-stories
 docker compose run --rm dev agentic workflow-run --story STORY_SLUG --phase prepare --execute
 docker compose run --rm dev agentic next-step --story STORY_SLUG
 docker compose run --rm dev agentic build-context --story STORY_SLUG --all --force
+docker compose run --rm dev agentic codex-task create --story STORY_SLUG --all --force
 docker compose run --rm dev agentic workflow-run --story STORY_SLUG --phase local-finalize --execute
 docker compose run --rm dev agentic workflow-run --story STORY_SLUG --phase cloud-review-prep --execute
 docker compose run --rm dev agentic record-cloud-review --story STORY_SLUG --result-file OUTPUT_FILE
@@ -186,6 +187,8 @@ local models may need micro mode, slim mode, a stronger configured agent
 runtime, or a story split; they are not automatic workflow failures.
 Use `docs/role_context_builder.md` to build focused context packets for each
 assigned agent before handing work to a configured runtime.
+Use `docs/codex_runtime.md` to create Codex-ready task files from those role
+context packets without invoking Codex automatically.
 
 For release and repository hygiene, use `docs/public_launch_checklist.md`,
 `docs/release_process.md`, `docs/v0_1_release_checklist.md`,
@@ -234,6 +237,8 @@ That file is ignored and blocked by policy. The public-safe example is
   are small enough for micro-mode local prompts.
 - `docs/role_context_builder.md` explains focused role context packets for
   assigned story agents.
+- `docs/codex_runtime.md` explains Codex-ready task files generated from role
+  context packets.
 - `docs/local_model_scorecard.md` explains how to compare local models on the
   same public-safe agent-style prompts before role assignment.
 - `docs/local_model_role_assignment.md` explains manual local model scoring,
