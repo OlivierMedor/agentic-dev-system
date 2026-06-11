@@ -95,6 +95,8 @@ Important pieces:
   through local workflow phases.
 - `review_bundle.py`, `quality_gate.py`, and `merge_readiness.py` collect and
   check review evidence.
+- `role_context.py` builds focused role-specific context packets from story
+  files, agent plans, rules, and local evidence.
 - Queue modules such as `support_queue.py` and `queue_management.py` manage
   local follow-up work.
 
@@ -113,6 +115,8 @@ A typical story contains:
 - `test_plan.yaml` and `monitoring_plan.yaml` for verification expectations.
 - `agent_plan.yaml`, `instructions/`, and `prompt_pack/` for agent handoff.
 - `reports/` for developer, test, finalize, and review evidence.
+- `reports/role_context/` for generated role-specific context packets that
+  normally keep only `.gitkeep` tracked.
 - `review_bundle/`, `cloud_review_packet/`, and `remote_dev_validation/` as
   generated artifact folders that normally keep only `.gitkeep` tracked.
 

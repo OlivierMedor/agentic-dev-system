@@ -1,0 +1,14 @@
+logs_required: true
+watch_for:
+- missing_story_folder
+- missing_agent_plan
+- missing_instruction_file
+- existing_context_without_force
+- oversized_role_context_packet
+- committed_role_context_packet
+- review_bundle_content_leaked_to_developer_context
+- cloud_review_packet_content_leaked_to_context
+- local_model_call
+- cloud_model_call
+- codex_call
+- agent_prompt_execution
