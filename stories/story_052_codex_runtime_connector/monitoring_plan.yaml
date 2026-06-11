@@ -1,0 +1,11 @@
+logs_required: true
+watch_for:
+- missing_story_folder
+- missing_role_context
+- existing_codex_task_without_force
+- committed_codex_task_file
+- codex_call
+- cloud_model_call
+- github_api_call
+- automatic_commit_or_merge
+- deployment_call

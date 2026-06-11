@@ -1,0 +1,31 @@
+test_layers_version: 1
+unit_tests:
+  required: true
+  action: add_or_update
+  frequency: every_commit
+  evidence_or_reason: Add deterministic tests for task generation, all-agent selection,
+    validation errors, overwrite behavior, required safety text, context inclusion,
+    result YAML, safety flags, and artifact-policy blocking.
+integration_tests:
+  required: true
+  action: add_or_update
+  frequency: every_pull_request
+  evidence_or_reason: CLI wiring is covered through the command path without live
+    Codex, model, or GitHub API calls.
+mock_e2e_tests:
+  required: true
+  action: confirm_existing
+  frequency: before_merge
+  evidence_or_reason: Existing workflow-run coverage exercises generated story workspaces;
+    this command writes local task files and reports only.
+live_read_only_checks:
+  required: false
+  action: not_applicable_with_reason
+  frequency: manual_only
+  evidence_or_reason: The command reads local role context files only and does not
+    need live services.
+remote_dev_smoke_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: after_remote_dev_deploy
+  evidence_or_reason: This story does not deploy to a remote dev environment.

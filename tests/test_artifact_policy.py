@@ -24,6 +24,7 @@ def test_allowed_project_paths_do_not_violate_artifact_policy() -> None:
         "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/.gitkeep",
         "stories/story_047_local_agent_prompt_slimming/reports/local_agent_context/.gitkeep",
         "stories/story_051_role_specific_context_builder/reports/role_context/.gitkeep",
+        "stories/story_052_codex_runtime_connector/reports/codex_tasks/.gitkeep",
         ".agentic/improvement_queue/pending/.gitkeep",
         ".agentic/maintenance_queue/pending/.gitkeep",
         ".agentic/feature_queue/pending/.gitkeep",
@@ -151,6 +152,20 @@ def test_role_context_packets_are_blocked_except_gitkeep() -> None:
     ) == blocked_paths
 
 
+def test_codex_task_files_are_blocked_except_gitkeep() -> None:
+    blocked_paths = [
+        "stories/story_052_codex_runtime_connector/reports/codex_tasks/developer_agent_codex_task.md",
+        "stories/story_052_codex_runtime_connector/reports/codex_tasks/test_agent_codex_task.md",
+    ]
+
+    assert violation_paths(
+        [
+            *blocked_paths,
+            "stories/story_052_codex_runtime_connector/reports/codex_tasks/.gitkeep",
+        ],
+    ) == blocked_paths
+
+
 def test_local_model_raw_response_files_are_blocked() -> None:
     blocked_paths = [
         "reports/debug_docs_agent_prompt_raw_response.json",
@@ -199,6 +214,7 @@ def test_multiple_violations_are_all_reported() -> None:
         ".agentic/local_model_scorecard/results/qwen3/run_summary.md",
         "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/docs_agent_gemma-4-26b_draft.md",
         "stories/story_051_role_specific_context_builder/reports/role_context/developer_agent_context.md",
+        "stories/story_052_codex_runtime_connector/reports/codex_tasks/developer_agent_codex_task.md",
         "reports/debug_docs_agent_prompt_raw_response.json",
         "reports/local_model_scorecard_report.md",
         ".agentic/local_model_scorecard/scorecard_scores.yaml",
@@ -217,6 +233,7 @@ def test_multiple_violations_are_all_reported() -> None:
         ".agentic/local_model_scorecard/results/qwen3/run_summary.md",
         "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/docs_agent_gemma-4-26b_draft.md",
         "stories/story_051_role_specific_context_builder/reports/role_context/developer_agent_context.md",
+        "stories/story_052_codex_runtime_connector/reports/codex_tasks/developer_agent_codex_task.md",
         "reports/debug_docs_agent_prompt_raw_response.json",
         "reports/local_model_scorecard_report.md",
         ".agentic/local_model_scorecard/scorecard_scores.yaml",
