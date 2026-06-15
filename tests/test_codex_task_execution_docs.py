@@ -33,7 +33,8 @@ def test_codex_task_execution_doc_mentions_required_commands() -> None:
 def test_codex_task_execution_doc_mentions_required_safety_boundaries() -> None:
     guide = GUIDE_PATH.read_text(encoding="utf-8")
 
-    assert "Codex is not invoked automatically" in guide
+    assert "Codex is not invoked automatically by `agentic codex-task create`" in guide
+    assert "Automatic Codex execution requires `codex_runtime.enabled: true`" in guide
     assert "Human approval is required before merge" in guide
     assert "Do not commit generated `codex_tasks`" in guide
     assert "Generated codex_tasks should not be committed" in guide

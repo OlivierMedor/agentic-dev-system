@@ -1,0 +1,15 @@
+logs_required: true
+watch_for:
+  - codex_runtime_enabled_not_detected
+  - unsafe_codex_command_template_accepted
+  - codex_task_run_out_of_order
+  - codex_nonzero_exit_continues_workflow
+  - missing_codex_report_not_detected
+  - existing_report_shortcut_regression
+  - automatic_merge
+  - automatic_push
+  - force_push
+  - deployment_call
+  - pr_creation
+  - github_api_call
+  - arbitrary_story_command_execution

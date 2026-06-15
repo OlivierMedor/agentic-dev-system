@@ -2,7 +2,7 @@
 
 Codex is the primary configured runtime for code-changing work in this project.
 Role context packets keep each agent handoff focused, and Codex task files turn
-those packets into copy/paste-ready instructions.
+those packets into runtime-ready instructions.
 
 For the manual operator flow that runs those files safely one role at a time,
 see `docs/codex_task_execution.md`.
@@ -118,10 +118,46 @@ local_reviewer_agent
 Generated files under `reports/codex_tasks/` are runtime artifacts. They are
 ignored by Git and blocked by artifact-policy except for `.gitkeep`.
 
+`agentic run-story --execute` can invoke Codex only when the safe automatic
+runtime adapter is explicitly enabled:
+
+```yaml
+codex_runtime:
+  enabled: true
+  command: codex
+  args:
+    - exec
+    - --file
+    - "{task_file}"
+  timeout_seconds: 1800
+```
+
+The adapter runs one generated task file at a time with `shell=False`, records
+stdout, stderr, and exit code under `stories/STORY_SLUG/reports/codex_runtime/`,
+requires each role's expected report after Codex exits, and stops before merge.
+The command template is allowlisted; story files cannot provide arbitrary
+commands.
+
+Story 056 adds this safe adapter; it does not install Codex into the Docker
+development image. Docker users must make the Codex CLI available inside the
+`dev` container, or mount/configure a supported runtime that provides the
+allowlisted `codex` command, before setting `codex_runtime.enabled: true`.
+Check from inside Docker with:
+
+```powershell
+docker compose run --rm dev which codex
+```
+
+If that command fails, automatic Codex execution will block safely with
+`BLOCKED_CODEX_COMMAND_NOT_FOUND`. Keep `codex_runtime.enabled: false` and run
+the generated task files manually until Codex is installed or configured in the
+container. Docker Codex installation/configuration is a separate setup step and
+follow-up story, not a story implementation failure.
+
 ## Human Review
 
 The human owner still reviews pull requests and merges manually. Codex task
 files are an operator handoff, not an approval or merge decision.
 
-Future versions may add controlled Codex execution, but this connector only
-prepares task files.
+Controlled Codex execution is limited to the run-story adapter and remains
+disabled by default.

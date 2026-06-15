@@ -1,11 +1,12 @@
 # Codex Task Execution Guide
 
-This guide explains how a human operator can use generated Codex task files
-manually, one role at a time. It is for the current workflow, before any future
-automatic Codex execution exists.
+This guide explains how generated Codex task files are used, either by a human
+operator manually or by `agentic run-story --execute` when the automatic Codex
+runtime adapter is explicitly enabled.
 
-Codex task files are instructions. They are not automatic execution, and the
-`agentic` CLI does not invoke Codex automatically.
+Codex task files are instructions. `agentic codex-task create` only writes task
+files; it does not invoke Codex. Automatic execution is limited to the
+allowlisted `codex_runtime` command template in `.agentic/agent_runtime.yaml`.
 
 ## What Codex Task Files Are
 
@@ -70,7 +71,7 @@ codex-task create
 codex_tasks/*.md
   |
   v
-manual Codex role passes
+manual or configured automatic Codex role passes
   |
   v
 reports/
@@ -130,6 +131,32 @@ docker compose run --rm dev agentic workflow-run --story STORY_SLUG --phase clou
 ```
 
 8. Human/cloud review and the merge decision remain manual.
+
+## Automatic Run-Story Flow
+
+When `.agentic/agent_runtime.yaml` contains an enabled safe Codex runtime:
+
+```yaml
+codex_runtime:
+  enabled: true
+  command: codex
+  args:
+    - exec
+    - --file
+    - "{task_file}"
+  timeout_seconds: 1800
+```
+
+the one-command runner can execute the generated task files:
+
+```powershell
+docker compose run --rm dev agentic run-story --story STORY_SLUG --execute
+```
+
+The runner prepares the story, builds role context, creates Codex task files,
+runs one role task at a time, records stdout/stderr/exit code under
+`reports/codex_runtime/`, verifies each expected report exists, runs local
+finalize, runs the quality gate, and stops before merge.
 
 ## Recommended Execution Order
 
@@ -228,6 +255,7 @@ docker compose run --rm dev agentic review-bundle --story STORY_SLUG
 
 - Codex task files are instructions, not automatic execution.
 - Codex is not invoked automatically by `agentic codex-task create`.
+- Automatic Codex execution requires `codex_runtime.enabled: true`.
 - Do not run all task files blindly.
 - Run Developer before Test.
 - Run Local Reviewer last.

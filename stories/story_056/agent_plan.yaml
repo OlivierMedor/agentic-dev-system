@@ -1,0 +1,22 @@
+story: story_056
+status: pending_execution
+execution_order:
+  - developer_agent
+  - test_agent
+  - local_reviewer_agent
+assigned_agents:
+  - id: developer_agent
+    display_name: Developer Agent
+    responsibility: Implement the automatic Codex runtime adapter and config validation.
+    instruction_file: instructions/developer_agent.md
+    expected_output: reports/developer_report.md
+  - id: test_agent
+    display_name: Test Agent
+    responsibility: Verify runner behavior, runtime config validation, safety flags, and docs.
+    instruction_file: instructions/test_agent.md
+    expected_output: reports/test_report.md
+  - id: local_reviewer_agent
+    display_name: Local Reviewer Agent
+    responsibility: Review local evidence and confirm the story is ready for human review.
+    instruction_file: instructions/local_reviewer_agent.md
+    expected_output: reports/local_review_report.md

@@ -42,6 +42,10 @@ RISKY_COMMAND_REQUIREMENTS = {
     "secret changes": "secret changes",
 }
 
+CODEX_RUNTIME_ALLOWED_COMMANDS = {"codex", "codex.cmd"}
+CODEX_RUNTIME_REQUIRED_ARGS = ["exec", "--file", "{task_file}"]
+MAX_CODEX_RUNTIME_TIMEOUT_SECONDS = 7200
+
 DEFAULT_RUNTIME_CONFIG = """agents:
   research_agent:
     provider: codex
@@ -147,6 +151,15 @@ local_model_runtime:
   max_output_tokens: 4096
   temperature: 0.2
 
+codex_runtime:
+  enabled: false
+  command: codex
+  args:
+    - exec
+    - --file
+    - "{task_file}"
+  timeout_seconds: 1800
+
 local_model_profiles:
   lm_studio:
     base_url: http://host.docker.internal:1234/v1
@@ -168,6 +181,14 @@ class IndentedYamlDumper(yaml.SafeDumper):
 class RuntimeConfigValidationResult:
     config_path: Path
     config: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class CodexRuntimeConfig:
+    enabled: bool
+    command: str
+    args: list[str]
+    timeout_seconds: int
 
 
 def runtime_config_path(project_path: Path) -> Path:
@@ -275,10 +296,90 @@ def validate_runtime_config(project_path: Path) -> RuntimeConfigValidationResult
                 f"'{label}'."
             )
 
+    parse_codex_runtime_config(config.get("codex_runtime"), errors)
+
     if errors:
         raise ValueError("Runtime config validation failed:\n- " + "\n- ".join(errors))
 
     return RuntimeConfigValidationResult(config_path=config_path, config=config)
+
+
+def load_codex_runtime_config(project_path: Path) -> tuple[Path, CodexRuntimeConfig]:
+    config_path, config = load_runtime_config(project_path)
+    section = config.get("codex_runtime")
+    errors: list[str] = []
+    parsed = parse_codex_runtime_config(section, errors)
+
+    if section is None:
+        raise ValueError("codex_runtime must be configured before invoking Codex.")
+
+    if errors or parsed is None:
+        raise ValueError("Codex runtime validation failed:\n- " + "\n- ".join(errors))
+
+    if not parsed.enabled:
+        raise ValueError("codex_runtime.enabled must be true before invoking Codex.")
+
+    return config_path, parsed
+
+
+def parse_codex_runtime_config(
+    section: Any,
+    errors: list[str],
+) -> CodexRuntimeConfig | None:
+    if section is None:
+        return None
+
+    if not isinstance(section, dict):
+        errors.append("codex_runtime must be a mapping.")
+        return None
+
+    enabled = section.get("enabled")
+    command = section.get("command")
+    args = section.get("args")
+    timeout_seconds = section.get("timeout_seconds")
+
+    if not isinstance(enabled, bool):
+        errors.append("codex_runtime.enabled must be a boolean.")
+
+    if not isinstance(command, str) or not command.strip():
+        errors.append("codex_runtime.command must be a non-empty string.")
+        command = ""
+    else:
+        command = command.strip()
+        if command not in CODEX_RUNTIME_ALLOWED_COMMANDS:
+            allowed = ", ".join(sorted(CODEX_RUNTIME_ALLOWED_COMMANDS))
+            errors.append(f"codex_runtime.command must be one of: {allowed}.")
+
+    if not isinstance(args, list) or not all(isinstance(item, str) for item in args):
+        errors.append("codex_runtime.args must be a list of strings.")
+        args = []
+    elif args != CODEX_RUNTIME_REQUIRED_ARGS:
+        errors.append(
+            "codex_runtime.args must be exactly: "
+            + " ".join(CODEX_RUNTIME_REQUIRED_ARGS)
+            + "."
+        )
+
+    if not isinstance(timeout_seconds, int) or isinstance(timeout_seconds, bool):
+        errors.append("codex_runtime.timeout_seconds must be an integer.")
+        timeout_seconds = 0
+    elif timeout_seconds <= 0:
+        errors.append("codex_runtime.timeout_seconds must be greater than 0.")
+    elif timeout_seconds > MAX_CODEX_RUNTIME_TIMEOUT_SECONDS:
+        errors.append(
+            "codex_runtime.timeout_seconds must be less than or equal to "
+            f"{MAX_CODEX_RUNTIME_TIMEOUT_SECONDS}."
+        )
+
+    if errors:
+        return None
+
+    return CodexRuntimeConfig(
+        enabled=enabled,
+        command=command,
+        args=list(args),
+        timeout_seconds=timeout_seconds,
+    )
 
 
 def mapping_value(
