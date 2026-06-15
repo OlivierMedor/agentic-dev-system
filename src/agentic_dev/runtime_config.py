@@ -43,7 +43,8 @@ RISKY_COMMAND_REQUIREMENTS = {
 }
 
 CODEX_RUNTIME_ALLOWED_COMMANDS = {"codex", "codex.cmd"}
-CODEX_RUNTIME_REQUIRED_ARGS = ["exec", "--file", "{task_file}"]
+CODEX_RUNTIME_REQUIRED_ARGS = ["exec", "-"]
+CODEX_RUNTIME_REQUIRED_STDIN_FROM_TASK_FILE = True
 MAX_CODEX_RUNTIME_TIMEOUT_SECONDS = 7200
 
 DEFAULT_RUNTIME_CONFIG = """agents:
@@ -156,8 +157,8 @@ codex_runtime:
   command: codex
   args:
     - exec
-    - --file
-    - "{task_file}"
+    - "-"
+  stdin_from_task_file: true
   timeout_seconds: 1800
 
 local_model_profiles:
@@ -188,6 +189,7 @@ class CodexRuntimeConfig:
     enabled: bool
     command: str
     args: list[str]
+    stdin_from_task_file: bool
     timeout_seconds: int
 
 
@@ -336,6 +338,7 @@ def parse_codex_runtime_config(
     enabled = section.get("enabled")
     command = section.get("command")
     args = section.get("args")
+    stdin_from_task_file = section.get("stdin_from_task_file")
     timeout_seconds = section.get("timeout_seconds")
 
     if not isinstance(enabled, bool):
@@ -360,6 +363,9 @@ def parse_codex_runtime_config(
             + "."
         )
 
+    if stdin_from_task_file is not CODEX_RUNTIME_REQUIRED_STDIN_FROM_TASK_FILE:
+        errors.append("codex_runtime.stdin_from_task_file must be true.")
+
     if not isinstance(timeout_seconds, int) or isinstance(timeout_seconds, bool):
         errors.append("codex_runtime.timeout_seconds must be an integer.")
         timeout_seconds = 0
@@ -378,6 +384,7 @@ def parse_codex_runtime_config(
         enabled=enabled,
         command=command,
         args=list(args),
+        stdin_from_task_file=stdin_from_task_file,
         timeout_seconds=timeout_seconds,
     )
 

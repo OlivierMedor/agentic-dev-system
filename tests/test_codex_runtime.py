@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -327,7 +328,8 @@ def test_missing_codex_command_blocks_with_runtime_environment_guidance(
     config = CodexRuntimeConfig(
         enabled=True,
         command="codex",
-        args=["exec", "--file", "{task_file}"],
+        args=["exec", "-"],
+        stdin_from_task_file=True,
         timeout_seconds=1800,
     )
 
@@ -353,6 +355,53 @@ def test_missing_codex_command_blocks_with_runtime_environment_guidance(
     assert "runtime setup problem, not a story implementation failure" in result.summary
     assert result.stderr_path is not None
     assert result.summary in result.stderr_path.read_text(encoding="utf-8")
+
+
+def test_runtime_passes_task_file_content_to_codex_stdin_with_shell_false(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task_file = tmp_path / "developer_agent_codex_task.md"
+    expected_report = tmp_path / "reports" / "developer_report.md"
+    runtime_path = tmp_path / "reports" / "codex_runtime"
+    task_file.write_text("task content for stdin\n", encoding="utf-8")
+    config = CodexRuntimeConfig(
+        enabled=True,
+        command="codex",
+        args=["exec", "-"],
+        stdin_from_task_file=True,
+        timeout_seconds=1800,
+    )
+    calls: list[dict[str, object]] = []
+
+    def fake_run(command: list[str], **kwargs: object) -> SimpleNamespace:
+        calls.append({"command": command, **kwargs})
+        return SimpleNamespace(returncode=0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr("agentic_dev.codex_runtime.subprocess.run", fake_run)
+
+    result = run_one_codex_task(
+        project_path=tmp_path,
+        runtime_path=runtime_path,
+        agent_id="developer_agent",
+        config=config,
+        task_file=task_file,
+        expected_report=expected_report,
+    )
+
+    assert result.status == "BLOCKED_MISSING_CODEX_REPORT"
+    assert calls == [
+        {
+            "command": ["codex", "exec", "-"],
+            "cwd": tmp_path,
+            "capture_output": True,
+            "input": "task content for stdin\n",
+            "text": True,
+            "shell": False,
+            "timeout": 1800,
+            "check": False,
+        }
+    ]
 
 
 def test_cli_codex_task_create_defaults_to_all_agents(

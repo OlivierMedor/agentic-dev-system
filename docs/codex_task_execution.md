@@ -142,8 +142,8 @@ codex_runtime:
   command: codex
   args:
     - exec
-    - --file
-    - "{task_file}"
+    - "-"
+  stdin_from_task_file: true
   timeout_seconds: 1800
 ```
 
@@ -154,9 +154,11 @@ docker compose run --rm dev agentic run-story --story STORY_SLUG --execute
 ```
 
 The runner prepares the story, builds role context, creates Codex task files,
-runs one role task at a time, records stdout/stderr/exit code under
-`reports/codex_runtime/`, verifies each expected report exists, runs local
-finalize, runs the quality gate, and stops before merge.
+runs one role task at a time by feeding each task file to `codex exec -` through
+stdin, records stdout/stderr/exit code under `reports/codex_runtime/`, verifies
+each expected report exists, runs local finalize, runs the quality gate, and
+stops before merge. Use this stdin shape unless `codex exec --help` confirms a
+different supported file-input flag.
 
 ## Recommended Execution Order
 

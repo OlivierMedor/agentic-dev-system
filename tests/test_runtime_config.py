@@ -151,9 +151,19 @@ def test_default_runtime_config_uses_codex_first_tiered_defaults(tmp_path: Path)
     assert result.config["codex_runtime"] == {
         "enabled": False,
         "command": "codex",
-        "args": ["exec", "--file", "{task_file}"],
+        "args": ["exec", "-"],
+        "stdin_from_task_file": True,
         "timeout_seconds": 1800,
     }
+
+
+def test_checked_in_runtime_config_keeps_codex_runtime_disabled_by_default() -> None:
+    config = yaml.safe_load(Path(".agentic/agent_runtime.yaml").read_text(encoding="utf-8"))
+
+    assert config["codex_runtime"]["enabled"] is False
+    assert config["codex_runtime"]["command"] == "codex"
+    assert config["codex_runtime"]["args"] == ["exec", "-"]
+    assert config["codex_runtime"]["stdin_from_task_file"] is True
 
 
 def test_validate_runtime_config_fails_for_missing_required_agent(tmp_path: Path) -> None:
@@ -239,13 +249,27 @@ def test_validate_runtime_config_rejects_arbitrary_codex_runtime_args(
 ) -> None:
     config = runtime_config_data()
     config["codex_runtime"]["enabled"] = True
-    config["codex_runtime"]["args"] = ["exec", "--file", "{task_file}", "--dangerous"]
+    config["codex_runtime"]["args"] = ["exec", "--file", "{task_file}"]
     write_runtime_config(tmp_path, config)
 
     with pytest.raises(ValueError) as error:
         validate_runtime_config(tmp_path)
 
     assert "codex_runtime.args must be exactly" in str(error.value)
+
+
+def test_validate_runtime_config_requires_codex_task_file_stdin(
+    tmp_path: Path,
+) -> None:
+    config = runtime_config_data()
+    config["codex_runtime"]["enabled"] = True
+    config["codex_runtime"]["stdin_from_task_file"] = False
+    write_runtime_config(tmp_path, config)
+
+    with pytest.raises(ValueError) as error:
+        validate_runtime_config(tmp_path)
+
+    assert "codex_runtime.stdin_from_task_file must be true" in str(error.value)
 
 
 def test_show_runtime_config_returns_yaml_content(tmp_path: Path) -> None:

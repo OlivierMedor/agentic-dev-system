@@ -1,0 +1,29 @@
+story: story_057
+status: pending_execution
+execution_order:
+  - developer_agent
+  - test_agent
+  - docs_agent
+  - security_quality_agent
+  - local_reviewer_agent
+assigned_agents:
+  - id: developer_agent
+    display_name: Developer Agent
+    responsibility: Configure the Docker dev runtime so the Codex CLI is available safely.
+    expected_output: reports/developer_report.md
+  - id: test_agent
+    display_name: Test Agent
+    responsibility: Verify Docker Codex smoke checks, runtime defaults, policy guards, and regressions.
+    expected_output: reports/test_report.md
+  - id: docs_agent
+    display_name: Docs Agent
+    responsibility: Document Docker Codex setup and credential handling.
+    expected_output: reports/developer_report.md
+  - id: security_quality_agent
+    display_name: Security Quality Agent
+    responsibility: Check that secrets are not committed or baked into the image.
+    expected_output: reports/test_report.md
+  - id: local_reviewer_agent
+    display_name: Local Reviewer Agent
+    responsibility: Review local evidence and decide whether the story is ready for human review.
+    expected_output: reports/local_review_report.md

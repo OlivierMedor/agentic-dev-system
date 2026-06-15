@@ -103,6 +103,15 @@ local_model_runtime:
   max_output_tokens: 4096
   temperature: 0.2
 
+codex_runtime:
+  enabled: false
+  command: codex
+  args:
+    - exec
+    - "-"
+  stdin_from_task_file: true
+  timeout_seconds: 1800
+
 local_model_profiles:
   lm_studio:
     base_url: http://host.docker.internal:1234/v1

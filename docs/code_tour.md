@@ -142,7 +142,9 @@ When adding or changing a feature, look for the matching test file first.
 
 `Dockerfile` and `compose.yml` define the local development environment. They
 make commands repeatable by running Python, pytest, Ruff, and the `agentic` CLI
-inside the same container setup.
+inside the same container setup. The image also installs the Codex CLI; Codex
+auth and config state use the Docker-managed `codex-home` volume, not repo
+files.
 
 Most validation commands use this shape:
 

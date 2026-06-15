@@ -366,13 +366,16 @@ def run_one_codex_task(
     stdout_path = runtime_path / f"{agent_id}_stdout.txt"
     stderr_path = runtime_path / f"{agent_id}_stderr.txt"
     start = time.monotonic()
+    task_input = task_file.read_text(encoding="utf-8") if config.stdin_from_task_file else None
 
     try:
         completed = subprocess.run(
             command,
             cwd=project_path,
             capture_output=True,
+            input=task_input,
             text=True,
+            shell=False,
             timeout=config.timeout_seconds,
             check=False,
         )

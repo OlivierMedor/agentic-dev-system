@@ -175,19 +175,29 @@ def test_execute_uses_enabled_codex_runtime_and_invokes_task_command(
     create_project(tmp_path, runtime_config=codex_runtime_config_text())
     story_path = create_story(tmp_path)
     commands: list[list[str]] = []
+    stdin_payloads: list[str] = []
 
     def fake_run(
         command: list[str],
         *,
         cwd: Path,
         capture_output: bool,
+        input: str | None,
         text: bool,
+        shell: bool,
         timeout: int,
         check: bool,
     ) -> SimpleNamespace:
         commands.append(command)
-        task_file = Path(command[-1])
-        agent_id = task_file.name.removesuffix("_codex_task.md")
+        assert cwd == tmp_path
+        assert capture_output is True
+        assert text is True
+        assert shell is False
+        assert timeout == 1800
+        assert check is False
+        assert input is not None
+        stdin_payloads.append(input)
+        agent_id = input.split("- Agent ID: `", 1)[1].split("`", 1)[0]
         report_name = AGENT_REPORTS[agent_id]
         report_content = "READY_FOR_REVIEW\n" if agent_id == "local_reviewer_agent" else "done\n"
         (story_path / "reports" / report_name).write_text(report_content, encoding="utf-8")
@@ -221,8 +231,8 @@ def test_execute_uses_enabled_codex_runtime_and_invokes_task_command(
 
     assert result.status == "completed"
     assert commands
-    assert commands[0][0:3] == ["codex", "exec", "--file"]
-    assert commands[0][-1].endswith("research_agent_codex_task.md")
+    assert commands[0] == ["codex", "exec", "-"]
+    assert "- Agent ID: `research_agent`" in stdin_payloads[0]
     assert runtime_result["status"] == "PASSED"
     assert runtime_result["safety_flags"]["called_codex"] is True
     assert ("automatic-agent-runtime:codex", "PASSED") in [

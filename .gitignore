@@ -9,6 +9,9 @@ __pycache__/
 .env
 .env.*
 !.env.example
+.codex/
+codex-home/
+codex-auth/
 
 # Private local operator guidance
 blueprints/agentic-architecture.md

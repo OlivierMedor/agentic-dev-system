@@ -4,8 +4,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from agentic_dev.artifact_policy import (
-    is_codex_task_output_path,
     is_codex_runtime_output_path,
+    is_codex_sensitive_state_path,
+    is_codex_task_output_path,
     is_env_file,
     is_feature_scan_runtime_path,
     is_generated_cloud_review_packet_path,
@@ -75,6 +76,9 @@ def public_readiness_violation_reason(
 
     if is_env_file(filename):
         return "environment files and secrets must remain untracked"
+
+    if is_codex_sensitive_state_path(normalized_path, parts):
+        return "Codex auth, config, and local state must remain untracked"
 
     if parts and parts[0] == "review_to_chatgpt":
         return "review_to_chatgpt artifacts must remain untracked"
@@ -194,6 +198,7 @@ def format_public_readiness_report(result: PublicReadinessResult) -> str:
             "",
             "- `blueprints/agentic-architecture.md`",
             "- `.env` and `.env.*` except `.env.example`",
+            "- `.codex/**`, `codex-home/**`, and `codex-auth/**`",
             "- `review_to_chatgpt/**`",
             "- `*.zip`",
             "- `stories/**/review_bundle/*` except `.gitkeep`",
