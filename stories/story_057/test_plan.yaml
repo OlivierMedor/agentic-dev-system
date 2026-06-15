@@ -1,0 +1,32 @@
+test_layers_version: 1
+unit_tests:
+  required: true
+  action: add_or_update
+  frequency: every_commit
+  evidence_or_reason: Add tests for Docker Codex setup docs, disabled runtime
+    defaults, artifact policy, public readiness, and missing-command safety.
+integration_tests:
+  required: true
+  action: confirm_existing
+  frequency: before_merge
+  evidence_or_reason: Run targeted Codex runtime and story runner tests, full
+    pytest, and Ruff through the Docker dev container.
+mock_e2e_tests:
+  required: true
+  action: confirm_existing
+  frequency: before_merge
+  evidence_or_reason: Story runner tests fake Codex subprocess execution and
+    verify safe blocking behavior without calling external services.
+live_read_only_checks:
+  required: true
+  action: confirm_existing
+  frequency: before_merge
+  evidence_or_reason: Run Docker smoke checks for `which codex` and
+    `codex --version`; these verify CLI availability only and do not call
+    GitHub APIs or perform story execution.
+remote_dev_smoke_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: after_remote_dev_deploy
+  evidence_or_reason: This story changes local Docker runtime setup only and
+    does not deploy remote dev infrastructure.

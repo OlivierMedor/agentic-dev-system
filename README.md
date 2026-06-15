@@ -55,14 +55,17 @@ Run these commands from the repository root:
 
 ```powershell
 docker compose build
+docker compose run --rm dev which codex
+docker compose run --rm dev codex --version
 docker compose run --rm dev pytest
 docker compose run --rm dev ruff check .
 docker compose run --rm dev agentic project-status
 docker compose run --rm dev agentic next-step --story story_034_public_launch_prep
 ```
 
-The demo builds the local development container, runs tests and linting, prints
-project status, and asks the CLI what should happen next for an existing story.
+The demo builds the local development container, confirms the Codex CLI is
+available inside Docker, runs tests and linting, prints project status, and asks
+the CLI what should happen next for an existing story.
 
 ## Try The Minimal Demo
 
@@ -198,12 +201,13 @@ Use `docs/codex_task_execution.md` to run generated Codex task files manually or
 through the enabled adapter, one role at a time, without committing generated
 runtime artifacts.
 
-Story 056 adds the safe Codex runtime adapter, not Codex installation inside
-Docker. Before enabling `codex_runtime.enabled` while using the Docker `dev`
-container, verify `docker compose run --rm dev which codex` succeeds. If it
-fails, automatic execution blocks safely with
-`BLOCKED_CODEX_COMMAND_NOT_FOUND`; keep `codex_runtime.enabled: false` and use
-manual task execution until Codex is installed or mounted/configured in Docker.
+The Docker `dev` image installs the Codex CLI. Verify it with
+`docker compose run --rm dev which codex` and
+`docker compose run --rm dev codex --version`. Authentication is not baked into
+the image and credentials are not stored in the repo; see
+`docs/codex_docker_runtime.md` for device-code login, Docker volume storage,
+and one-off `CODEX_API_KEY` usage. If Codex is unavailable, automatic execution
+blocks safely with `BLOCKED_CODEX_COMMAND_NOT_FOUND`.
 
 ## Tiered Codex Runtime Defaults
 
@@ -269,6 +273,8 @@ That file is ignored and blocked by policy. The public-safe example is
   command approval policy.
 - `docs/codex_runtime.md` explains Codex-ready task files generated from role
   context packets.
+- `docs/codex_docker_runtime.md` explains the supported Docker Codex CLI and
+  authentication setup.
 - `docs/codex_task_execution.md` explains safe manual execution of generated
   Codex task files, one role at a time.
 - `docs/local_model_scorecard.md` explains how to compare local models on the

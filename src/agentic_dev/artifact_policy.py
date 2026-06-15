@@ -204,6 +204,16 @@ def find_artifact_policy_violations(tracked_files: list[str]) -> list[ArtifactPo
                     reason="environment file is tracked",
                 ),
             )
+            continue
+
+        if is_codex_sensitive_state_path(normalized_path, parts):
+            violations.append(
+                ArtifactPolicyViolation(
+                    path=normalized_path,
+                    reason="Codex auth/config state is tracked",
+                ),
+            )
+            continue
 
     return violations
 
@@ -358,6 +368,16 @@ def is_env_file(filename: str) -> bool:
     return filename == ".env" or filename.startswith(".env.")
 
 
+def is_codex_sensitive_state_path(normalized_path: str, parts: list[str]) -> bool:
+    if not parts:
+        return False
+
+    if parts[0] in {".codex", "codex-home", "codex-auth"}:
+        return True
+
+    return normalized_path.endswith("/.codex/auth.json")
+
+
 def run_git_ls_files(project_path: Path) -> list[str]:
     completed = subprocess.run(
         ["git", "ls-files"],
@@ -401,7 +421,7 @@ def format_artifact_policy_report(result: ArtifactPolicyResult) -> str:
         "queue runtime files, feature scan runtime files, local model scorecard results, "
         "local agent draft outputs, role context packets, Codex task runtime files, local model "
         "raw responses, local model scorecard scoring artifacts, zip files, environment files, "
-        "or private operator guidance.",
+        "Codex auth/config state, or private operator guidance.",
         "",
         "Violations:",
     ]

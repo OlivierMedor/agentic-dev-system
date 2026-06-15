@@ -50,6 +50,19 @@ def test_public_readiness_blocks_env_files_but_allows_env_example() -> None:
     assert violation_paths([".env", ".env.local", ".env.example"]) == [".env", ".env.local"]
 
 
+def test_public_readiness_blocks_codex_auth_and_config_state() -> None:
+    blocked_paths = [
+        ".codex/auth.json",
+        ".codex/config.toml",
+        ".codex/sessions/session.jsonl",
+        "codex-home/auth.json",
+        "codex-auth/auth.json",
+        "tmp/.codex/auth.json",
+    ]
+
+    assert violation_paths(blocked_paths) == blocked_paths
+
+
 def test_public_readiness_blocks_review_bundles() -> None:
     blocked_paths = [
         "stories/story_033_public_readiness_private_instructions/review_bundle/handoff.md",
@@ -102,6 +115,7 @@ def test_public_readiness_blocks_other_runtime_artifacts() -> None:
         ".agentic/improvement_queue/pending/IMP-20260605-120000.yaml",
         ".agentic/maintenance_queue/pending/MAINT-20260605-120000.yaml",
         ".agentic/feature_queue/pending/FEATURE-20260605-120000.yaml",
+        ".codex/auth.json",
     ]
 
     assert violation_paths(blocked_paths) == blocked_paths

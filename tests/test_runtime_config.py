@@ -156,6 +156,14 @@ def test_default_runtime_config_uses_codex_first_tiered_defaults(tmp_path: Path)
     }
 
 
+def test_checked_in_runtime_config_keeps_codex_runtime_disabled_by_default() -> None:
+    config = yaml.safe_load(Path(".agentic/agent_runtime.yaml").read_text(encoding="utf-8"))
+
+    assert config["codex_runtime"]["enabled"] is False
+    assert config["codex_runtime"]["command"] == "codex"
+    assert config["codex_runtime"]["args"] == ["exec", "--file", "{task_file}"]
+
+
 def test_validate_runtime_config_fails_for_missing_required_agent(tmp_path: Path) -> None:
     config = runtime_config_data()
     del config["agents"]["test_agent"]

@@ -1,0 +1,45 @@
+story: story_057
+current_state:
+  status: ready_for_review
+  ready_for_review: true
+  blocked_by: null
+  agent_plan_exists: true
+  prompt_pack_exists: false
+  prompt_file_count: 0
+  report_files:
+  - developer_report.md
+  - finalize_story_report.md
+  - finalize_story_result.yaml
+  - local_review_report.md
+  - quality_gate_report.md
+  - quality_gate_result.yaml
+  - test_layer_report.md
+  - test_layer_result.yaml
+  - test_report.md
+  - workflow_preview_report.md
+  - workflow_preview_result.yaml
+  - workflow_run_report.md
+  - workflow_run_result.yaml
+  review_bundle_file_count: 12
+  cloud_review_export_exists: false
+  remote_dev_packet_exists: false
+  test_plan_uses_layers: true
+  result_files:
+  - finalize_story_result.yaml
+  - quality_gate_result.yaml
+  - test_layer_result.yaml
+  - workflow_run_result.yaml
+  warnings: []
+recommended_next_action: Run workflow-run prepare.
+suggested_command: agentic workflow-run --story story_057 --phase prepare --execute
+graph_nodes_visited:
+- collect_story_state
+- determine_next_action
+- write_preview
+automation_level: preview_only
+executed_agents: false
+called_cloud_models: false
+called_github_apis: false
+committed_or_merged: false
+deployed: false
+next_action: Run workflow-run prepare.

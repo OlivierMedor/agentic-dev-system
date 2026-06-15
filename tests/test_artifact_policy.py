@@ -220,6 +220,19 @@ def test_environment_files_are_blocked_except_example() -> None:
     assert violation_paths([".env", ".env.local", ".env.example"]) == [".env", ".env.local"]
 
 
+def test_codex_auth_and_config_state_are_blocked() -> None:
+    blocked_paths = [
+        ".codex/auth.json",
+        ".codex/config.toml",
+        ".codex/sessions/session.jsonl",
+        "codex-home/auth.json",
+        "codex-auth/auth.json",
+        "tmp/.codex/auth.json",
+    ]
+
+    assert violation_paths(blocked_paths) == blocked_paths
+
+
 def test_multiple_violations_are_all_reported() -> None:
     paths = [
         "src/agentic_dev/cli.py",
@@ -239,6 +252,7 @@ def test_multiple_violations_are_all_reported() -> None:
         "review_to_chatgpt/handoff.md",
         "agentic_story001_review.zip",
         ".env.local",
+        ".codex/auth.json",
         ".env.example",
     ]
 
@@ -259,4 +273,5 @@ def test_multiple_violations_are_all_reported() -> None:
         "review_to_chatgpt/handoff.md",
         "agentic_story001_review.zip",
         ".env.local",
+        ".codex/auth.json",
     ]

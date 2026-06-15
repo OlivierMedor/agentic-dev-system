@@ -1,0 +1,15 @@
+logs_required: true
+watch_for:
+  - codex_cli_not_installed_in_docker
+  - codex_version_smoke_check_failure
+  - codex_credentials_committed
+  - codex_auth_baked_into_image
+  - codex_runtime_enabled_by_default
+  - unsafe_codex_command_template_accepted
+  - missing_codex_command_no_longer_blocks_safely
+  - automatic_merge
+  - automatic_push
+  - force_push
+  - deployment_call
+  - pr_creation
+  - github_api_call

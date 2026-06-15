@@ -2,6 +2,12 @@ services:
   dev:
     build: .
     working_dir: /app
+    environment:
+      CODEX_HOME: /codex-home
     volumes:
       - ./:/app
       - ../sandbox-product:/sandbox-product
+      - codex-home:/codex-home
+
+volumes:
+  codex-home:

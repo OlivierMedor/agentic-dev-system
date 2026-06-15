@@ -7,6 +7,8 @@ those packets into runtime-ready instructions.
 For the manual operator flow that runs those files safely one role at a time,
 see `docs/codex_task_execution.md`.
 For the runtime tier policy, see `docs/runtime_config.md`.
+For Docker CLI installation and authentication, see
+`docs/codex_docker_runtime.md`.
 
 ## Command
 
@@ -138,21 +140,22 @@ requires each role's expected report after Codex exits, and stops before merge.
 The command template is allowlisted; story files cannot provide arbitrary
 commands.
 
-Story 056 adds this safe adapter; it does not install Codex into the Docker
-development image. Docker users must make the Codex CLI available inside the
-`dev` container, or mount/configure a supported runtime that provides the
-allowlisted `codex` command, before setting `codex_runtime.enabled: true`.
-Check from inside Docker with:
+The Docker `dev` image installs the Codex CLI. Check from inside Docker with:
 
 ```powershell
 docker compose run --rm dev which codex
+docker compose run --rm dev codex --version
 ```
 
-If that command fails, automatic Codex execution will block safely with
-`BLOCKED_CODEX_COMMAND_NOT_FOUND`. Keep `codex_runtime.enabled: false` and run
-the generated task files manually until Codex is installed or configured in the
-container. Docker Codex installation/configuration is a separate setup step and
-follow-up story, not a story implementation failure.
+Installation does not include credentials. `compose.yml` sets
+`CODEX_HOME=/codex-home` and mounts a Docker-managed `codex-home` named volume
+so optional `codex login --device-auth` state stays outside the repo and outside
+the image. Operators may also pass `CODEX_API_KEY` only to the single
+`docker compose run` invocation that needs it.
+
+Do not commit API keys, access tokens, `.codex/`, `codex-home/`, `codex-auth/`,
+or `auth.json`. If Codex is unavailable, automatic Codex execution blocks safely
+with `BLOCKED_CODEX_COMMAND_NOT_FOUND`.
 
 ## Human Review
 
