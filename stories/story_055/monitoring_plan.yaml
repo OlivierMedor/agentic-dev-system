@@ -1,0 +1,15 @@
+logs_required: true
+watch_for:
+- story_resolution_failure
+- missing_runtime_unclear_error
+- missing_required_agent_report_not_detected
+- dry_run_executes_workflow
+- run_next_uses_unordered_fallback
+- automatic_merge
+- automatic_push
+- force_push
+- deployment_call
+- pr_creation
+- github_api_call
+- cloud_model_call
+- unrelated_story_modification

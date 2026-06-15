@@ -1,0 +1,39 @@
+test_layers_version: 1
+unit_tests:
+  required: true
+  action: add_or_update
+  frequency: every_commit
+  evidence_or_reason: Added tests/test_story_runner.py covering story resolution by
+    folder and slug, dry-run plan output, missing automatic runtime behavior,
+    required report blocking, run-next selection, and safety flags that prevent
+    merge, push, deploy, PR, GitHub API, and cloud model actions.
+integration_tests:
+  required: true
+  action: add_or_update
+  frequency: every_pull_request
+  evidence_or_reason: CLI coverage exercises agentic run-story and run-next-story
+    command wiring through dry-run and execute paths. Smoke checks include
+    run-story --help, run-next-story --help, run-story --story story_055, and
+    run-story --story story_055 --execute.
+mock_e2e_tests:
+  required: true
+  action: confirm_existing
+  frequency: before_merge
+  evidence_or_reason: Existing workflow-run and review-bundle coverage exercise
+    the local story workflow with fixture projects and safe local commands. Story
+    055 also verifies dry-run planning and missing-runtime stops without calling
+    external services.
+live_read_only_checks:
+  required: false
+  action: not_applicable_with_reason
+  frequency: manual_only
+  evidence_or_reason: The story runner operates on local project files and local
+    Docker commands only. It must not call GitHub APIs, cloud models, deploys, or
+    other live services.
+remote_dev_smoke_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: after_remote_dev_deploy
+  evidence_or_reason: This story does not deploy to a remote dev environment. The
+    safety requirement is to stop before merge, push, PR creation, deployment,
+    GitHub API calls, and cloud model calls.

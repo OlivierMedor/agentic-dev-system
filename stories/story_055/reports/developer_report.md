@@ -93,3 +93,42 @@ All checks passed!
 ## Safety Confirmation
 
 The runner does not merge, push, force-push, deploy, open PRs, call GitHub APIs, or call cloud models automatically. It stops before merge and records false safety flags for those actions in `story_runner_result.yaml`.
+
+## Workflow Evidence Cleanup
+
+- Added `test_plan.yaml` using `test_layers_version: 1` and documenting unit,
+  integration, mock E2E, live read-only, and remote dev layers for Story 055.
+- Added `monitoring_plan.yaml` focused on one-command runner safety and missing
+  runtime/report failure modes.
+- Added `reports/test_report.md` with the targeted, full-suite, lint, and CLI
+  smoke evidence from the implementation validation.
+- Added `reports/local_review_report.md` with `READY_FOR_REVIEW` for local
+  evidence only. No cloud review decision was recorded or fabricated.
+
+## Final Workflow Command Results
+
+- `docker compose run --rm dev agentic test-layers --story story_055`:
+  `Test layer status: PASSED`.
+- `docker compose run --rm dev pytest tests/test_story_runner.py -q`:
+  `9 passed in 0.75s`.
+- `docker compose run --rm dev pytest`: `495 passed in 5.35s`.
+- `docker compose run --rm dev ruff check .`: `All checks passed!`.
+- `docker compose run --rm dev agentic workflow-run --story story_055 --phase local-finalize --execute`:
+  the local command client timed out while the Docker container continued
+  running; waiting for the container returned exit code 0. The refreshed
+  `workflow_run_result.yaml` has `status: completed`, and all safe steps
+  (`test-layers`, `finalize-story`, `review-bundle`, `workflow-preview`) passed.
+- `docker compose run --rm dev agentic merge-readiness --story story_055`:
+  `Status: REQUEST_CHANGES`, `Ready for human merge decision: False`, and
+  `Cloud review decision: None`.
+- `docker compose run --rm dev agentic cloud-review-packet --story story_055`:
+  packet files created under `stories/story_055/cloud_review_packet`.
+
+## Final Local Gate Status
+
+Local finalization passed. `quality_gate_result.yaml` is `READY_FOR_REVIEW`,
+`finalize_story_result.yaml` has `ready_for_review: true`, and
+`test_layer_result.yaml` is `PASSED`.
+
+Merge-readiness is blocked only by missing `reports/cloud_review_result.yaml`.
+No cloud review decision was recorded during this evidence cleanup.
