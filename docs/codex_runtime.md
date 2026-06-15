@@ -143,10 +143,11 @@ records stdout, stderr, and exit code under
 report after Codex exits, and stops before merge. The command template is
 allowlisted; story files cannot provide arbitrary commands.
 
-`codex exec` is read-only by default. Agentic uses `--sandbox workspace-write`
-so Codex can create required story report files under the mounted workspace
-without enabling unrestricted access. `danger-full-access` is not used or
-allowlisted by default.
+`codex exec` accepts `-` to read task file content from stdin and is read-only
+by default. Agentic uses `--sandbox workspace-write` so Codex can create
+required story report files under the mounted workspace without enabling
+unrestricted access. `danger-full-access` is not used or allowlisted by
+default.
 
 The Docker `dev` image installs the Codex CLI. Check from inside Docker with:
 

@@ -73,12 +73,13 @@ codex_runtime:
 
 When enabled, `agentic run-story --story STORY_SLUG --execute` runs generated
 Codex task files one role at a time by passing the task file content to
-`codex exec --sandbox workspace-write -` through stdin. `codex exec` is
-read-only by default, so agentic opts into `workspace-write` so Codex can
-create the required story report files inside the mounted workspace only. It
-requires each role's expected report before finalization. The command, args,
-and stdin behavior are validated against a narrow allowlist so story content
-cannot provide arbitrary commands.
+`codex exec --sandbox workspace-write -` through stdin. `codex exec` accepts
+`-` to read task file content from stdin and is read-only by default, so
+agentic opts into `workspace-write` so Codex can create the required story
+report files inside the mounted workspace only. It requires each role's
+expected report before finalization. The command, args, and stdin behavior are
+validated against a narrow allowlist so story content cannot provide arbitrary
+commands.
 
 The Docker `dev` image installs the Codex CLI. If you run agentic through
 Docker, confirm Codex is available inside the `dev` container before enabling
