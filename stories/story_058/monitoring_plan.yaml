@@ -1,0 +1,15 @@
+logs_required: true
+watch_for:
+  - codex_runtime_enabled_by_default
+  - codex_runtime_missing_workspace_write
+  - codex_runtime_accepts_unsafe_sandbox
+  - codex_runtime_accepts_arbitrary_args
+  - codex_runtime_stops_passing_task_files_via_stdin
+  - missing_codex_report_no_longer_blocks
+  - nonzero_codex_exit_no_longer_blocks
+  - automatic_merge
+  - automatic_push
+  - force_push
+  - deployment_call
+  - pr_creation
+  - github_api_call

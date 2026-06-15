@@ -206,8 +206,12 @@ The Docker `dev` image installs the Codex CLI. Verify it with
 `docker compose run --rm dev which codex` and
 `docker compose run --rm dev codex --version`, then check command compatibility
 with `docker compose run --rm dev codex exec --help`. The automatic adapter
-feeds generated task files through stdin using `codex exec -`, unless the
-installed CLI help confirms a different supported file-input flag.
+feeds generated task files through stdin using
+`codex exec --sandbox workspace-write -`. `codex exec` is read-only by default,
+so agentic uses `workspace-write` to let Codex create the required story report
+files inside the mounted workspace only. The installed CLI help should confirm
+that this command shape remains supported. `danger-full-access` is not used or
+allowlisted by default.
 Authentication is not baked into the image and credentials are not stored in the
 repo; see
 `docs/codex_docker_runtime.md` for device-code login, Docker volume storage,

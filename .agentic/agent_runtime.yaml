@@ -108,6 +108,8 @@ codex_runtime:
   command: codex
   args:
     - exec
+    - --sandbox
+    - workspace-write
     - "-"
   stdin_from_task_file: true
   timeout_seconds: 1800

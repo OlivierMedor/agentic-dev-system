@@ -45,12 +45,14 @@ def test_codex_docker_docs_explain_smoke_checks_and_no_committed_credentials() -
         assert "docker compose run --rm dev which codex" in text
         assert "docker compose run --rm dev codex --version" in text
         assert "docker compose run --rm dev codex exec --help" in text
-        assert "codex exec -" in text
+        assert "codex exec --sandbox workspace-write -" in text
 
     assert "docs/codex_docker_runtime.md" in readme
     assert "CODEX_HOME=/codex-home" in guide
     assert "Docker-managed named volume" in normalized_guide
     assert "does not bake API keys, access tokens" in normalized_guide
+    assert "read-only by default" in guide
+    assert "danger-full-access" in guide
     assert "Do not put `CODEX_API_KEY`, `CODEX_ACCESS_TOKEN`, `auth.json`" in normalized_guide
     assert "BLOCKED_CODEX_COMMAND_NOT_FOUND" in guide
 

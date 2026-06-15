@@ -50,6 +50,8 @@ codex_runtime:
   command: codex
   args:
     - exec
+    - --sandbox
+    - workspace-write
     - "-"
   stdin_from_task_file: true
   timeout_seconds: 1800
@@ -62,9 +64,17 @@ docker compose run --rm dev agentic run-story --story STORY_SLUG --execute
 ```
 
 The adapter still runs one generated task file at a time, uses the allowlisted
-`codex exec -` command template, feeds the generated task file through stdin,
-records runtime output under the story reports folder, requires expected
-reports, and stops before merge, push, deploy, PR creation, or GitHub API calls.
+`codex exec --sandbox workspace-write -` command template, feeds the generated
+task file through stdin, records runtime output under the story reports folder,
+requires expected reports, and stops before merge, push, deploy, PR creation, or
+GitHub API calls.
+
+`codex exec` is read-only by default. Agentic adds `--sandbox workspace-write`
+so Codex can create the required story report files inside the mounted
+workspace. This does not enable unrestricted host access. The allowed sandbox is
+limited to the mounted workspace path. `danger-full-access` is not used or
+allowlisted by default, and the runtime config rejects it.
+
 Use this stdin shape unless `codex exec --help` in the installed CLI confirms a
 different supported file-input flag.
 

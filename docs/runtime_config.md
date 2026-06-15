@@ -64,6 +64,8 @@ codex_runtime:
   command: codex
   args:
     - exec
+    - --sandbox
+    - workspace-write
     - "-"
   stdin_from_task_file: true
   timeout_seconds: 1800
@@ -71,9 +73,12 @@ codex_runtime:
 
 When enabled, `agentic run-story --story STORY_SLUG --execute` runs generated
 Codex task files one role at a time by passing the task file content to
-`codex exec -` through stdin. It requires each role's expected report before
-finalization. The command, args, and stdin behavior are validated against a
-narrow allowlist so story content cannot provide arbitrary commands.
+`codex exec --sandbox workspace-write -` through stdin. `codex exec` is
+read-only by default, so agentic opts into `workspace-write` so Codex can
+create the required story report files inside the mounted workspace only. It
+requires each role's expected report before finalization. The command, args,
+and stdin behavior are validated against a narrow allowlist so story content
+cannot provide arbitrary commands.
 
 The Docker `dev` image installs the Codex CLI. If you run agentic through
 Docker, confirm Codex is available inside the `dev` container before enabling
@@ -85,9 +90,14 @@ docker compose run --rm dev codex --version
 docker compose run --rm dev codex exec --help
 ```
 
-Use `codex exec -` for generated task files unless the installed CLI help
-confirms a different supported file-input flag. The help command checks command
-compatibility without requiring an authenticated model run.
+Use `codex exec --sandbox workspace-write -` for generated task files unless
+the installed CLI help confirms a different supported file-input flag. The help
+command checks command compatibility without requiring an authenticated model
+run.
+
+`danger-full-access` is not used or allowed by default. The runtime config only
+accepts the exact `workspace-write` sandbox shape with `shell=False` and
+`stdin_from_task_file: true`.
 
 If `which codex` fails inside Docker, `run-story --execute` will stop safely
 with `BLOCKED_CODEX_COMMAND_NOT_FOUND`. Keep `codex_runtime.enabled: false` and

@@ -151,7 +151,7 @@ def test_default_runtime_config_uses_codex_first_tiered_defaults(tmp_path: Path)
     assert result.config["codex_runtime"] == {
         "enabled": False,
         "command": "codex",
-        "args": ["exec", "-"],
+        "args": ["exec", "--sandbox", "workspace-write", "-"],
         "stdin_from_task_file": True,
         "timeout_seconds": 1800,
     }
@@ -162,7 +162,7 @@ def test_checked_in_runtime_config_keeps_codex_runtime_disabled_by_default() -> 
 
     assert config["codex_runtime"]["enabled"] is False
     assert config["codex_runtime"]["command"] == "codex"
-    assert config["codex_runtime"]["args"] == ["exec", "-"]
+    assert config["codex_runtime"]["args"] == ["exec", "--sandbox", "workspace-write", "-"]
     assert config["codex_runtime"]["stdin_from_task_file"] is True
 
 
@@ -250,6 +250,20 @@ def test_validate_runtime_config_rejects_arbitrary_codex_runtime_args(
     config = runtime_config_data()
     config["codex_runtime"]["enabled"] = True
     config["codex_runtime"]["args"] = ["exec", "--file", "{task_file}"]
+    write_runtime_config(tmp_path, config)
+
+    with pytest.raises(ValueError) as error:
+        validate_runtime_config(tmp_path)
+
+    assert "codex_runtime.args must be exactly" in str(error.value)
+
+
+def test_validate_runtime_config_rejects_danger_full_access_sandbox(
+    tmp_path: Path,
+) -> None:
+    config = runtime_config_data()
+    config["codex_runtime"]["enabled"] = True
+    config["codex_runtime"]["args"] = ["exec", "--sandbox", "danger-full-access", "-"]
     write_runtime_config(tmp_path, config)
 
     with pytest.raises(ValueError) as error:
