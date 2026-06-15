@@ -67,6 +67,7 @@ same route shape after the workflow rules are clear.
 - review_bundle/skipped_untracked_files.txt
 - review_bundle/untracked_file_contents.md
 - review_bundle/untracked_files.txt
+- cloud_review_packet/cloud_review_export.md
 
 ## Current state
 
@@ -76,7 +77,7 @@ same route shape after the workflow rules are clear.
 - prompt_pack: yes (7 prompt file(s))
 - reports: codex_task_report.md, codex_task_result.yaml, codex_tasks, developer_report.md, finalize_story_report.md, finalize_story_result.yaml, local_review_report.md, merge_readiness_report.md, merge_readiness_result.yaml, prepare_story_report.md, quality_gate_report.md, quality_gate_result.yaml, role_context, role_context_report.md, role_context_result.yaml, story_runner_report.md, story_runner_result.yaml, test_layer_report.md, test_layer_result.yaml, test_report.md, workflow_preview_report.md, workflow_preview_result.yaml, workflow_run_report.md, workflow_run_result.yaml
 - review_bundle: file_tree.txt, git_diff.patch, git_diff_staged.patch, git_diff_stat.txt, git_log.txt, git_status.txt, handoff.md, pytest_output.txt, ruff_output.txt, skipped_untracked_files.txt, untracked_file_contents.md, untracked_files.txt
-- cloud_review_packet/cloud_review_export.md: no
+- cloud_review_packet/cloud_review_export.md: yes
 - remote_dev_validation/remote_dev_packet.md: no
 - test_plan.yaml uses test_layers_version: 1: yes
 - result files: finalize_story_result.yaml, merge_readiness_result.yaml, quality_gate_result.yaml, test_layer_result.yaml, workflow_run_result.yaml
