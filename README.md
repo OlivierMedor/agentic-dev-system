@@ -7,8 +7,10 @@ turns approved blueprints into story workspaces, separates planning,
 development, testing, review, cloud review preparation, and human approval, and
 keeps every step visible in files a reviewer can inspect.
 
-The system is intentionally conservative: it does not call cloud models automatically,
-does not merge, does not deploy, and does not approve its own work. Human approval remains required.
+The system is intentionally conservative: it does not call cloud models automatically
+for manual cloud review, does not merge, does not deploy, and does not approve
+its own work. Automatic Codex execution is disabled by default and must be
+enabled explicitly in local runtime config. Human approval remains required.
 
 It uses Docker, Python, pytest, Ruff, GitHub Actions, and LangGraph-safe
 workflow phases. LangGraph is used for deterministic local workflow phases, not
@@ -190,9 +192,11 @@ assigned agent before handing work to a configured runtime.
 Use `docs/runtime_config.md` to understand the tiered Codex-first runtime
 defaults and the command approval policy.
 Use `docs/codex_runtime.md` to create Codex-ready task files from those role
-context packets without invoking Codex automatically.
-Use `docs/codex_task_execution.md` to run generated Codex task files manually,
-one role at a time, without committing generated runtime artifacts.
+context packets and to configure the disabled-by-default automatic Codex
+adapter.
+Use `docs/codex_task_execution.md` to run generated Codex task files manually or
+through the enabled adapter, one role at a time, without committing generated
+runtime artifacts.
 
 ## Tiered Codex Runtime Defaults
 
@@ -217,7 +221,7 @@ The safety model is deliberately boring: the CLI prepares local artifacts,
 records evidence, and reports status. It does not:
 
 - Call cloud models automatically.
-- Run generated prompts automatically.
+- Run generated prompts automatically outside the configured runtime adapters.
 - Commit, push, merge, or deploy automatically.
 - Change GitHub repository visibility.
 - Approve pull requests or merge readiness on behalf of the human owner.

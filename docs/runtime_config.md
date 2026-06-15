@@ -14,7 +14,8 @@ rewriting story scope or acceptance criteria.
 Codex is the primary runtime for assigned agent roles because this project is a
 codebase workflow. Most role outputs require repository context, file edits,
 tests, linting, and careful adherence to local safety rules. Codex task files
-still remain instructions only; the CLI does not invoke Codex automatically.
+remain inert when created; automatic execution only happens through
+`run-story --execute` when `codex_runtime.enabled` is true.
 
 The default tiers are:
 
@@ -52,6 +53,26 @@ cloud model and records the result manually.
 draft helper. It is not the default docs runtime, not a final reviewer, and not
 required for normal workflow validation. Its `prompt_mode: micro` setting keeps
 local draft prompts intentionally small.
+
+## Codex Runtime Adapter
+
+The automatic Codex adapter is disabled by default:
+
+```yaml
+codex_runtime:
+  enabled: false
+  command: codex
+  args:
+    - exec
+    - --file
+    - "{task_file}"
+  timeout_seconds: 1800
+```
+
+When enabled, `agentic run-story --story STORY_SLUG --execute` runs generated
+Codex task files one role at a time and requires each role's expected report
+before finalization. The command and args are validated against a narrow
+allowlist so story content cannot provide arbitrary commands.
 
 ## Command Policy
 

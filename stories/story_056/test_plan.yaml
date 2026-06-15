@@ -1,0 +1,34 @@
+test_layers_version: 1
+unit_tests:
+  required: true
+  action: add_or_update
+  frequency: every_commit
+  evidence_or_reason: Add and update tests for story runner Codex runtime
+    execution, runtime config validation, artifact policy, public readiness, and
+    docs assertions.
+integration_tests:
+  required: true
+  action: confirm_existing
+  frequency: before_merge
+  evidence_or_reason: Run full pytest plus CLI smoke checks for run-story and
+    run-next-story help output through the Docker dev container.
+mock_e2e_tests:
+  required: true
+  action: add_or_update
+  frequency: before_merge
+  evidence_or_reason: Story runner tests fake subprocess execution of the Codex
+    command and verify command invocation, report requirements, and finalization
+    behavior without invoking external services.
+live_read_only_checks:
+  required: false
+  action: not_applicable_with_reason
+  frequency: manual_only
+  evidence_or_reason: The adapter uses local subprocess execution only and tests
+    replace Codex with a deterministic fake. No live GitHub or cloud review API
+    calls are required.
+remote_dev_smoke_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: after_remote_dev_deploy
+  evidence_or_reason: This story does not deploy to remote dev. Safety requires
+    stopping before merge, push, PR creation, deployment, and GitHub API calls.

@@ -17,6 +17,16 @@ from agentic_dev.story_runner import (
 
 STORY = "story_055_one_command_story_runner"
 
+AGENT_REPORTS = {
+    "research_agent": "research_report.md",
+    "planner_agent": "planner_report.md",
+    "developer_agent": "developer_report.md",
+    "test_agent": "test_report.md",
+    "docs_agent": "docs_report.md",
+    "security_quality_agent": "security_quality_report.md",
+    "local_reviewer_agent": "local_review_report.md",
+}
+
 
 def create_project(project_path: Path, *, runtime_config: str | None = None) -> None:
     (project_path / "stories").mkdir(parents=True)
@@ -61,6 +71,15 @@ def create_story(
 
 def read_yaml(path: Path) -> dict:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
+
+
+def codex_runtime_config_text(*, command: str = "codex", args: list[str] | None = None) -> str:
+    config = yaml.safe_load(default_runtime_config_text())
+    config["codex_runtime"]["enabled"] = True
+    config["codex_runtime"]["command"] = command
+    if args is not None:
+        config["codex_runtime"]["args"] = args
+    return yaml.safe_dump(config, sort_keys=False)
 
 
 def write_required_agent_reports(story_path: Path) -> None:
@@ -141,11 +160,115 @@ def test_execute_stops_clearly_when_no_automatic_runtime_is_configured(
 
     assert result.status == "BLOCKED_MISSING_RUNTIME"
     assert "No automatic agent runtime is configured" in result.next_action
-    assert "Enable local_model_runtime.enabled" in result.next_action
+    assert "Enable codex_runtime.enabled or local_model_runtime.enabled" in result.next_action
     assert (story_path / "agent_plan.yaml").exists()
     assert (story_path / "prompt_pack").exists()
     assert (story_path / "reports" / "role_context_result.yaml").exists()
     assert (story_path / "reports" / "codex_task_result.yaml").exists()
+    assert not (story_path / "reports" / "finalize_story_result.yaml").exists()
+
+
+def test_execute_uses_enabled_codex_runtime_and_invokes_task_command(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    create_project(tmp_path, runtime_config=codex_runtime_config_text())
+    story_path = create_story(tmp_path)
+    commands: list[list[str]] = []
+
+    def fake_run(
+        command: list[str],
+        *,
+        cwd: Path,
+        capture_output: bool,
+        text: bool,
+        timeout: int,
+        check: bool,
+    ) -> SimpleNamespace:
+        commands.append(command)
+        task_file = Path(command[-1])
+        agent_id = task_file.name.removesuffix("_codex_task.md")
+        report_name = AGENT_REPORTS[agent_id]
+        report_content = "READY_FOR_REVIEW\n" if agent_id == "local_reviewer_agent" else "done\n"
+        (story_path / "reports" / report_name).write_text(report_content, encoding="utf-8")
+        return SimpleNamespace(returncode=0, stdout=f"ran {agent_id}\n", stderr="")
+
+    def fake_finalize_story(project_path: Path, story: str) -> SimpleNamespace:
+        result_path = project_path / "stories" / story / "reports" / "finalize_story_result.yaml"
+        result_path.write_text("status: ready_for_review\n", encoding="utf-8")
+        return SimpleNamespace(
+            ready_for_review=True,
+            status="ready_for_review",
+            finalize_result_path=result_path,
+        )
+
+    def fake_run_quality_gate(project_path: Path, story: str) -> SimpleNamespace:
+        result_path = project_path / "stories" / story / "reports" / "quality_gate_result.yaml"
+        result_path.write_text("status: READY_FOR_REVIEW\n", encoding="utf-8")
+        return SimpleNamespace(
+            ready_for_review=True,
+            status="READY_FOR_REVIEW",
+            result_path=result_path,
+            next_action="Send the story to a human or cloud reviewer.",
+        )
+
+    monkeypatch.setattr("agentic_dev.codex_runtime.subprocess.run", fake_run)
+    monkeypatch.setattr("agentic_dev.story_runner.finalize_story", fake_finalize_story)
+    monkeypatch.setattr("agentic_dev.story_runner.run_quality_gate", fake_run_quality_gate)
+
+    result = run_story(tmp_path, STORY, execute=True)
+    runtime_result = read_yaml(story_path / "reports" / "codex_runtime_execution_result.yaml")
+
+    assert result.status == "completed"
+    assert commands
+    assert commands[0][0:3] == ["codex", "exec", "--file"]
+    assert commands[0][-1].endswith("research_agent_codex_task.md")
+    assert runtime_result["status"] == "PASSED"
+    assert runtime_result["safety_flags"]["called_codex"] is True
+    assert ("automatic-agent-runtime:codex", "PASSED") in [
+        (step.step, step.status) for step in result.step_results
+    ]
+
+
+def test_execute_stops_when_codex_exits_nonzero(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    create_project(tmp_path, runtime_config=codex_runtime_config_text())
+    story_path = create_story(tmp_path)
+
+    def fake_run(*args: object, **kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(returncode=7, stdout="partial\n", stderr="failed\n")
+
+    monkeypatch.setattr("agentic_dev.codex_runtime.subprocess.run", fake_run)
+
+    result = run_story(tmp_path, STORY, execute=True)
+    runtime_result = read_yaml(story_path / "reports" / "codex_runtime_execution_result.yaml")
+
+    assert result.status == "BLOCKED_CODEX_NONZERO_EXIT"
+    assert "exited with code 7" in result.next_action
+    assert runtime_result["executions"][0]["exit_code"] == 7
+    assert not (story_path / "reports" / "finalize_story_result.yaml").exists()
+
+
+def test_execute_stops_when_codex_report_is_missing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    create_project(tmp_path, runtime_config=codex_runtime_config_text())
+    story_path = create_story(tmp_path)
+
+    def fake_run(*args: object, **kwargs: object) -> SimpleNamespace:
+        return SimpleNamespace(returncode=0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr("agentic_dev.codex_runtime.subprocess.run", fake_run)
+
+    result = run_story(tmp_path, STORY, execute=True)
+    runtime_result = read_yaml(story_path / "reports" / "codex_runtime_execution_result.yaml")
+
+    assert result.status == "BLOCKED_MISSING_CODEX_REPORT"
+    assert "did not create the expected report" in result.next_action
+    assert runtime_result["executions"][0]["status"] == "BLOCKED_MISSING_CODEX_REPORT"
     assert not (story_path / "reports" / "finalize_story_result.yaml").exists()
 
 
@@ -321,4 +444,4 @@ def test_cli_run_story_execute_missing_runtime_exits_with_clear_plan(
     assert error.value.code == 1
     assert "BLOCKED_MISSING_RUNTIME" in captured.out
     assert "No automatic agent runtime is configured" in captured.out
-    assert "Enable local_model_runtime.enabled" in captured.out
+    assert "Enable codex_runtime.enabled or local_model_runtime.enabled" in captured.out

@@ -1,0 +1,15 @@
+story: story_056
+status: REQUEST_CHANGES
+ready_for_human_merge_decision: false
+cloud_review_decision: null
+remote_dev_validation_present: false
+remote_dev_validation_status: null
+passed_checks:
+- Remote dev validation was not recorded; optional check skipped.
+- Quality gate is ready for review.
+- Finalize story result is ready for review.
+- Test layer result status is PASSED.
+failed_checks:
+- 'Missing required evidence: reports/cloud_review_result.yaml.'
+next_action: Address missing evidence or requested changes, then rerun finalize-story,
+  cloud review, and merge-readiness as needed.

@@ -148,6 +148,12 @@ def test_default_runtime_config_uses_codex_first_tiered_defaults(tmp_path: Path)
     assert agents["local_model_helper"]["provider"] == "local_model_optional"
     assert agents["local_model_helper"]["model"] == "gemma-4-26b"
     assert agents["local_model_helper"]["prompt_mode"] == "micro"
+    assert result.config["codex_runtime"] == {
+        "enabled": False,
+        "command": "codex",
+        "args": ["exec", "--file", "{task_file}"],
+        "timeout_seconds": 1800,
+    }
 
 
 def test_validate_runtime_config_fails_for_missing_required_agent(tmp_path: Path) -> None:
@@ -212,6 +218,34 @@ def test_validate_runtime_config_requires_risky_commands_to_need_human_approval(
     message = str(error.value)
     assert "requires_human_approval must include an entry covering 'git push'" in message
     assert "allowed_without_approval must not include risky command 'git push'" in message
+
+
+def test_validate_runtime_config_rejects_unsafe_codex_runtime_command(
+    tmp_path: Path,
+) -> None:
+    config = runtime_config_data()
+    config["codex_runtime"]["enabled"] = True
+    config["codex_runtime"]["command"] = "powershell"
+    write_runtime_config(tmp_path, config)
+
+    with pytest.raises(ValueError) as error:
+        validate_runtime_config(tmp_path)
+
+    assert "codex_runtime.command must be one of" in str(error.value)
+
+
+def test_validate_runtime_config_rejects_arbitrary_codex_runtime_args(
+    tmp_path: Path,
+) -> None:
+    config = runtime_config_data()
+    config["codex_runtime"]["enabled"] = True
+    config["codex_runtime"]["args"] = ["exec", "--file", "{task_file}", "--dangerous"]
+    write_runtime_config(tmp_path, config)
+
+    with pytest.raises(ValueError) as error:
+        validate_runtime_config(tmp_path)
+
+    assert "codex_runtime.args must be exactly" in str(error.value)
 
 
 def test_show_runtime_config_returns_yaml_content(tmp_path: Path) -> None:
