@@ -1,0 +1,59 @@
+story: story_055
+status: PASSED
+passed_checks:
+- unit_tests is addressed.
+- integration_tests is addressed.
+- mock_e2e_tests is addressed.
+- live_read_only_checks is addressed.
+- remote_dev_smoke_tests is addressed.
+failed_checks: []
+layers:
+  unit_tests:
+    status: PASSED
+    required: true
+    action: add_or_update
+    frequency: every_commit
+    evidence_or_reason: Added tests/test_story_runner.py covering story resolution
+      by folder and slug, dry-run plan output, missing automatic runtime behavior,
+      required report blocking, run-next selection, and safety flags that prevent
+      merge, push, deploy, PR, GitHub API, and cloud model actions.
+    failed_checks: []
+  integration_tests:
+    status: PASSED
+    required: true
+    action: add_or_update
+    frequency: every_pull_request
+    evidence_or_reason: CLI coverage exercises agentic run-story and run-next-story
+      command wiring through dry-run and execute paths. Smoke checks include run-story
+      --help, run-next-story --help, run-story --story story_055, and run-story --story
+      story_055 --execute.
+    failed_checks: []
+  mock_e2e_tests:
+    status: PASSED
+    required: true
+    action: confirm_existing
+    frequency: before_merge
+    evidence_or_reason: Existing workflow-run and review-bundle coverage exercise
+      the local story workflow with fixture projects and safe local commands. Story
+      055 also verifies dry-run planning and missing-runtime stops without calling
+      external services.
+    failed_checks: []
+  live_read_only_checks:
+    status: PASSED
+    required: false
+    action: not_applicable_with_reason
+    frequency: manual_only
+    evidence_or_reason: The story runner operates on local project files and local
+      Docker commands only. It must not call GitHub APIs, cloud models, deploys, or
+      other live services.
+    failed_checks: []
+  remote_dev_smoke_tests:
+    status: PASSED
+    required: false
+    action: not_applicable_with_reason
+    frequency: after_remote_dev_deploy
+    evidence_or_reason: This story does not deploy to a remote dev environment. The
+      safety requirement is to stop before merge, push, PR creation, deployment, GitHub
+      API calls, and cloud model calls.
+    failed_checks: []
+next_action: Continue to the quality gate or finalize-story workflow.

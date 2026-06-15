@@ -1,0 +1,13 @@
+id: '055'
+slug: one-command-story-runner
+title: One-command story runner
+status: ready_for_human_merge_decision
+branch: story/055-one-command-story-runner
+phase: platform-improvement
+review_status: not_started
+merge_ready: false
+story_id: story_055
+ready_for_review: true
+merge_readiness_status: READY_FOR_HUMAN_MERGE_DECISION
+ready_for_human_merge_decision: true
+cloud_review_decision: APPROVE
