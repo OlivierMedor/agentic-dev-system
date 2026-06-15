@@ -198,6 +198,13 @@ Use `docs/codex_task_execution.md` to run generated Codex task files manually or
 through the enabled adapter, one role at a time, without committing generated
 runtime artifacts.
 
+Story 056 adds the safe Codex runtime adapter, not Codex installation inside
+Docker. Before enabling `codex_runtime.enabled` while using the Docker `dev`
+container, verify `docker compose run --rm dev which codex` succeeds. If it
+fails, automatic execution blocks safely with
+`BLOCKED_CODEX_COMMAND_NOT_FOUND`; keep `codex_runtime.enabled: false` and use
+manual task execution until Codex is installed or mounted/configured in Docker.
+
 ## Tiered Codex Runtime Defaults
 
 `.agentic/agent_runtime.yaml` is the source of truth for agent provider and

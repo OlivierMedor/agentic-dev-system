@@ -16,6 +16,14 @@ CODEX_TASK_STATUS_READY = "CODEX_TASKS_READY"
 CODEX_TASK_STATUS_READY_WITH_WARNINGS = "CODEX_TASKS_READY_WITH_WARNINGS"
 CODEX_RUNTIME_RESULT_FILENAME = "codex_runtime_execution_result.yaml"
 CODEX_RUNTIME_REPORT_FILENAME = "codex_runtime_execution_report.md"
+CODEX_COMMAND_NOT_FOUND_MESSAGE = (
+    "Codex command was not found in the current runtime environment: {command}. "
+    "If you are running agentic through Docker, the dev container must include "
+    "the Codex CLI or a supported mounted runtime before codex_runtime.enabled "
+    "can execute tasks. Install/configure Codex in the container, or keep "
+    "codex_runtime.enabled: false and use manual task execution. This is a "
+    "runtime setup problem, not a story implementation failure."
+)
 
 BUILD_CONTEXT_HINT = "agentic build-context --story {story} --all --force"
 
@@ -370,8 +378,9 @@ def run_one_codex_task(
         )
     except FileNotFoundError:
         duration = time.monotonic() - start
+        message = CODEX_COMMAND_NOT_FOUND_MESSAGE.format(command=config.command)
         write_text_artifact(stdout_path, "")
-        write_text_artifact(stderr_path, f"Command not found: {config.command}\n")
+        write_text_artifact(stderr_path, message + "\n")
         return CodexRuntimeTaskExecution(
             agent_id=agent_id,
             status="BLOCKED_CODEX_COMMAND_NOT_FOUND",
@@ -382,7 +391,7 @@ def run_one_codex_task(
             stdout_path=stdout_path,
             stderr_path=stderr_path,
             duration_seconds=duration,
-            summary=f"Codex command was not found: {config.command}",
+            summary=message,
         )
     except subprocess.TimeoutExpired as error:
         duration = time.monotonic() - start

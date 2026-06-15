@@ -74,6 +74,21 @@ Codex task files one role at a time and requires each role's expected report
 before finalization. The command and args are validated against a narrow
 allowlist so story content cannot provide arbitrary commands.
 
+Story 056 adds the adapter, not Docker installation for the Codex CLI. If you
+run agentic through Docker, confirm Codex is available inside the `dev`
+container before enabling the adapter:
+
+```powershell
+docker compose run --rm dev which codex
+```
+
+If `which codex` fails inside Docker, `run-story --execute` will stop safely
+with `BLOCKED_CODEX_COMMAND_NOT_FOUND`. Keep `codex_runtime.enabled: false` and
+use manual task execution until the container includes the Codex CLI or a
+supported mounted/configured runtime. Installing or configuring Codex in Docker
+is a separate setup step and follow-up story, not a failure of the story being
+implemented.
+
 ## Command Policy
 
 Safe Docker, test, lint, and deterministic workflow commands can be listed under

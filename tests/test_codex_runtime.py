@@ -4,7 +4,8 @@ import pytest
 import yaml
 
 from agentic_dev.cli import main
-from agentic_dev.codex_runtime import create_codex_tasks
+from agentic_dev.codex_runtime import create_codex_tasks, run_one_codex_task
+from agentic_dev.runtime_config import CodexRuntimeConfig
 
 
 STORY = "story_052_codex_runtime_connector"
@@ -313,6 +314,45 @@ def test_tests_do_not_require_codex_cloud_models_or_github_apis(tmp_path: Path) 
     assert result_yaml["safety_flags"]["called_codex"] is False
     assert result_yaml["safety_flags"]["called_cloud_models"] is False
     assert result_yaml["safety_flags"]["called_github_apis"] is False
+
+
+def test_missing_codex_command_blocks_with_runtime_environment_guidance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    task_file = tmp_path / "developer_agent_codex_task.md"
+    expected_report = tmp_path / "reports" / "developer_report.md"
+    runtime_path = tmp_path / "reports" / "codex_runtime"
+    task_file.write_text("task\n", encoding="utf-8")
+    config = CodexRuntimeConfig(
+        enabled=True,
+        command="codex",
+        args=["exec", "--file", "{task_file}"],
+        timeout_seconds=1800,
+    )
+
+    def fake_run(*args: object, **kwargs: object) -> object:
+        raise FileNotFoundError("codex")
+
+    monkeypatch.setattr("agentic_dev.codex_runtime.subprocess.run", fake_run)
+
+    result = run_one_codex_task(
+        project_path=tmp_path,
+        runtime_path=runtime_path,
+        agent_id="developer_agent",
+        config=config,
+        task_file=task_file,
+        expected_report=expected_report,
+    )
+
+    assert result.status == "BLOCKED_CODEX_COMMAND_NOT_FOUND"
+    assert "current runtime environment" in result.summary
+    assert "Docker" in result.summary
+    assert "dev container" in result.summary
+    assert "codex_runtime.enabled: false" in result.summary
+    assert "runtime setup problem, not a story implementation failure" in result.summary
+    assert result.stderr_path is not None
+    assert result.summary in result.stderr_path.read_text(encoding="utf-8")
 
 
 def test_cli_codex_task_create_defaults_to_all_agents(

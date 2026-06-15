@@ -251,6 +251,47 @@ def test_execute_stops_when_codex_exits_nonzero(
     assert not (story_path / "reports" / "finalize_story_result.yaml").exists()
 
 
+def test_execute_stops_with_clear_docker_message_when_codex_command_is_missing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    create_project(tmp_path, runtime_config=codex_runtime_config_text())
+    story_path = create_story(tmp_path)
+
+    def fake_run(*args: object, **kwargs: object) -> SimpleNamespace:
+        raise FileNotFoundError("codex")
+
+    monkeypatch.setattr("agentic_dev.codex_runtime.subprocess.run", fake_run)
+
+    result = run_story(tmp_path, STORY, execute=True)
+    result_data = read_yaml(result.result_path)
+    runtime_result = read_yaml(story_path / "reports" / "codex_runtime_execution_result.yaml")
+    runtime_report = (
+        story_path / "reports" / "codex_runtime_execution_report.md"
+    ).read_text(encoding="utf-8")
+    story_runner_report = result.report_path.read_text(encoding="utf-8")
+    summary = runtime_result["executions"][0]["summary"]
+
+    assert result.status == "BLOCKED_CODEX_COMMAND_NOT_FOUND"
+    assert result.next_action == summary
+    assert runtime_result["status"] == "BLOCKED_CODEX_COMMAND_NOT_FOUND"
+    assert runtime_result["executions"][0]["status"] == "BLOCKED_CODEX_COMMAND_NOT_FOUND"
+    assert "current runtime environment" in summary
+    assert "Docker" in summary
+    assert "dev container" in summary
+    assert "codex_runtime.enabled: false" in summary
+    assert "runtime setup problem, not a story implementation failure" in summary
+    assert summary in runtime_report
+    assert summary in story_runner_report
+    assert not (story_path / "reports" / "finalize_story_result.yaml").exists()
+    safety_flags = result_data["safety_flags"]
+    assert safety_flags["committed_or_merged"] is False
+    assert safety_flags["pushed"] is False
+    assert safety_flags["merged"] is False
+    assert safety_flags["deployed"] is False
+    assert safety_flags["opened_pr"] is False
+
+
 def test_execute_stops_when_codex_report_is_missing(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
