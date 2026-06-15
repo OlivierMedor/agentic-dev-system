@@ -73,6 +73,7 @@ from agentic_dev.role_context import (
 from agentic_dev.runtime_config import show_runtime_config, validate_runtime_config
 from agentic_dev.scaffolding import init_project
 from agentic_dev.story_generator import generate_stories
+from agentic_dev.story_runner import run_next_story, run_story
 from agentic_dev.support_queue import (
     answer_support_ticket,
     close_support_ticket,
@@ -296,6 +297,43 @@ def main() -> None:
         "--execute",
         action="store_true",
         help="Run the hardcoded safe local steps. Without this flag, only a plan is written.",
+    )
+
+    run_story_parser = subparsers.add_parser(
+        "run-story",
+        help="Plan or run the one-command local workflow for one story.",
+    )
+    run_story_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    run_story_parser.add_argument(
+        "--story",
+        required=True,
+        help="Story folder name, slug, or story_id.",
+    )
+    run_story_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Run safe local workflow steps. Without this flag, only a plan is written.",
+    )
+
+    run_next_story_parser = subparsers.add_parser(
+        "run-next-story",
+        help="Plan or run the next runnable story using blueprint order and story status.",
+    )
+    run_next_story_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    run_next_story_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Run safe local workflow steps. Without this flag, only a plan is written.",
     )
 
     finalize_story_parser = subparsers.add_parser(
@@ -1312,6 +1350,18 @@ def main() -> None:
                 execute=args.execute,
             )
             print(result.terminal_summary)
+
+        if args.command == "run-story":
+            result = run_story(args.project, args.story, execute=args.execute)
+            print(result.terminal_summary)
+            if args.execute and result.status not in {"completed"}:
+                parser.exit(status=1)
+
+        if args.command == "run-next-story":
+            result = run_next_story(args.project, execute=args.execute)
+            print(result.terminal_summary)
+            if args.execute and result.status not in {"completed"}:
+                parser.exit(status=1)
 
         if args.command == "finalize-story":
             result = finalize_story(args.project, args.story, args.force)

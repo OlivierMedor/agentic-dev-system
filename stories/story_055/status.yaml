@@ -1,8 +1,10 @@
-﻿id: 055
+id: '055'
 slug: one-command-story-runner
 title: One-command story runner
-status: in_progress
+status: prepared
 branch: story/055-one-command-story-runner
 phase: platform-improvement
 review_status: not_started
 merge_ready: false
+story_id: story_055
+ready_for_review: false
