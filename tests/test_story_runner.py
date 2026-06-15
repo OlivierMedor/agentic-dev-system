@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -60,6 +61,22 @@ def create_story(
 
 def read_yaml(path: Path) -> dict:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
+
+
+def write_required_agent_reports(story_path: Path) -> None:
+    reports_path = story_path / "reports"
+    reports_path.mkdir()
+    for filename in [
+        "research_report.md",
+        "planner_report.md",
+        "developer_report.md",
+        "test_report.md",
+        "docs_report.md",
+        "security_quality_report.md",
+        "local_review_report.md",
+    ]:
+        content = "READY_FOR_REVIEW\n" if filename == "local_review_report.md" else "done\n"
+        (reports_path / filename).write_text(content, encoding="utf-8")
 
 
 def test_resolves_story_by_exact_folder_name(tmp_path: Path) -> None:
@@ -130,6 +147,66 @@ def test_execute_stops_clearly_when_no_automatic_runtime_is_configured(
     assert (story_path / "reports" / "role_context_result.yaml").exists()
     assert (story_path / "reports" / "codex_task_result.yaml").exists()
     assert not (story_path / "reports" / "finalize_story_result.yaml").exists()
+
+
+def test_execute_skips_missing_runtime_when_required_reports_already_exist(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    create_project(tmp_path, runtime_config=default_runtime_config_text())
+    story_path = create_story(tmp_path)
+    write_required_agent_reports(story_path)
+    finalized: list[str] = []
+    quality_checked: list[str] = []
+
+    def fake_finalize_story(project_path: Path, story: str) -> SimpleNamespace:
+        finalized.append(story)
+        result_path = project_path / "stories" / story / "reports" / "finalize_story_result.yaml"
+        result_path.write_text("status: ready_for_review\n", encoding="utf-8")
+        return SimpleNamespace(
+            ready_for_review=True,
+            status="ready_for_review",
+            finalize_result_path=result_path,
+        )
+
+    def fake_run_quality_gate(project_path: Path, story: str) -> SimpleNamespace:
+        quality_checked.append(story)
+        result_path = project_path / "stories" / story / "reports" / "quality_gate_result.yaml"
+        result_path.write_text("status: READY_FOR_REVIEW\n", encoding="utf-8")
+        return SimpleNamespace(
+            ready_for_review=True,
+            status="READY_FOR_REVIEW",
+            result_path=result_path,
+            next_action="Send the story to a human or cloud reviewer.",
+        )
+
+    monkeypatch.setattr("agentic_dev.story_runner.finalize_story", fake_finalize_story)
+    monkeypatch.setattr("agentic_dev.story_runner.run_quality_gate", fake_run_quality_gate)
+
+    result = run_story(tmp_path, STORY, execute=True)
+    result_data = read_yaml(result.result_path)
+
+    assert result.status != "BLOCKED_MISSING_RUNTIME"
+    assert result.missing_reports == []
+    assert finalized == [STORY]
+    assert quality_checked == [STORY]
+    assert (story_path / "reports" / "finalize_story_result.yaml").exists()
+    assert (story_path / "reports" / "quality_gate_result.yaml").exists()
+    assert ("automatic-agent-runtime", "SKIPPED_EXISTING_REPORTS") in [
+        (step.step, step.status) for step in result.step_results
+    ]
+    assert ("local-finalize", "PASSED") in [
+        (step.step, step.status) for step in result.step_results
+    ]
+    assert ("quality-gate", "READY_FOR_REVIEW") in [
+        (step.step, step.status) for step in result.step_results
+    ]
+    safety_flags = result_data["safety_flags"]
+    assert safety_flags["committed_or_merged"] is False
+    assert safety_flags["pushed"] is False
+    assert safety_flags["merged"] is False
+    assert safety_flags["deployed"] is False
+    assert safety_flags["opened_pr"] is False
 
 
 def test_story_runner_records_no_auto_merge_push_deploy_or_pr(tmp_path: Path) -> None:

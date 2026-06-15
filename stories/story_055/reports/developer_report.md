@@ -7,6 +7,7 @@ Implemented the one-command story runner:
 - Added `agentic run-story --story <story-folder-or-slug> [--project <path>] [--execute]`.
 - Added `agentic run-next-story [--project <path>] [--execute]`.
 - Added `src/agentic_dev/story_runner.py` for story resolution, dry-run planning, safe execute orchestration, required report checks, runtime blockage handling, and run-next selection.
+- Updated execute orchestration after cloud review `REQUEST_CHANGES`: after prepare/context/Codex task generation, the runner now checks required agent reports before attempting automatic runtime. If all required reports already exist, it skips automatic runtime and continues to local finalization and quality gate.
 - Dry-run terminal output now visibly includes selected story, resolved project path, execute mode, planned safe steps, safety reminders, output paths, and next action.
 - `run-next-story` uses blueprint order/status/dependencies when available and fails clearly instead of falling back to unordered story folders.
 - Added regression tests in `tests/test_story_runner.py`.
@@ -53,27 +54,20 @@ usage: agentic run-next-story [-h] [--project PROJECT] [--execute]
 Error: No runnable story with blueprint order and satisfied dependencies was found. Run a specific story with run-story --story <story-folder-or-slug>.
 ```
 
-`docker compose run --rm dev agentic run-story --story story_055 --execute`
-
-```text
-Status: BLOCKED_MISSING_RUNTIME
-Next action: No automatic agent runtime is configured. Enable local_model_runtime.enabled in .agentic/agent_runtime.yaml, or run the generated Codex task files manually and rerun run-story after required reports exist.
-```
-
 ## Test Results
 
 Targeted:
 
 ```text
 docker compose run --rm dev pytest tests/test_story_runner.py -q
-9 passed in 0.75s
+10 passed in 0.79s
 ```
 
 Full suite:
 
 ```text
 docker compose run --rm dev pytest
-495 passed in 4.77s
+496 passed in 5.14s
 ```
 
 Ruff:
@@ -87,7 +81,8 @@ All checks passed!
 
 - Automatic Codex execution is not implemented; Codex task files are generated for manual Codex handoff.
 - Execute mode only attempts automatic agent execution through the configured local model runtime when `local_model_runtime.enabled: true`.
-- If no automatic runtime is configured, execute mode stops before finalization with an actionable error.
+- If required agent reports already exist, execute mode skips automatic runtime and continues to local finalization and quality gate.
+- If required agent reports are missing and no automatic runtime is configured, execute mode stops before finalization with an actionable error.
 - `run-next-story` refuses unordered fallback when blueprint ordering exists and no ordered runnable story is eligible.
 
 ## Safety Confirmation
@@ -110,8 +105,8 @@ The runner does not merge, push, force-push, deploy, open PRs, call GitHub APIs,
 - `docker compose run --rm dev agentic test-layers --story story_055`:
   `Test layer status: PASSED`.
 - `docker compose run --rm dev pytest tests/test_story_runner.py -q`:
-  `9 passed in 0.75s`.
-- `docker compose run --rm dev pytest`: `495 passed in 5.35s`.
+  `10 passed in 0.79s`.
+- `docker compose run --rm dev pytest`: `496 passed in 5.14s`.
 - `docker compose run --rm dev ruff check .`: `All checks passed!`.
 - `docker compose run --rm dev agentic workflow-run --story story_055 --phase local-finalize --execute`:
   the local command client timed out while the Docker container continued

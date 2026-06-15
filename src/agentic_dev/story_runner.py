@@ -243,6 +243,24 @@ def execute_story_steps(
         )
     )
 
+    missing_reports = missing_required_agent_reports(resolved.story_path)
+    if not missing_reports:
+        results.append(
+            StoryRunnerStepResult(
+                step="automatic-agent-runtime",
+                status="SKIPPED_EXISTING_REPORTS",
+                summary="All required agent reports already exist; skipping automatic runtime.",
+            )
+        )
+        results.append(
+            StoryRunnerStepResult(
+                step="verify-required-agent-reports",
+                status="PASSED",
+                summary="All required agent reports exist.",
+            )
+        )
+        return results
+
     try:
         runtime_results = (
             runtime_runner(resolved.project_path, resolved.story)
