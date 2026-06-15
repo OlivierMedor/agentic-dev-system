@@ -55,7 +55,7 @@ completed
   - report: `/app/stories/story_057/review_bundle/handoff.md`
 - workflow-preview: PASSED (exit 0)
   - command: `agentic workflow-preview --project /app --story story_057`
-  - summary: workflow-preview next action: Run workflow-run prepare.
+  - summary: workflow-preview next action: Fix failed checks before continuing.
   - result: `/app/stories/story_057/reports/workflow_preview_result.yaml`
   - report: `/app/stories/story_057/reports/workflow_preview_report.md`
 

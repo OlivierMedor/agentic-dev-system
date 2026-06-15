@@ -57,6 +57,7 @@ Run these commands from the repository root:
 docker compose build
 docker compose run --rm dev which codex
 docker compose run --rm dev codex --version
+docker compose run --rm dev codex exec --help
 docker compose run --rm dev pytest
 docker compose run --rm dev ruff check .
 docker compose run --rm dev agentic project-status
@@ -203,8 +204,12 @@ runtime artifacts.
 
 The Docker `dev` image installs the Codex CLI. Verify it with
 `docker compose run --rm dev which codex` and
-`docker compose run --rm dev codex --version`. Authentication is not baked into
-the image and credentials are not stored in the repo; see
+`docker compose run --rm dev codex --version`, then check command compatibility
+with `docker compose run --rm dev codex exec --help`. The automatic adapter
+feeds generated task files through stdin using `codex exec -`, unless the
+installed CLI help confirms a different supported file-input flag.
+Authentication is not baked into the image and credentials are not stored in the
+repo; see
 `docs/codex_docker_runtime.md` for device-code login, Docker volume storage,
 and one-off `CODEX_API_KEY` usage. If Codex is unavailable, automatic execution
 blocks safely with `BLOCKED_CODEX_COMMAND_NOT_FOUND`.

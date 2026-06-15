@@ -7,6 +7,7 @@ the normal container workflow can detect and run Codex:
 docker compose build
 docker compose run --rm dev which codex
 docker compose run --rm dev codex --version
+docker compose run --rm dev codex exec --help
 ```
 
 This installs the CLI binary only. It does not bake API keys, access tokens,
@@ -49,8 +50,8 @@ codex_runtime:
   command: codex
   args:
     - exec
-    - --file
-    - "{task_file}"
+    - "-"
+  stdin_from_task_file: true
   timeout_seconds: 1800
 ```
 
@@ -61,9 +62,11 @@ docker compose run --rm dev agentic run-story --story STORY_SLUG --execute
 ```
 
 The adapter still runs one generated task file at a time, uses the allowlisted
-`codex exec --file {task_file}` command template, records runtime output under
-the story reports folder, requires expected reports, and stops before merge,
-push, deploy, PR creation, or GitHub API calls.
+`codex exec -` command template, feeds the generated task file through stdin,
+records runtime output under the story reports folder, requires expected
+reports, and stops before merge, push, deploy, PR creation, or GitHub API calls.
+Use this stdin shape unless `codex exec --help` in the installed CLI confirms a
+different supported file-input flag.
 
 If Codex is missing or unavailable, `run-story --execute` blocks safely with
 `BLOCKED_CODEX_COMMAND_NOT_FOUND`.

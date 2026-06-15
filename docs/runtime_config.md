@@ -64,15 +64,16 @@ codex_runtime:
   command: codex
   args:
     - exec
-    - --file
-    - "{task_file}"
+    - "-"
+  stdin_from_task_file: true
   timeout_seconds: 1800
 ```
 
 When enabled, `agentic run-story --story STORY_SLUG --execute` runs generated
-Codex task files one role at a time and requires each role's expected report
-before finalization. The command and args are validated against a narrow
-allowlist so story content cannot provide arbitrary commands.
+Codex task files one role at a time by passing the task file content to
+`codex exec -` through stdin. It requires each role's expected report before
+finalization. The command, args, and stdin behavior are validated against a
+narrow allowlist so story content cannot provide arbitrary commands.
 
 The Docker `dev` image installs the Codex CLI. If you run agentic through
 Docker, confirm Codex is available inside the `dev` container before enabling
@@ -81,7 +82,12 @@ the adapter:
 ```powershell
 docker compose run --rm dev which codex
 docker compose run --rm dev codex --version
+docker compose run --rm dev codex exec --help
 ```
+
+Use `codex exec -` for generated task files unless the installed CLI help
+confirms a different supported file-input flag. The help command checks command
+compatibility without requiring an authenticated model run.
 
 If `which codex` fails inside Docker, `run-story --execute` will stop safely
 with `BLOCKED_CODEX_COMMAND_NOT_FOUND`. Keep `codex_runtime.enabled: false` and

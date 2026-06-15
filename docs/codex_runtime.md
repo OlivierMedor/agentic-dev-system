@@ -129,23 +129,28 @@ codex_runtime:
   command: codex
   args:
     - exec
-    - --file
-    - "{task_file}"
+    - "-"
+  stdin_from_task_file: true
   timeout_seconds: 1800
 ```
 
-The adapter runs one generated task file at a time with `shell=False`, records
-stdout, stderr, and exit code under `stories/STORY_SLUG/reports/codex_runtime/`,
-requires each role's expected report after Codex exits, and stops before merge.
-The command template is allowlisted; story files cannot provide arbitrary
-commands.
+The adapter runs one generated task file at a time with `shell=False`, feeds the
+task file content to `codex exec -` through stdin, records stdout, stderr, and
+exit code under `stories/STORY_SLUG/reports/codex_runtime/`, requires each
+role's expected report after Codex exits, and stops before merge. The command
+template is allowlisted; story files cannot provide arbitrary commands.
 
 The Docker `dev` image installs the Codex CLI. Check from inside Docker with:
 
 ```powershell
 docker compose run --rm dev which codex
 docker compose run --rm dev codex --version
+docker compose run --rm dev codex exec --help
 ```
+
+Use stdin with `codex exec -` unless the installed CLI help confirms a different
+supported file-input flag. The current Docker smoke check verifies command
+compatibility without starting a model run.
 
 Installation does not include credentials. `compose.yml` sets
 `CODEX_HOME=/codex-home` and mounts a Docker-managed `codex-home` named volume

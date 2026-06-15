@@ -44,6 +44,8 @@ def test_codex_docker_docs_explain_smoke_checks_and_no_committed_credentials() -
     for text in [guide, readme, runtime_doc, runtime_config_doc]:
         assert "docker compose run --rm dev which codex" in text
         assert "docker compose run --rm dev codex --version" in text
+        assert "docker compose run --rm dev codex exec --help" in text
+        assert "codex exec -" in text
 
     assert "docs/codex_docker_runtime.md" in readme
     assert "CODEX_HOME=/codex-home" in guide

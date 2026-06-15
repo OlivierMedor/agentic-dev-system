@@ -108,8 +108,8 @@ codex_runtime:
   command: codex
   args:
     - exec
-    - --file
-    - "{task_file}"
+    - "-"
+  stdin_from_task_file: true
   timeout_seconds: 1800
 
 local_model_profiles:
