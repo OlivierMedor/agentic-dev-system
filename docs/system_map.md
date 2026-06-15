@@ -9,7 +9,7 @@ safe local workflow phases to prepare and finalize evidence, then leaves cloud
 review and merge decisions under human control.
 
 For a beginner-friendly repository tour, see `docs/code_tour.md`. For a
-command-to-code lookup table, see `docs/command_map.md`. For the manual Codex
+command-to-code lookup table, see `docs/command_map.md`. For the Codex
 task-file flow, see `docs/codex_task_execution.md`.
 
 ## Blueprint To Story Flow
@@ -113,7 +113,7 @@ stories/STORY_SLUG/reports/
 Prompt packs are generated local instructions for the assigned agent roles. The
 CLI writes the prompts, but it does not execute agents automatically.
 
-## Manual Codex Task Flow
+## Codex Task Flow
 
 ```text
 story workspace
@@ -131,7 +131,7 @@ agentic codex-task create
 reports/codex_tasks/*.md
   |
   v
-operator opens one task file in Codex
+operator or enabled run-story adapter runs one task file in Codex
   |
   v
 role writes reports/
@@ -140,9 +140,11 @@ role writes reports/
 agentic workflow-run --phase local-finalize --execute
 ```
 
-`build-context` and `codex-task create` generate local runtime artifacts. The
-operator decides which Codex role pass to run next; the CLI does not invoke
-Codex, run all roles, commit, push, merge, deploy, or call cloud models.
+`build-context` and `codex-task create` generate local runtime artifacts.
+Without `codex_runtime.enabled`, the operator decides which Codex role pass to
+run next. With `codex_runtime.enabled`, `run-story --execute` runs the
+allowlisted Codex command one role at a time. The CLI does not commit, push,
+merge, deploy, open PRs, or call GitHub APIs.
 
 ## Review Bundle, Quality Gate, And Finalize Flow
 

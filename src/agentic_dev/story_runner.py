@@ -7,7 +7,7 @@ from typing import Any
 
 import yaml
 
-from agentic_dev.codex_runtime import create_codex_tasks
+from agentic_dev.codex_runtime import create_codex_tasks, run_codex_task_runtime
 from agentic_dev.finalize_story import finalize_story
 from agentic_dev.local_model_runtime import run_local_agent_draft
 from agentic_dev.prepare_story import prepare_story
@@ -278,6 +278,9 @@ def execute_story_steps(
         return results
 
     results.extend(runtime_results)
+    if first_blocking_step(runtime_results) is not None:
+        return results
+
     results.append(
         StoryRunnerStepResult(
             step="verify-required-agent-reports",
@@ -290,12 +293,17 @@ def execute_story_steps(
 
 def run_configured_runtime(project_path: Path, story: str) -> list[StoryRunnerStepResult]:
     _, runtime_config = load_runtime_config(project_path)
+    codex_runtime = runtime_config.get("codex_runtime")
+    if isinstance(codex_runtime, dict) and codex_runtime.get("enabled") is True:
+        return codex_runtime_step_results(project_path, story)
+
     local_model_runtime = runtime_config.get("local_model_runtime")
     if not isinstance(local_model_runtime, dict) or local_model_runtime.get("enabled") is not True:
         raise ValueError(
-            "No automatic agent runtime is configured. Enable local_model_runtime.enabled "
-            "in .agentic/agent_runtime.yaml, or run the generated Codex task files manually "
-            "and rerun run-story after required reports exist."
+            "No automatic agent runtime is configured. Enable codex_runtime.enabled "
+            "or local_model_runtime.enabled in .agentic/agent_runtime.yaml, or run the "
+            "generated Codex task files manually and rerun run-story after required "
+            "reports exist."
         )
 
     story_path = project_path.resolve() / "stories" / story
@@ -343,6 +351,32 @@ def run_configured_runtime(project_path: Path, story: str) -> list[StoryRunnerSt
                 path=result.output_file,
             )
         )
+
+    return results
+
+
+def codex_runtime_step_results(project_path: Path, story: str) -> list[StoryRunnerStepResult]:
+    result = run_codex_task_runtime(project_path, story)
+    results: list[StoryRunnerStepResult] = []
+
+    for execution in result.executions:
+        results.append(
+            StoryRunnerStepResult(
+                step=f"automatic-agent-runtime:{execution.agent_id}",
+                status=execution.status,
+                summary=execution.summary,
+                path=execution.expected_report if execution.expected_report.is_file() else None,
+            )
+        )
+
+    results.append(
+        StoryRunnerStepResult(
+            step="automatic-agent-runtime:codex",
+            status=result.status,
+            summary=f"Codex runtime execution status: {result.status}",
+            path=result.report_path,
+        )
+    )
 
     return results
 
@@ -569,7 +603,7 @@ def build_story_runner_plan() -> list[StoryRunnerStep]:
         ),
         StoryRunnerStep(
             "automatic-agent-runtime",
-            "Attempt the configured automatic local runtime if available.",
+            "Attempt the configured automatic agent runtime if available.",
         ),
         StoryRunnerStep(
             "verify-required-agent-reports",
@@ -655,6 +689,7 @@ def write_story_runner_result(result: StoryRunnerResult) -> None:
         ],
         "missing_reports": result.missing_reports,
         "safety_flags": {
+            "called_codex": any("codex" in step.step for step in result.step_results),
             "called_cloud_models": False,
             "called_github_apis": False,
             "committed_or_merged": False,
@@ -713,7 +748,6 @@ def write_story_runner_report(
 - Did not deploy.
 - Did not open a PR.
 - Did not call GitHub APIs.
-- Did not call cloud models.
 - Stopped before merge.
 
 ## Next Action
@@ -746,7 +780,7 @@ def format_terminal_summary(
     lines.extend(
         [
             "Safety: stopped before merge; no merge, push, force-push, deploy, PR, "
-            "GitHub API, or cloud model call.",
+            "or GitHub API call.",
             f"Next action: {next_action}",
             f"Result written to: {result_path}",
             f"Report written to: {report_path}",

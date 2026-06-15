@@ -5,6 +5,7 @@ from pathlib import Path
 
 from agentic_dev.artifact_policy import (
     is_codex_task_output_path,
+    is_codex_runtime_output_path,
     is_env_file,
     is_feature_scan_runtime_path,
     is_generated_cloud_review_packet_path,
@@ -108,6 +109,9 @@ def public_readiness_violation_reason(
     if is_codex_task_output_path(parts, filename):
         return "Codex task runtime files must remain untracked"
 
+    if is_codex_runtime_output_path(parts, filename):
+        return "Codex runtime output files must remain untracked"
+
     if is_local_model_raw_response_path(parts, filename):
         return "local model raw response files must remain untracked"
 
@@ -202,6 +206,7 @@ def format_public_readiness_report(result: PublicReadinessResult) -> str:
             "- `stories/**/reports/local_agent_context/*` except `.gitkeep`",
             "- `stories/**/reports/role_context/*` except `.gitkeep`",
             "- `stories/**/reports/codex_tasks/*` except `.gitkeep`",
+            "- `stories/**/reports/codex_runtime/*` except `.gitkeep`",
             "- `*_raw_response.json`",
             "- `.agentic/local_model_scorecard/scorecard_scores.yaml`",
             "- `reports/local_model_scorecard_report.md`",

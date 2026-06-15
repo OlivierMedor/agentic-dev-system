@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -7,10 +9,21 @@ from typing import Any
 import yaml
 
 from agentic_dev.prompt_pack import load_agent_plan, ordered_assigned_agents, text_value
+from agentic_dev.runtime_config import CodexRuntimeConfig, load_codex_runtime_config
 
 
 CODEX_TASK_STATUS_READY = "CODEX_TASKS_READY"
 CODEX_TASK_STATUS_READY_WITH_WARNINGS = "CODEX_TASKS_READY_WITH_WARNINGS"
+CODEX_RUNTIME_RESULT_FILENAME = "codex_runtime_execution_result.yaml"
+CODEX_RUNTIME_REPORT_FILENAME = "codex_runtime_execution_report.md"
+CODEX_COMMAND_NOT_FOUND_MESSAGE = (
+    "Codex command was not found in the current runtime environment: {command}. "
+    "If you are running agentic through Docker, the dev container must include "
+    "the Codex CLI or a supported mounted runtime before codex_runtime.enabled "
+    "can execute tasks. Install/configure Codex in the container, or keep "
+    "codex_runtime.enabled: false and use manual task execution. This is a "
+    "runtime setup problem, not a story implementation failure."
+)
 
 BUILD_CONTEXT_HINT = "agentic build-context --story {story} --all --force"
 
@@ -89,6 +102,35 @@ class CodexTaskResult:
             lines.extend(f"  - {warning}" for warning in self.warnings)
 
         return "\n".join(lines)
+
+
+@dataclass(frozen=True)
+class CodexRuntimeTaskExecution:
+    agent_id: str
+    status: str
+    command: list[str]
+    task_file: Path
+    expected_report: Path
+    exit_code: int | None
+    stdout_path: Path | None
+    stderr_path: Path | None
+    duration_seconds: float | None
+    summary: str
+
+
+@dataclass(frozen=True)
+class CodexRuntimeExecutionResult:
+    project_path: Path
+    story: str
+    status: str
+    config_path: Path
+    result_path: Path
+    report_path: Path
+    executions: list[CodexRuntimeTaskExecution]
+
+    @property
+    def blocked(self) -> bool:
+        return self.status.startswith("BLOCKED") or self.status == "FAILED"
 
 
 def create_codex_tasks(
@@ -219,6 +261,350 @@ def create_codex_tasks(
     report_path.write_text(format_codex_task_report(result), encoding="utf-8")
 
     return result
+
+
+def run_codex_task_runtime(
+    project_path: Path,
+    story: str,
+) -> CodexRuntimeExecutionResult:
+    resolved_project_path = project_path.resolve()
+    story_path = resolved_project_path / "stories" / story
+    if not story_path.exists() or not story_path.is_dir():
+        raise FileNotFoundError(f"Story folder does not exist: {story_path}")
+
+    config_path, config = load_codex_runtime_config(resolved_project_path)
+    runtime_path = story_path / "reports" / "codex_runtime"
+    runtime_path.mkdir(parents=True, exist_ok=True)
+
+    executions: list[CodexRuntimeTaskExecution] = []
+    status = "PASSED"
+
+    for assigned_agent in ordered_assigned_agents(load_agent_plan(story_path / "agent_plan.yaml")):
+        agent_id = text_value(assigned_agent, "id", "")
+        expected_output = text_value(assigned_agent, "expected_output", "")
+        expected_report = resolve_codex_runtime_expected_report(story_path, expected_output)
+        if not agent_id or expected_report is None:
+            continue
+
+        task_file = story_path / "reports" / "codex_tasks" / f"{agent_id}_codex_task.md"
+        command = render_codex_runtime_command(config, task_file)
+
+        if expected_report.is_file():
+            executions.append(
+                CodexRuntimeTaskExecution(
+                    agent_id=agent_id,
+                    status="SKIPPED_EXISTING_REPORT",
+                    command=command,
+                    task_file=task_file,
+                    expected_report=expected_report,
+                    exit_code=None,
+                    stdout_path=None,
+                    stderr_path=None,
+                    duration_seconds=None,
+                    summary=f"Report already exists: {expected_report}",
+                )
+            )
+            continue
+
+        if not task_file.is_file():
+            status = "BLOCKED_MISSING_CODEX_TASK"
+            executions.append(
+                CodexRuntimeTaskExecution(
+                    agent_id=agent_id,
+                    status=status,
+                    command=command,
+                    task_file=task_file,
+                    expected_report=expected_report,
+                    exit_code=None,
+                    stdout_path=None,
+                    stderr_path=None,
+                    duration_seconds=None,
+                    summary=f"Codex task file is missing: {task_file}",
+                )
+            )
+            break
+
+        execution = run_one_codex_task(
+            project_path=resolved_project_path,
+            runtime_path=runtime_path,
+            agent_id=agent_id,
+            config=config,
+            task_file=task_file,
+            expected_report=expected_report,
+        )
+        executions.append(execution)
+        if execution.status.startswith("BLOCKED") or execution.status == "FAILED":
+            status = execution.status
+            break
+
+    result_path = story_path / "reports" / CODEX_RUNTIME_RESULT_FILENAME
+    report_path = story_path / "reports" / CODEX_RUNTIME_REPORT_FILENAME
+    result = CodexRuntimeExecutionResult(
+        project_path=resolved_project_path,
+        story=story,
+        status=status,
+        config_path=config_path,
+        result_path=result_path,
+        report_path=report_path,
+        executions=executions,
+    )
+    result_path.write_text(format_codex_runtime_execution_result(result), encoding="utf-8")
+    report_path.write_text(format_codex_runtime_execution_report(result), encoding="utf-8")
+    return result
+
+
+def run_one_codex_task(
+    *,
+    project_path: Path,
+    runtime_path: Path,
+    agent_id: str,
+    config: CodexRuntimeConfig,
+    task_file: Path,
+    expected_report: Path,
+) -> CodexRuntimeTaskExecution:
+    command = render_codex_runtime_command(config, task_file)
+    stdout_path = runtime_path / f"{agent_id}_stdout.txt"
+    stderr_path = runtime_path / f"{agent_id}_stderr.txt"
+    start = time.monotonic()
+
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=project_path,
+            capture_output=True,
+            text=True,
+            timeout=config.timeout_seconds,
+            check=False,
+        )
+    except FileNotFoundError:
+        duration = time.monotonic() - start
+        message = CODEX_COMMAND_NOT_FOUND_MESSAGE.format(command=config.command)
+        write_text_artifact(stdout_path, "")
+        write_text_artifact(stderr_path, message + "\n")
+        return CodexRuntimeTaskExecution(
+            agent_id=agent_id,
+            status="BLOCKED_CODEX_COMMAND_NOT_FOUND",
+            command=command,
+            task_file=task_file,
+            expected_report=expected_report,
+            exit_code=None,
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+            duration_seconds=duration,
+            summary=message,
+        )
+    except subprocess.TimeoutExpired as error:
+        duration = time.monotonic() - start
+        write_text_artifact(stdout_path, normalize_subprocess_text(error.stdout))
+        write_text_artifact(stderr_path, normalize_subprocess_text(error.stderr))
+        return CodexRuntimeTaskExecution(
+            agent_id=agent_id,
+            status="BLOCKED_CODEX_TIMEOUT",
+            command=command,
+            task_file=task_file,
+            expected_report=expected_report,
+            exit_code=None,
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+            duration_seconds=duration,
+            summary=f"Codex timed out after {config.timeout_seconds} second(s).",
+        )
+
+    duration = time.monotonic() - start
+    write_text_artifact(stdout_path, completed.stdout)
+    write_text_artifact(stderr_path, completed.stderr)
+
+    if completed.returncode != 0:
+        return CodexRuntimeTaskExecution(
+            agent_id=agent_id,
+            status="BLOCKED_CODEX_NONZERO_EXIT",
+            command=command,
+            task_file=task_file,
+            expected_report=expected_report,
+            exit_code=completed.returncode,
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+            duration_seconds=duration,
+            summary=f"Codex exited with code {completed.returncode} for {agent_id}.",
+        )
+
+    if not expected_report.is_file():
+        return CodexRuntimeTaskExecution(
+            agent_id=agent_id,
+            status="BLOCKED_MISSING_CODEX_REPORT",
+            command=command,
+            task_file=task_file,
+            expected_report=expected_report,
+            exit_code=completed.returncode,
+            stdout_path=stdout_path,
+            stderr_path=stderr_path,
+            duration_seconds=duration,
+            summary=(
+                "Codex exited successfully but did not create the expected report: "
+                f"{expected_report}"
+            ),
+        )
+
+    return CodexRuntimeTaskExecution(
+        agent_id=agent_id,
+        status="PASSED",
+        command=command,
+        task_file=task_file,
+        expected_report=expected_report,
+        exit_code=completed.returncode,
+        stdout_path=stdout_path,
+        stderr_path=stderr_path,
+        duration_seconds=duration,
+        summary=f"Codex completed {agent_id}; expected report exists.",
+    )
+
+
+def render_codex_runtime_command(config: CodexRuntimeConfig, task_file: Path) -> list[str]:
+    resolved_task_file = str(task_file.resolve())
+    return [
+        config.command,
+        *[argument.replace("{task_file}", resolved_task_file) for argument in config.args],
+    ]
+
+
+def resolve_codex_runtime_expected_report(
+    story_path: Path,
+    expected_output: str,
+) -> Path | None:
+    if not expected_output:
+        return None
+    path = Path(expected_output)
+    if path.is_absolute():
+        return path
+    if path.parts and path.parts[0] == "reports":
+        return story_path / path
+    return None
+
+
+def write_text_artifact(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
+def normalize_subprocess_text(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
+
+
+def format_codex_runtime_execution_result(result: CodexRuntimeExecutionResult) -> str:
+    data = {
+        "story": result.story,
+        "status": result.status,
+        "config_path": relative_to_project(result.project_path, result.config_path),
+        "executions": [
+            {
+                "agent": execution.agent_id,
+                "status": execution.status,
+                "command": redact_command_paths(result.project_path, execution.command),
+                "task_file": relative_to_project(result.project_path, execution.task_file),
+                "expected_report": relative_to_project(
+                    result.project_path,
+                    execution.expected_report,
+                ),
+                "exit_code": execution.exit_code,
+                "stdout_path": (
+                    relative_to_project(result.project_path, execution.stdout_path)
+                    if execution.stdout_path is not None
+                    else None
+                ),
+                "stderr_path": (
+                    relative_to_project(result.project_path, execution.stderr_path)
+                    if execution.stderr_path is not None
+                    else None
+                ),
+                "duration_seconds": execution.duration_seconds,
+                "summary": execution.summary,
+            }
+            for execution in result.executions
+        ],
+        "safety_flags": {
+            "called_codex": any(
+                execution.exit_code is not None or execution.stdout_path is not None
+                for execution in result.executions
+            ),
+            "called_github_apis": False,
+            "committed_or_merged": False,
+            "pushed": False,
+            "merged": False,
+            "deployed": False,
+            "opened_pr": False,
+            "ran_destructive_commands": False,
+        },
+    }
+    return yaml.safe_dump(data, sort_keys=False)
+
+
+def format_codex_runtime_execution_report(result: CodexRuntimeExecutionResult) -> str:
+    lines = [
+        "# Codex Runtime Execution Report",
+        "",
+        f"- Story: `{result.story}`",
+        f"- Status: {result.status}",
+        f"- Runtime config: `{relative_to_project(result.project_path, result.config_path)}`",
+        "",
+        "## Executions",
+        "",
+    ]
+    if not result.executions:
+        lines.append("- None.")
+    for execution in result.executions:
+        lines.extend(
+            [
+                f"### {execution.agent_id}",
+                "",
+                f"- Status: {execution.status}",
+                f"- Command: `{format_command_for_report(result.project_path, execution.command)}`",
+                f"- Task file: `{relative_to_project(result.project_path, execution.task_file)}`",
+                "- Expected report: "
+                f"`{relative_to_project(result.project_path, execution.expected_report)}`",
+                f"- Exit code: {execution.exit_code if execution.exit_code is not None else 'None'}",
+                f"- Summary: {execution.summary}",
+                "",
+            ],
+        )
+        if execution.stdout_path is not None:
+            lines.append(
+                f"- Stdout: `{relative_to_project(result.project_path, execution.stdout_path)}`"
+            )
+        if execution.stderr_path is not None:
+            lines.append(
+                f"- Stderr: `{relative_to_project(result.project_path, execution.stderr_path)}`"
+            )
+        lines.append("")
+
+    lines.extend(
+        [
+            "## Safety",
+            "",
+            "- Used the allowlisted Codex command template from runtime config.",
+            "- Ran one role task at a time.",
+            "- Did not call GitHub APIs.",
+            "- Did not commit, push, merge, deploy, or open a PR.",
+            "- Stopped before merge.",
+            "",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def format_command_for_report(project_path: Path, command: list[str]) -> str:
+    return " ".join(redact_command_paths(project_path, command))
+
+
+def redact_command_paths(project_path: Path, command: list[str]) -> list[str]:
+    return [relative_to_project(project_path, Path(part)) if looks_like_path(part) else part for part in command]
+
+
+def looks_like_path(value: str) -> bool:
+    return "/" in value or "\\" in value
 
 
 def select_context_packets(
