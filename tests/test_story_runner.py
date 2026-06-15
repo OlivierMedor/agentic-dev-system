@@ -231,7 +231,7 @@ def test_execute_uses_enabled_codex_runtime_and_invokes_task_command(
 
     assert result.status == "completed"
     assert commands
-    assert commands[0] == ["codex", "exec", "-"]
+    assert commands[0] == ["codex", "exec", "--sandbox", "workspace-write", "-"]
     assert "- Agent ID: `research_agent`" in stdin_payloads[0]
     assert runtime_result["status"] == "PASSED"
     assert runtime_result["safety_flags"]["called_codex"] is True

@@ -1,0 +1,6 @@
+story: story_058
+decision: APPROVE
+ready_for_human_merge_decision: true
+result_file: /app/stories/story_058/cloud_review_approval_input.md
+cloud_review_report_path: /app/stories/story_058/reports/cloud_review_report.md
+next_action: Human owner may approve merge after reviewing the PR.

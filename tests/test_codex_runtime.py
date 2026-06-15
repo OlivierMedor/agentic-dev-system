@@ -5,7 +5,11 @@ import pytest
 import yaml
 
 from agentic_dev.cli import main
-from agentic_dev.codex_runtime import create_codex_tasks, run_one_codex_task
+from agentic_dev.codex_runtime import (
+    create_codex_tasks,
+    render_codex_runtime_command,
+    run_one_codex_task,
+)
 from agentic_dev.runtime_config import CodexRuntimeConfig
 
 
@@ -328,7 +332,7 @@ def test_missing_codex_command_blocks_with_runtime_environment_guidance(
     config = CodexRuntimeConfig(
         enabled=True,
         command="codex",
-        args=["exec", "-"],
+        args=["exec", "--sandbox", "workspace-write", "-"],
         stdin_from_task_file=True,
         timeout_seconds=1800,
     )
@@ -368,7 +372,7 @@ def test_runtime_passes_task_file_content_to_codex_stdin_with_shell_false(
     config = CodexRuntimeConfig(
         enabled=True,
         command="codex",
-        args=["exec", "-"],
+        args=["exec", "--sandbox", "workspace-write", "-"],
         stdin_from_task_file=True,
         timeout_seconds=1800,
     )
@@ -392,7 +396,7 @@ def test_runtime_passes_task_file_content_to_codex_stdin_with_shell_false(
     assert result.status == "BLOCKED_MISSING_CODEX_REPORT"
     assert calls == [
         {
-            "command": ["codex", "exec", "-"],
+            "command": ["codex", "exec", "--sandbox", "workspace-write", "-"],
             "cwd": tmp_path,
             "capture_output": True,
             "input": "task content for stdin\n",
@@ -402,6 +406,21 @@ def test_runtime_passes_task_file_content_to_codex_stdin_with_shell_false(
             "check": False,
         }
     ]
+
+
+def test_render_codex_runtime_command_uses_workspace_write_sandbox(tmp_path: Path) -> None:
+    task_file = tmp_path / "developer_agent_codex_task.md"
+    config = CodexRuntimeConfig(
+        enabled=True,
+        command="codex",
+        args=["exec", "--sandbox", "workspace-write", "-"],
+        stdin_from_task_file=True,
+        timeout_seconds=1800,
+    )
+
+    command = render_codex_runtime_command(config, task_file)
+
+    assert command == ["codex", "exec", "--sandbox", "workspace-write", "-"]
 
 
 def test_cli_codex_task_create_defaults_to_all_agents(

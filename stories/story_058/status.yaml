@@ -1,0 +1,13 @@
+id: 058
+slug: codex-workspace-write-runtime
+title: Codex Workspace-Write Runtime Mode
+status: ready_for_human_merge_decision
+branch: story/058-codex-workspace-write-runtime
+phase: platform-improvement
+review_status: not_started
+merge_ready: false
+story_id: story_058
+ready_for_review: true
+merge_readiness_status: READY_FOR_HUMAN_MERGE_DECISION
+ready_for_human_merge_decision: true
+cloud_review_decision: APPROVE

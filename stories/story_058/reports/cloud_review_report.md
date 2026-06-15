@@ -1,0 +1,31 @@
+# Cloud Review Report
+
+## Story
+
+story_058
+
+## Decision
+
+APPROVE
+
+## Summary
+
+Recorded the manual cloud review decision from `/app/stories/story_058/cloud_review_approval_input.md`.
+This command did not call cloud models, commit, push, merge, or deploy.
+Human final approval is still required before merge.
+
+## Original result file
+
+/app/stories/story_058/cloud_review_approval_input.md
+
+## Raw cloud review content
+
+```markdown
+Decision: APPROVE
+
+APPROVED. Reviewed Story 058 after docs cleanup. The Codex runtime command is now consistently documented and configured as `codex exec --sandbox workspace-write -`. Generated task file content is passed through stdin. `workspace-write` allows Codex to write required story report files inside the mounted workspace only. `danger-full-access` is not used or allowlisted. Validation passed: targeted Codex/runtime/story-runner/docs tests passed, full pytest passed with 515 tests, Ruff passed, and local-finalize completed. The runner still does not merge, push, force-push, deploy, open PRs, or call GitHub APIs.
+```
+
+## Next action
+
+Human owner may approve merge after reviewing the PR.

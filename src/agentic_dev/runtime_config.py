@@ -43,7 +43,7 @@ RISKY_COMMAND_REQUIREMENTS = {
 }
 
 CODEX_RUNTIME_ALLOWED_COMMANDS = {"codex", "codex.cmd"}
-CODEX_RUNTIME_REQUIRED_ARGS = ["exec", "-"]
+CODEX_RUNTIME_REQUIRED_ARGS = ["exec", "--sandbox", "workspace-write", "-"]
 CODEX_RUNTIME_REQUIRED_STDIN_FROM_TASK_FILE = True
 MAX_CODEX_RUNTIME_TIMEOUT_SECONDS = 7200
 
@@ -157,6 +157,8 @@ codex_runtime:
   command: codex
   args:
     - exec
+    - --sandbox
+    - workspace-write
     - "-"
   stdin_from_task_file: true
   timeout_seconds: 1800

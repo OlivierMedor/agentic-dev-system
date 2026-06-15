@@ -129,16 +129,25 @@ codex_runtime:
   command: codex
   args:
     - exec
+    - --sandbox
+    - workspace-write
     - "-"
   stdin_from_task_file: true
   timeout_seconds: 1800
 ```
 
 The adapter runs one generated task file at a time with `shell=False`, feeds the
-task file content to `codex exec -` through stdin, records stdout, stderr, and
-exit code under `stories/STORY_SLUG/reports/codex_runtime/`, requires each
-role's expected report after Codex exits, and stops before merge. The command
-template is allowlisted; story files cannot provide arbitrary commands.
+task file content to `codex exec --sandbox workspace-write -` through stdin,
+records stdout, stderr, and exit code under
+`stories/STORY_SLUG/reports/codex_runtime/`, requires each role's expected
+report after Codex exits, and stops before merge. The command template is
+allowlisted; story files cannot provide arbitrary commands.
+
+`codex exec` accepts `-` to read task file content from stdin and is read-only
+by default. Agentic uses `--sandbox workspace-write` so Codex can create
+required story report files under the mounted workspace without enabling
+unrestricted access. `danger-full-access` is not used or allowlisted by
+default.
 
 The Docker `dev` image installs the Codex CLI. Check from inside Docker with:
 
@@ -148,9 +157,9 @@ docker compose run --rm dev codex --version
 docker compose run --rm dev codex exec --help
 ```
 
-Use stdin with `codex exec -` unless the installed CLI help confirms a different
-supported file-input flag. The current Docker smoke check verifies command
-compatibility without starting a model run.
+Use stdin with `codex exec --sandbox workspace-write -` unless the installed CLI
+help confirms a different supported file-input flag. The current Docker smoke
+check verifies command compatibility without starting a model run.
 
 Installation does not include credentials. `compose.yml` sets
 `CODEX_HOME=/codex-home` and mounts a Docker-managed `codex-home` named volume

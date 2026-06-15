@@ -1,0 +1,22 @@
+story: story_058
+status: planned
+execution_order:
+  - developer_agent
+  - test_agent
+  - local_reviewer_agent
+assigned_agents:
+  - id: developer_agent
+    display_name: Developer Agent
+    responsibility: Update the Codex runtime contract to use the safe
+      workspace-write sandbox and keep the runtime allowlist narrow.
+    expected_output: reports/developer_report.md
+  - id: test_agent
+    display_name: Test Agent
+    responsibility: Add or update tests for runtime config validation, command
+      rendering, blocking behavior, and safety invariants.
+    expected_output: reports/test_report.md
+  - id: local_reviewer_agent
+    display_name: Local Reviewer Agent
+    responsibility: Review the Story 058 evidence and decide whether it is ready
+      for human review.
+    expected_output: reports/local_review_report.md
