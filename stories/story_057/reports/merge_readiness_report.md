@@ -18,14 +18,15 @@ story_057
 - Quality gate is ready for review.
 - Finalize story result is ready for review.
 - Test layer result status is PASSED.
+- Cloud review decision is APPROVE.
 
 ## Failed checks
 
-- Missing required evidence: reports/cloud_review_result.yaml.
+- None
 
 ## Cloud review decision
 
-missing
+APPROVE
 
 ## Remote dev validation
 
@@ -33,11 +34,11 @@ Remote dev validation was not recorded. Missing remote dev validation is current
 
 ## Final recommendation
 
-REQUEST_CHANGES
+READY_FOR_HUMAN_MERGE_DECISION
 
 ## Next recommended action
 
-Address missing evidence or requested changes, then rerun finalize-story, cloud review, and merge-readiness as needed.
+Human owner should review the PR, confirm GitHub Actions are passing, and decide whether to merge.
 
 ## Merge reminders
 
