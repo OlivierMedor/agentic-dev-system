@@ -1,0 +1,16 @@
+logs_required: true
+watch_for:
+  - codex_runtime_enabled_by_default
+  - codex_runtime_accepts_danger_full_access_without_ack
+  - codex_runtime_accepts_ack_without_danger_full_access
+  - codex_runtime_accepts_arbitrary_args
+  - codex_runtime_stops_passing_task_files_via_stdin
+  - missing_codex_report_no_longer_blocks
+  - nonzero_codex_exit_no_longer_blocks
+  - codex_auth_state_paths_allowed_in_git
+  - automatic_merge
+  - automatic_push
+  - force_push
+  - deployment_call
+  - pr_creation
+  - github_api_call

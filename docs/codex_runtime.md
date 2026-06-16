@@ -134,6 +134,7 @@ codex_runtime:
     - "-"
   stdin_from_task_file: true
   timeout_seconds: 1800
+  docker_isolation_acknowledged: false
 ```
 
 The adapter runs one generated task file at a time with `shell=False`, feeds the
@@ -143,11 +144,45 @@ records stdout, stderr, and exit code under
 report after Codex exits, and stops before merge. The command template is
 allowlisted; story files cannot provide arbitrary commands.
 
+Default safe runtime:
+`codex exec --sandbox workspace-write -`
+
 `codex exec` accepts `-` to read task file content from stdin and is read-only
-by default. Agentic uses `--sandbox workspace-write` so Codex can create
-required story report files under the mounted workspace without enabling
-unrestricted access. `danger-full-access` is not used or allowlisted by
-default.
+by default. Agentic prefers `workspace-write` when it works so Codex can create
+required story report files under the mounted workspace while keeping the inner
+Codex sandbox active.
+
+Inside some Docker environments, Codex's inner Linux sandbox can fail with
+`bwrap: No permissions to create a new namespace`. If that happens, the only
+supported fallback is an explicit Docker-isolated shape:
+
+Docker-compatible fallback:
+`codex exec --sandbox danger-full-access -`
+
+Requires:
+`docker_isolation_acknowledged: true`
+
+```yaml
+codex_runtime:
+  enabled: true
+  command: codex
+  args:
+    - exec
+    - --sandbox
+    - danger-full-access
+    - "-"
+  stdin_from_task_file: true
+  timeout_seconds: 1800
+  docker_isolation_acknowledged: true
+```
+
+This is a tradeoff. Docker remains the outer isolation boundary, but Codex no
+longer has its inner `workspace-write` sandbox. In that mode it can read and
+write the mounted workspace and may access Codex auth or config state inside
+the container. It remains disabled by default and is rejected unless
+`docker_isolation_acknowledged: true`. Use it only for trusted repos and
+controlled local automation. The runner still does not merge, push,
+force-push, deploy, open PRs, or call GitHub APIs.
 
 The Docker `dev` image installs the Codex CLI. Check from inside Docker with:
 

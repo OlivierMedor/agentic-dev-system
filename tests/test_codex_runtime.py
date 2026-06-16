@@ -335,6 +335,7 @@ def test_missing_codex_command_blocks_with_runtime_environment_guidance(
         args=["exec", "--sandbox", "workspace-write", "-"],
         stdin_from_task_file=True,
         timeout_seconds=1800,
+        docker_isolation_acknowledged=False,
     )
 
     def fake_run(*args: object, **kwargs: object) -> object:
@@ -375,6 +376,7 @@ def test_runtime_passes_task_file_content_to_codex_stdin_with_shell_false(
         args=["exec", "--sandbox", "workspace-write", "-"],
         stdin_from_task_file=True,
         timeout_seconds=1800,
+        docker_isolation_acknowledged=False,
     )
     calls: list[dict[str, object]] = []
 
@@ -416,11 +418,28 @@ def test_render_codex_runtime_command_uses_workspace_write_sandbox(tmp_path: Pat
         args=["exec", "--sandbox", "workspace-write", "-"],
         stdin_from_task_file=True,
         timeout_seconds=1800,
+        docker_isolation_acknowledged=False,
     )
 
     command = render_codex_runtime_command(config, task_file)
 
     assert command == ["codex", "exec", "--sandbox", "workspace-write", "-"]
+
+
+def test_render_codex_runtime_command_accepts_explicit_docker_danger_shape(tmp_path: Path) -> None:
+    task_file = tmp_path / "developer_agent_codex_task.md"
+    config = CodexRuntimeConfig(
+        enabled=True,
+        command="codex",
+        args=["exec", "--sandbox", "danger-full-access", "-"],
+        stdin_from_task_file=True,
+        timeout_seconds=1800,
+        docker_isolation_acknowledged=True,
+    )
+
+    command = render_codex_runtime_command(config, task_file)
+
+    assert command == ["codex", "exec", "--sandbox", "danger-full-access", "-"]
 
 
 def test_cli_codex_task_create_defaults_to_all_agents(

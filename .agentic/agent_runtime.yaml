@@ -113,6 +113,7 @@ codex_runtime:
     - "-"
   stdin_from_task_file: true
   timeout_seconds: 1800
+  docker_isolation_acknowledged: false
 
 local_model_profiles:
   lm_studio:

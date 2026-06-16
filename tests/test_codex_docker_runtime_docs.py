@@ -53,6 +53,11 @@ def test_codex_docker_docs_explain_smoke_checks_and_no_committed_credentials() -
     assert "does not bake API keys, access tokens" in normalized_guide
     assert "read-only by default" in guide
     assert "danger-full-access" in guide
+    assert "bwrap" in guide
+    assert "No permissions to create a new namespace" in guide
+    assert "docker_isolation_acknowledged: true" in guide
+    assert "trusted repos" in normalized_guide
+    assert "mounted workspace" in normalized_guide
     assert "Do not put `CODEX_API_KEY`, `CODEX_ACCESS_TOKEN`, `auth.json`" in normalized_guide
     assert "BLOCKED_CODEX_COMMAND_NOT_FOUND" in guide
 
