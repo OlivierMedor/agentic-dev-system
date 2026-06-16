@@ -134,6 +134,7 @@ codex_runtime:
     - "-"
   stdin_from_task_file: true
   timeout_seconds: 1800
+  docker_isolation_acknowledged: false
 ```
 
 The adapter runs one generated task file at a time with `shell=False`, feeds the
@@ -146,8 +147,33 @@ allowlisted; story files cannot provide arbitrary commands.
 `codex exec` accepts `-` to read task file content from stdin and is read-only
 by default. Agentic uses `--sandbox workspace-write` so Codex can create
 required story report files under the mounted workspace without enabling
-unrestricted access. `danger-full-access` is not used or allowlisted by
-default.
+unrestricted access.
+
+Inside some Docker environments, Codex's inner Linux sandbox can fail with
+`bwrap: No permissions to create a new namespace`. If that happens, the only
+supported fallback is an explicit Docker-isolated shape:
+
+```yaml
+codex_runtime:
+  enabled: true
+  command: codex
+  args:
+    - exec
+    - --sandbox
+    - danger-full-access
+    - "-"
+  stdin_from_task_file: true
+  timeout_seconds: 1800
+  docker_isolation_acknowledged: true
+```
+
+This is a tradeoff. Docker remains the outer isolation boundary, but Codex no
+longer has its inner `workspace-write` sandbox. In that mode it can read and
+write the mounted workspace and may access Codex auth or config state inside
+the container. Use it only for trusted repos and controlled local automation.
+It remains disabled by default, must be explicitly acknowledged, and does not
+change the runner's safety boundary: no merge, push, deploy, PR creation, or
+GitHub API calls.
 
 The Docker `dev` image installs the Codex CLI. Check from inside Docker with:
 

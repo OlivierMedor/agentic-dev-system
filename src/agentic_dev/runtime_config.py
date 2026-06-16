@@ -43,7 +43,8 @@ RISKY_COMMAND_REQUIREMENTS = {
 }
 
 CODEX_RUNTIME_ALLOWED_COMMANDS = {"codex", "codex.cmd"}
-CODEX_RUNTIME_REQUIRED_ARGS = ["exec", "--sandbox", "workspace-write", "-"]
+CODEX_RUNTIME_WORKSPACE_WRITE_ARGS = ["exec", "--sandbox", "workspace-write", "-"]
+CODEX_RUNTIME_DOCKER_DANGER_ARGS = ["exec", "--sandbox", "danger-full-access", "-"]
 CODEX_RUNTIME_REQUIRED_STDIN_FROM_TASK_FILE = True
 MAX_CODEX_RUNTIME_TIMEOUT_SECONDS = 7200
 
@@ -162,6 +163,7 @@ codex_runtime:
     - "-"
   stdin_from_task_file: true
   timeout_seconds: 1800
+  docker_isolation_acknowledged: false
 
 local_model_profiles:
   lm_studio:
@@ -193,6 +195,7 @@ class CodexRuntimeConfig:
     args: list[str]
     stdin_from_task_file: bool
     timeout_seconds: int
+    docker_isolation_acknowledged: bool
 
 
 def runtime_config_path(project_path: Path) -> Path:
@@ -342,6 +345,7 @@ def parse_codex_runtime_config(
     args = section.get("args")
     stdin_from_task_file = section.get("stdin_from_task_file")
     timeout_seconds = section.get("timeout_seconds")
+    docker_isolation_acknowledged = section.get("docker_isolation_acknowledged", False)
 
     if not isinstance(enabled, bool):
         errors.append("codex_runtime.enabled must be a boolean.")
@@ -358,10 +362,15 @@ def parse_codex_runtime_config(
     if not isinstance(args, list) or not all(isinstance(item, str) for item in args):
         errors.append("codex_runtime.args must be a list of strings.")
         args = []
-    elif args != CODEX_RUNTIME_REQUIRED_ARGS:
+    elif tuple(args) not in {
+        tuple(CODEX_RUNTIME_WORKSPACE_WRITE_ARGS),
+        tuple(CODEX_RUNTIME_DOCKER_DANGER_ARGS),
+    }:
         errors.append(
-            "codex_runtime.args must be exactly: "
-            + " ".join(CODEX_RUNTIME_REQUIRED_ARGS)
+            "codex_runtime.args must be exactly one of: "
+            + " ".join(CODEX_RUNTIME_WORKSPACE_WRITE_ARGS)
+            + " OR "
+            + " ".join(CODEX_RUNTIME_DOCKER_DANGER_ARGS)
             + "."
         )
 
@@ -379,6 +388,19 @@ def parse_codex_runtime_config(
             f"{MAX_CODEX_RUNTIME_TIMEOUT_SECONDS}."
         )
 
+    if not isinstance(docker_isolation_acknowledged, bool):
+        errors.append("codex_runtime.docker_isolation_acknowledged must be a boolean.")
+    elif args == CODEX_RUNTIME_DOCKER_DANGER_ARGS and not docker_isolation_acknowledged:
+        errors.append(
+            "codex_runtime.args uses danger-full-access, which requires "
+            "codex_runtime.docker_isolation_acknowledged: true."
+        )
+    elif args == CODEX_RUNTIME_WORKSPACE_WRITE_ARGS and docker_isolation_acknowledged:
+        errors.append(
+            "codex_runtime.docker_isolation_acknowledged must be false unless "
+            "codex_runtime.args is the Docker danger-full-access shape."
+        )
+
     if errors:
         return None
 
@@ -388,6 +410,7 @@ def parse_codex_runtime_config(
         args=list(args),
         stdin_from_task_file=stdin_from_task_file,
         timeout_seconds=timeout_seconds,
+        docker_isolation_acknowledged=docker_isolation_acknowledged,
     )
 
 

@@ -211,7 +211,18 @@ feeds generated task file content through stdin to
 stdin and is read-only by default, so agentic uses `workspace-write` to let
 Codex create the required story report files inside the mounted workspace only.
 The installed CLI help should confirm that this command shape remains
-supported. `danger-full-access` is not used or allowlisted by default.
+supported.
+
+Some Docker environments cannot start Codex's inner Linux sandbox and fail with
+`bwrap: No permissions to create a new namespace`. When that happens, the only
+supported fallback is an explicit Docker-isolated config using
+`codex exec --sandbox danger-full-access -` plus
+`docker_isolation_acknowledged: true`. That mode is disabled by default, must
+be acknowledged explicitly, can read and write the mounted workspace, and may
+access Codex auth state inside the container. Use it only for trusted repos and
+controlled local automation. The runner still does not merge, push, force-push,
+deploy, open PRs, or call GitHub APIs.
+
 Authentication is not baked into the image and credentials are not stored in the
 repo; see
 `docs/codex_docker_runtime.md` for device-code login, Docker volume storage,

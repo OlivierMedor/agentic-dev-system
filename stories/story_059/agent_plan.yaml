@@ -1,0 +1,22 @@
+story: story_059
+status: pending_execution
+execution_order:
+  - developer_agent
+  - test_agent
+  - local_reviewer_agent
+assigned_agents:
+  - id: developer_agent
+    display_name: Developer Agent
+    responsibility: Implement the Docker-compatible Codex runtime mode with
+      explicit acknowledgement.
+    expected_output: reports/developer_report.md
+  - id: test_agent
+    display_name: Test Agent
+    responsibility: Validate the runtime contract, Docker smoke path, and
+      unchanged safety boundaries.
+    expected_output: reports/test_report.md
+  - id: local_reviewer_agent
+    display_name: Local Reviewer Agent
+    responsibility: Review the implementation and decide whether it is ready
+      for human merge review.
+    expected_output: reports/local_review_report.md

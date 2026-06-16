@@ -73,12 +73,18 @@ def read_yaml(path: Path) -> dict:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
-def codex_runtime_config_text(*, command: str = "codex", args: list[str] | None = None) -> str:
+def codex_runtime_config_text(
+    *,
+    command: str = "codex",
+    args: list[str] | None = None,
+    docker_isolation_acknowledged: bool = False,
+) -> str:
     config = yaml.safe_load(default_runtime_config_text())
     config["codex_runtime"]["enabled"] = True
     config["codex_runtime"]["command"] = command
     if args is not None:
         config["codex_runtime"]["args"] = args
+    config["codex_runtime"]["docker_isolation_acknowledged"] = docker_isolation_acknowledged
     return yaml.safe_dump(config, sort_keys=False)
 
 
@@ -237,6 +243,75 @@ def test_execute_uses_enabled_codex_runtime_and_invokes_task_command(
     assert runtime_result["safety_flags"]["called_codex"] is True
     assert ("automatic-agent-runtime:codex", "PASSED") in [
         (step.step, step.status) for step in result.step_results
+    ]
+
+
+def test_execute_uses_explicit_docker_danger_shape_only_when_acknowledged(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    create_project(
+        tmp_path,
+        runtime_config=codex_runtime_config_text(
+            args=["exec", "--sandbox", "danger-full-access", "-"],
+            docker_isolation_acknowledged=True,
+        ),
+    )
+    story_path = create_story(tmp_path)
+    commands: list[list[str]] = []
+
+    def fake_run(
+        command: list[str],
+        *,
+        cwd: Path,
+        capture_output: bool,
+        input: str | None,
+        text: bool,
+        shell: bool,
+        timeout: int,
+        check: bool,
+    ) -> SimpleNamespace:
+        commands.append(command)
+        agent_id = input.split("- Agent ID: `", 1)[1].split("`", 1)[0]
+        report_name = AGENT_REPORTS[agent_id]
+        report_content = "READY_FOR_REVIEW\n" if agent_id == "local_reviewer_agent" else "done\n"
+        (story_path / "reports" / report_name).write_text(report_content, encoding="utf-8")
+        return SimpleNamespace(returncode=0, stdout=f"ran {agent_id}\n", stderr="")
+
+    def fake_finalize_story(project_path: Path, story: str) -> SimpleNamespace:
+        result_path = project_path / "stories" / story / "reports" / "finalize_story_result.yaml"
+        result_path.write_text("status: ready_for_review\n", encoding="utf-8")
+        return SimpleNamespace(
+            ready_for_review=True,
+            status="ready_for_review",
+            finalize_result_path=result_path,
+        )
+
+    def fake_run_quality_gate(project_path: Path, story: str) -> SimpleNamespace:
+        result_path = project_path / "stories" / story / "reports" / "quality_gate_result.yaml"
+        result_path.write_text("status: READY_FOR_REVIEW\n", encoding="utf-8")
+        return SimpleNamespace(
+            ready_for_review=True,
+            status="READY_FOR_REVIEW",
+            result_path=result_path,
+            next_action="Send the story to a human or cloud reviewer.",
+        )
+
+    monkeypatch.setattr("agentic_dev.codex_runtime.subprocess.run", fake_run)
+    monkeypatch.setattr("agentic_dev.story_runner.finalize_story", fake_finalize_story)
+    monkeypatch.setattr("agentic_dev.story_runner.run_quality_gate", fake_run_quality_gate)
+
+    result = run_story(tmp_path, STORY, execute=True)
+    runtime_result = read_yaml(story_path / "reports" / "codex_runtime_execution_result.yaml")
+
+    assert result.status == "completed"
+    assert commands[0] == ["codex", "exec", "--sandbox", "danger-full-access", "-"]
+    assert runtime_result["executions"][0]["command"] == [
+        "codex",
+        "exec",
+        "--sandbox",
+        "danger-full-access",
+        "-",
     ]
 
 

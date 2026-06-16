@@ -1,0 +1,33 @@
+test_layers_version: 1
+unit_tests:
+  required: true
+  action: add_or_update
+  frequency: every_commit
+  evidence_or_reason: Update runtime config, Codex runtime, story runner, and
+    docs tests for the explicit Docker acknowledgement contract.
+integration_tests:
+  required: true
+  action: confirm_existing
+  frequency: before_merge
+  evidence_or_reason: Run targeted Docker pytest suites for Codex runtime,
+    runtime config, and story runner plus the full pytest suite and Ruff inside
+    the dev container.
+mock_e2e_tests:
+  required: true
+  action: confirm_existing
+  frequency: before_merge
+  evidence_or_reason: Story runner and Codex runtime tests fake subprocess
+    behavior to confirm missing-report blocking, nonzero exits, exact command
+    rendering, and unchanged safety flags.
+live_read_only_checks:
+  required: true
+  action: confirm_existing
+  frequency: before_merge
+  evidence_or_reason: Verify `which codex`, `codex --version`, and
+    `codex exec --help` inside Docker before the write smoke test.
+remote_dev_smoke_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: after_remote_dev_deploy
+  evidence_or_reason: This change is local Docker runtime policy only and does
+    not deploy remote infrastructure.

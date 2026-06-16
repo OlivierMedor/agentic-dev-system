@@ -69,6 +69,7 @@ codex_runtime:
     - "-"
   stdin_from_task_file: true
   timeout_seconds: 1800
+  docker_isolation_acknowledged: false
 ```
 
 When enabled, `agentic run-story --story STORY_SLUG --execute` runs generated
@@ -97,8 +98,22 @@ command checks command compatibility without requiring an authenticated model
 run.
 
 `danger-full-access` is not used or allowed by default. The runtime config only
-accepts the exact `workspace-write` sandbox shape with `shell=False` and
-`stdin_from_task_file: true`.
+accepts two exact shapes with `shell=False` and `stdin_from_task_file: true`:
+
+- Default safe shape: `codex exec --sandbox workspace-write -`
+- Docker-compatible explicit fallback:
+  `codex exec --sandbox danger-full-access -`
+
+The Docker-compatible fallback is rejected unless
+`docker_isolation_acknowledged: true` is set explicitly. That acknowledgement
+exists because nested Linux sandboxing can fail inside Docker with errors such
+as `bwrap: No permissions to create a new namespace`. In that case Docker is
+the isolation boundary and Codex runs without its inner Linux sandbox.
+
+Use the Docker-compatible shape only for trusted repos and controlled local
+automation. In that mode Codex can read and write the mounted workspace and may
+access Codex auth or config state available inside the container, including the
+`CODEX_HOME` volume.
 
 If `which codex` fails inside Docker, `run-story --execute` will stop safely
 with `BLOCKED_CODEX_COMMAND_NOT_FOUND`. Keep `codex_runtime.enabled: false` and

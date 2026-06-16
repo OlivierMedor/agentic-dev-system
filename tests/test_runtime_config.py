@@ -154,6 +154,7 @@ def test_default_runtime_config_uses_codex_first_tiered_defaults(tmp_path: Path)
         "args": ["exec", "--sandbox", "workspace-write", "-"],
         "stdin_from_task_file": True,
         "timeout_seconds": 1800,
+        "docker_isolation_acknowledged": False,
     }
 
 
@@ -164,6 +165,7 @@ def test_checked_in_runtime_config_keeps_codex_runtime_disabled_by_default() -> 
     assert config["codex_runtime"]["command"] == "codex"
     assert config["codex_runtime"]["args"] == ["exec", "--sandbox", "workspace-write", "-"]
     assert config["codex_runtime"]["stdin_from_task_file"] is True
+    assert config["codex_runtime"]["docker_isolation_acknowledged"] is False
 
 
 def test_validate_runtime_config_fails_for_missing_required_agent(tmp_path: Path) -> None:
@@ -269,7 +271,42 @@ def test_validate_runtime_config_rejects_danger_full_access_sandbox(
     with pytest.raises(ValueError) as error:
         validate_runtime_config(tmp_path)
 
-    assert "codex_runtime.args must be exactly" in str(error.value)
+    assert "docker_isolation_acknowledged: true" in str(error.value)
+
+
+def test_validate_runtime_config_accepts_danger_full_access_only_with_docker_ack(
+    tmp_path: Path,
+) -> None:
+    config = runtime_config_data()
+    config["codex_runtime"]["enabled"] = True
+    config["codex_runtime"]["args"] = ["exec", "--sandbox", "danger-full-access", "-"]
+    config["codex_runtime"]["docker_isolation_acknowledged"] = True
+    write_runtime_config(tmp_path, config)
+
+    result = validate_runtime_config(tmp_path)
+
+    assert result.config["codex_runtime"]["args"] == [
+        "exec",
+        "--sandbox",
+        "danger-full-access",
+        "-",
+    ]
+    assert result.config["codex_runtime"]["docker_isolation_acknowledged"] is True
+
+
+def test_validate_runtime_config_rejects_docker_ack_without_danger_full_access(
+    tmp_path: Path,
+) -> None:
+    config = runtime_config_data()
+    config["codex_runtime"]["docker_isolation_acknowledged"] = True
+    write_runtime_config(tmp_path, config)
+
+    with pytest.raises(ValueError) as error:
+        validate_runtime_config(tmp_path)
+
+    assert "must be false unless codex_runtime.args is the Docker danger-full-access shape" in str(
+        error.value
+    )
 
 
 def test_validate_runtime_config_requires_codex_task_file_stdin(

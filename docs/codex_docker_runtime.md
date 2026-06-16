@@ -55,6 +55,7 @@ codex_runtime:
     - "-"
   stdin_from_task_file: true
   timeout_seconds: 1800
+  docker_isolation_acknowledged: false
 ```
 
 Then run:
@@ -75,6 +76,66 @@ required story report files inside the mounted workspace. This does not enable
 unrestricted host access. The allowed sandbox is limited to the mounted
 workspace path. `danger-full-access` is not used or allowlisted by default, and
 the runtime config rejects it.
+
+## Why Docker Mode Exists
+
+Some Docker runtimes do not allow the inner Linux sandbox that Codex uses for
+`workspace-write`. A typical failure looks like:
+
+```text
+bwrap: No permissions to create a new namespace
+```
+
+That means Codex launched, but its inner sandbox could not start inside the
+container. In that case the supported fallback is to use Docker as the
+isolation boundary and explicitly acknowledge the less-restricted Codex mode:
+
+```yaml
+codex_runtime:
+  enabled: true
+  command: codex
+  args:
+    - exec
+    - --sandbox
+    - danger-full-access
+    - "-"
+  stdin_from_task_file: true
+  timeout_seconds: 1800
+  docker_isolation_acknowledged: true
+```
+
+This mode is disabled by default and validation rejects it unless the
+acknowledgement flag is present.
+
+## Security Tradeoff
+
+`workspace-write` keeps the inner Codex sandbox active and is the preferred
+mode whenever it works.
+
+`danger-full-access` inside Docker is a tradeoff:
+
+- Codex can read and write the mounted workspace.
+- Codex may access auth or config state available inside the container,
+  including the `CODEX_HOME` volume.
+- Docker is the isolation boundary, not Codex's inner Linux sandbox.
+
+Use this only for trusted repos and controlled local automation. Do not use it
+for untrusted repositories.
+
+The runner safety policy is unchanged. It still does not merge, push,
+force-push, deploy, open PRs, or call GitHub APIs.
+
+## Verify With A Small Story
+
+Use a disposable or controlled story that requires a single report such as
+`reports/research_report.md`.
+
+1. Build context and task files.
+2. Enable the acknowledged Docker-compatible config above.
+3. Run `docker compose run --rm dev agentic run-story --story STORY_SLUG --execute`.
+4. Confirm the required report is created under `/workspace/stories/.../reports/`.
+5. Confirm the run moves past `automatic-agent-runtime` and only stops later if
+   normal story evidence is missing.
 
 Use this stdin shape unless `codex exec --help` in the installed CLI confirms a
 different supported file-input flag.
