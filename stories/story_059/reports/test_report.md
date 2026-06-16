@@ -31,6 +31,14 @@
 - Existing no-merge/no-push/no-deploy/no-PR/no-GitHub-API behavior remains
   covered.
 
+## Docs Cleanup Validation
+
+- `docker compose run --rm dev pytest tests/test_codex_docker_runtime_docs.py -q`
+  passed after the wording cleanup.
+- The cleanup preserved the required doc assertions for:
+  `workspace-write`, `danger-full-access`, `docker_isolation_acknowledged: true`,
+  `bwrap`, trusted-repo warnings, and Docker auth-state guidance.
+
 ## Docker Write Smoke
 
 - Verified the Codex CLI inside Docker and then ran a disposable smoke project

@@ -47,7 +47,7 @@ step_results:
   ran: true
   status: PASSED
   returncode: 0
-  summary: 'workflow-preview next action: Run workflow-run prepare.'
+  summary: 'workflow-preview next action: Fix failed checks before continuing.'
   result_path: /app/stories/story_059/reports/workflow_preview_result.yaml
   report_path: /app/stories/story_059/reports/workflow_preview_report.md
 executed_agents: false

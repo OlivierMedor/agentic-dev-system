@@ -2,12 +2,12 @@ id: 059
 story_id: story_059
 slug: docker-compatible-codex-execution-mode
 title: Docker-Compatible Codex Execution Mode
-status: request_changes
+status: ready_for_review
 branch: story/059-docker-compatible-codex-execution
 phase: platform-improvement
 review_status: not_started
 merge_ready: false
-ready_for_review: false
+ready_for_review: true
 merge_readiness_status: REQUEST_CHANGES
 ready_for_human_merge_decision: false
 cloud_review_decision: null

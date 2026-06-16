@@ -9,6 +9,8 @@
   `codex_runtime.enabled: false` by default.
 - Updated docs to explain the `bwrap` nested-sandbox failure mode, the Docker
   isolation tradeoff, and the enablement steps.
+- Follow-up doc cleanup removed duplicated and conflicting wording so all
+  operator docs now describe the same two accepted runtime shapes consistently.
 
 ## Code Changes
 
@@ -44,6 +46,15 @@
 - `docker compose run --rm dev agentic merge-readiness --story story_059`
   returned `REQUEST_CHANGES` only because
   `reports/cloud_review_result.yaml` is intentionally still missing.
+
+## Documentation Cleanup
+
+- Cleaned wording in `README.md`, `docs/codex_runtime.md`,
+  `docs/runtime_config.md`, and `docs/codex_docker_runtime.md`.
+- Removed duplicated trailing wording and normalized the policy language to:
+  - Default safe runtime: `codex exec --sandbox workspace-write -`
+  - Docker-compatible fallback: `codex exec --sandbox danger-full-access -`
+  - Required acknowledgement: `docker_isolation_acknowledged: true`
 
 ## Security Notes
 

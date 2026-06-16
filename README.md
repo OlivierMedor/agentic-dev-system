@@ -206,22 +206,33 @@ The Docker `dev` image installs the Codex CLI. Verify it with
 `docker compose run --rm dev which codex` and
 `docker compose run --rm dev codex --version`, then check command compatibility
 with `docker compose run --rm dev codex exec --help`. The automatic adapter
-feeds generated task file content through stdin to
-`codex exec --sandbox workspace-write -`. `codex exec` accepts `-` to read from
-stdin and is read-only by default, so agentic uses `workspace-write` to let
-Codex create the required story report files inside the mounted workspace only.
-The installed CLI help should confirm that this command shape remains
-supported.
+feeds generated task file content through stdin.
+
+Default safe runtime:
+`codex exec --sandbox workspace-write -`
+
+`codex exec` accepts `-` to read from stdin and is read-only by default, so
+agentic prefers `workspace-write` when it works. That lets Codex create the
+required story report files inside the mounted workspace without dropping the
+inner Codex sandbox. The installed CLI help should confirm that this command
+shape remains supported.
 
 Some Docker environments cannot start Codex's inner Linux sandbox and fail with
 `bwrap: No permissions to create a new namespace`. When that happens, the only
-supported fallback is an explicit Docker-isolated config using
-`codex exec --sandbox danger-full-access -` plus
-`docker_isolation_acknowledged: true`. That mode is disabled by default, must
-be acknowledged explicitly, can read and write the mounted workspace, and may
-access Codex auth state inside the container. Use it only for trusted repos and
-controlled local automation. The runner still does not merge, push, force-push,
-deploy, open PRs, or call GitHub APIs.
+supported fallback is an explicit Docker-isolated config.
+
+Docker-compatible fallback:
+`codex exec --sandbox danger-full-access -`
+
+Requires:
+`docker_isolation_acknowledged: true`
+
+That mode is disabled by default and rejected unless the acknowledgement flag
+is true. In that fallback, Docker becomes the isolation boundary, Codex can
+read and write the mounted workspace, and Codex may access auth state inside
+the container. Use it only for trusted repos and controlled local automation.
+The runner still does not merge, push, force-push, deploy, open PRs, or call
+GitHub APIs.
 
 Authentication is not baked into the image and credentials are not stored in the
 repo; see

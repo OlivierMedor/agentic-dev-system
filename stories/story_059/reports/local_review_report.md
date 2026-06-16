@@ -19,6 +19,8 @@
   tradeoff of using Docker as the isolation boundary.
 - Existing safety boundaries remain intact: no merge, push, force-push, deploy,
   PR creation, or GitHub API calls were added.
+- The docs now describe the same contract consistently across README, runtime,
+  and Docker guides without leftover contradictory wording.
 
 ## Docker Smoke Review
 

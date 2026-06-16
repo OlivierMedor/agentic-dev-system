@@ -28,11 +28,17 @@ same route shape after the workflow rules are clear.
 - reports/finalize_story_report.md
 - reports/finalize_story_result.yaml
 - reports/local_review_report.md
+- reports/merge_readiness_report.md
+- reports/merge_readiness_result.yaml
 - reports/quality_gate_report.md
 - reports/quality_gate_result.yaml
 - reports/test_layer_report.md
 - reports/test_layer_result.yaml
 - reports/test_report.md
+- reports/workflow_preview_report.md
+- reports/workflow_preview_result.yaml
+- reports/workflow_run_report.md
+- reports/workflow_run_result.yaml
 - review_bundle/file_tree.txt
 - review_bundle/git_diff.patch
 - review_bundle/git_diff_staged.patch
@@ -52,33 +58,29 @@ same route shape after the workflow rules are clear.
 - ready_for_review: true
 - agent_plan.yaml: yes
 - prompt_pack: no (0 prompt file(s))
-- reports: developer_report.md, finalize_story_report.md, finalize_story_result.yaml, local_review_report.md, quality_gate_report.md, quality_gate_result.yaml, test_layer_report.md, test_layer_result.yaml, test_report.md
+- reports: developer_report.md, finalize_story_report.md, finalize_story_result.yaml, local_review_report.md, merge_readiness_report.md, merge_readiness_result.yaml, quality_gate_report.md, quality_gate_result.yaml, test_layer_report.md, test_layer_result.yaml, test_report.md, workflow_preview_report.md, workflow_preview_result.yaml, workflow_run_report.md, workflow_run_result.yaml
 - review_bundle: file_tree.txt, git_diff.patch, git_diff_staged.patch, git_diff_stat.txt, git_log.txt, git_status.txt, handoff.md, pytest_output.txt, ruff_output.txt, skipped_untracked_files.txt, untracked_file_contents.md, untracked_files.txt
 - cloud_review_packet/cloud_review_export.md: no
 - remote_dev_validation/remote_dev_packet.md: no
 - test_plan.yaml uses test_layers_version: 1: yes
-- result files: finalize_story_result.yaml, quality_gate_result.yaml, test_layer_result.yaml
+- result files: finalize_story_result.yaml, merge_readiness_result.yaml, quality_gate_result.yaml, test_layer_result.yaml, workflow_run_result.yaml
 
 ## Recommended next action
 
-Run workflow-run prepare.
+Fix failed checks before continuing.
 
 ## Suggested command
 
-agentic workflow-run --story story_059 --phase prepare --execute
+No command. Human review or manual correction is required.
 
 ## Why
 
-The story is missing its agent plan or generated prompt files.
+One or more recorded workflow results request changes or show failed remote-dev validation.
 
 ## Details
 
-- agent_plan.yaml present: yes
-- prompt_pack present: no
-- prompt files found: 0
-- workflow-run prepare wraps prepare-story and workflow-preview safely.
-- The prepare phase also records micro-readiness story sizing guidance.
-- It does not execute agents, run generated prompts, call cloud models, call GitHub APIs, commit, push, merge, or deploy.
+- merge_readiness_result.yaml contains: REQUEST_CHANGES.
+- Update the story work and rerun the failed gate before moving forward.
 
 ## Warnings
 

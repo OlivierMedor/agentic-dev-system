@@ -97,18 +97,22 @@ the installed CLI help confirms a different supported file-input flag. The help
 command checks command compatibility without requiring an authenticated model
 run.
 
-`danger-full-access` is not used or allowed by default. The runtime config only
-accepts two exact shapes with `shell=False` and `stdin_from_task_file: true`:
+The runtime config only accepts two exact shapes with `shell=False` and
+`stdin_from_task_file: true`:
 
-- Default safe shape: `codex exec --sandbox workspace-write -`
-- Docker-compatible explicit fallback:
+- Default safe runtime:
+  `codex exec --sandbox workspace-write -`
+- Docker-compatible fallback:
   `codex exec --sandbox danger-full-access -`
 
-The Docker-compatible fallback is rejected unless
-`docker_isolation_acknowledged: true` is set explicitly. That acknowledgement
-exists because nested Linux sandboxing can fail inside Docker with errors such
-as `bwrap: No permissions to create a new namespace`. In that case Docker is
-the isolation boundary and Codex runs without its inner Linux sandbox.
+`workspace-write` is preferred when it works.
+
+`danger-full-access` is disabled by default. The Docker-compatible fallback is
+rejected unless `docker_isolation_acknowledged: true` is set explicitly. That
+acknowledgement exists because nested Linux sandboxing can fail inside Docker
+with errors such as `bwrap: No permissions to create a new namespace`. In that
+case Docker becomes the isolation boundary and Codex runs without its inner
+Linux sandbox.
 
 Use the Docker-compatible shape only for trusted repos and controlled local
 automation. In that mode Codex can read and write the mounted workspace and may
