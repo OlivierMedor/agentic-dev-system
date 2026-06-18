@@ -1,4 +1,4 @@
-﻿project:
+project:
   name: agentic-dev-system
   type: agentic_development_tool
   description: Reusable agentic development workflow system.
@@ -3713,6 +3713,689 @@ stories:
       - Ruff passes.
       - Existing tests remain green.
       - Documentation explains blueprint overrides and runtime defaults.
+
+  - id: STORY-061
+    story_id: story_061
+    slug: blueprint-defined-context-safe-subtask-execution
+    title: Blueprint-Defined Context-Safe Sub-Task Execution
+    goal: Define blueprint-driven, dependency-aware sub-task execution that only runs local tasks whose complete required context fits the assigned model's usable input budget.
+    why: Story 060 made blueprint-selected local role execution possible. Story 061 makes cloud-planned decomposition explicit and enforceable so local agents execute bounded, context-safe tasks without silently trimming required instructions or falling back to cloud or Codex implementation.
+    agents:
+      developer:
+        writable_paths:
+          - src/**
+          - tests/**
+          - docs/**
+          - stories/story_061/reports/**
+      test:
+        writable_paths:
+          - tests/**
+          - stories/story_061/reports/**
+      documentation:
+        writable_paths:
+          - README.md
+          - docs/**
+          - stories/story_061/reports/**
+      security_quality:
+        writable_paths:
+          - stories/story_061/reports/**
+      local_reviewer:
+        writable_paths:
+          - stories/story_061/reports/**
+    execution_order:
+      - developer
+      - test
+      - documentation
+      - security_quality
+      - local_reviewer
+    local_execution_constraints:
+      decomposition_authority: cloud_planner
+      required_context_must_fit: true
+      allow_required_context_trimming: false
+      oversized_task_policy: reject_for_cloud_redecomposition
+      local_agent_may_redecompose: false
+      require_independent_token_estimate: true
+      require_final_story_validation: true
+      maximum_task_size_contract: The complete required prompt for a sub-task, including mandatory system instructions, role instructions, applicable story requirements, relevant source context, dependency handoffs, writable-path rules, output contract, and validation instructions, must fit within the assigned model's usable input-token budget. A task that does not fit must be decomposed further by the cloud planner before local execution.
+      forbidden_fallbacks:
+        - cloud_model_implementation
+        - codex_implementation
+        - hidden_implementation_fallback
+      required_failure_states:
+        dependency_missing: A declared dependency does not reference a known sub-task ID.
+        dependency_cycle: The sub-task graph contains a cycle.
+        context_budget_invalid: The context window and reserved output budget do not leave a positive usable input budget.
+        context_over_budget: The independently estimated complete prompt exceeds the usable input budget.
+        cloud_redecomposition_required: The task is too large for local execution and must be returned to the cloud planner for finer decomposition.
+        blocked_by_dependency: A dependency is failed, blocked, or waiting for cloud redecomposition.
+        file_boundary_violation: A task requested writes outside its declared writable paths or through an unsafe resolved path.
+    subtasks:
+      - id: define-subtask-schema
+        title: Define blueprint sub-task schema
+        role: developer
+        depends_on: []
+        requirement_ids:
+          - AC-001
+          - AC-002
+          - AC-003
+          - AC-007
+          - AC-008
+          - AC-009
+          - AC-010
+          - AC-030
+        required_context:
+          files:
+            - blueprints/blueprint.yaml
+            - src/agentic_dev/story_blueprint.py
+            - src/agentic_dev/agent_assignment.py
+            - tests/test_agent_assignment.py
+            - tests/test_story_generator.py
+          summaries:
+            - Existing story blueprint lookup accepts unknown story fields and agent assignment reads the agents and execution_order sections.
+            - Preserve Story 060 behavior for blueprints that do not define subtasks.
+          prior_task_outputs: []
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_061/reports/**
+        expected_outputs:
+          - Schema or parsing helpers for sub-task IDs, dependencies, roles, required context, writable paths, expected outputs, validation rules, and context budgets.
+          - Focused tests proving backward compatibility for stories without subtasks.
+        validation:
+          - Unit tests reject malformed sub-task records.
+          - Story 060 agent assignment tests remain green.
+        context_budget:
+          max_input_tokens: 24000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: validate-subtask-graph
+        title: Add dependency graph validation
+        role: developer
+        depends_on:
+          - define-subtask-schema
+        requirement_ids:
+          - AC-004
+          - AC-005
+          - AC-006
+          - AC-029
+        required_context:
+          files:
+            - src/agentic_dev/story_blueprint.py
+            - tests/test_agent_assignment.py
+          summaries:
+            - Execution order must be deterministic and dependency-aware.
+          prior_task_outputs:
+            - define-subtask-schema
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_061/reports/**
+        expected_outputs:
+          - Duplicate IDs, missing dependencies, self-dependencies, and cycles are rejected before execution.
+          - Deterministic topological ordering is available to local execution.
+        validation:
+          - Tests cover duplicate IDs, missing references, self-dependencies, cycles, and stable ordering.
+        context_budget:
+          max_input_tokens: 24000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: resolve-context-budgets
+        title: Add model context-budget resolution
+        role: developer
+        depends_on:
+          - define-subtask-schema
+        requirement_ids:
+          - AC-011
+          - AC-012
+          - AC-016
+          - AC-017
+        required_context:
+          files:
+            - .agentic/agent_runtime.yaml
+            - src/agentic_dev/runtime_config.py
+            - src/agentic_dev/local_execution.py
+            - tests/test_runtime_config.py
+            - tests/test_local_execution.py
+          summaries:
+            - Runtime configuration already resolves role model defaults for Story 060 local execution.
+          prior_task_outputs:
+            - define-subtask-schema
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_061/reports/**
+        expected_outputs:
+          - Context window, reserved output tokens, and usable input budget are resolved deterministically.
+          - Invalid budgets block execution before any model call.
+        validation:
+          - Tests cover blueprint overrides, runtime defaults, missing models, zero or negative usable budgets, and audit output.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: assemble-required-context
+        title: Add required-context manifest assembly
+        role: developer
+        depends_on:
+          - define-subtask-schema
+          - resolve-context-budgets
+        requirement_ids:
+          - AC-007
+          - AC-013
+          - AC-014
+          - AC-015
+          - AC-022
+        required_context:
+          files:
+            - src/agentic_dev/role_context.py
+            - src/agentic_dev/local_execution.py
+            - src/agentic_dev/prompt_pack.py
+            - tests/test_role_context.py
+            - tests/test_prompt_pack.py
+          summaries:
+            - Required instructions, story requirements, relevant files, dependency handoffs, decisions, writable paths, output contract, and validation rules must be assembled with provenance.
+          prior_task_outputs:
+            - define-subtask-schema
+            - resolve-context-budgets
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_061/reports/**
+        expected_outputs:
+          - A complete manifest for each sub-task prompt with section provenance and mandatory-section markers.
+        validation:
+          - Tests prove required sections are present and no mandatory section is dropped.
+        context_budget:
+          max_input_tokens: 26000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: enforce-context-fit-gate
+        title: Add token estimation and context-fit gate
+        role: developer
+        depends_on:
+          - resolve-context-budgets
+          - assemble-required-context
+        requirement_ids:
+          - AC-013
+          - AC-014
+          - AC-015
+          - AC-016
+          - AC-017
+          - AC-018
+          - AC-029
+        required_context:
+          files:
+            - src/agentic_dev/local_execution.py
+            - src/agentic_dev/local_model_runtime.py
+            - tests/test_local_execution.py
+            - tests/test_local_model_runtime.py
+          summaries:
+            - Required context must not be silently trimmed; oversized tasks must stop before local model invocation.
+          prior_task_outputs:
+            - resolve-context-budgets
+            - assemble-required-context
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_061/reports/**
+        expected_outputs:
+          - Deterministic prompt-size estimates.
+          - Structured cloud_redecomposition_required status for oversized tasks.
+          - Zero model calls for tasks that fail the fit gate.
+        validation:
+          - Tests prove over-budget tasks are blocked before the fake local client is called.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: persist-subtask-state
+        title: Add sub-task execution state and audit records
+        role: developer
+        depends_on:
+          - define-subtask-schema
+          - validate-subtask-graph
+          - enforce-context-fit-gate
+        requirement_ids:
+          - AC-019
+          - AC-020
+          - AC-021
+          - AC-029
+        required_context:
+          files:
+            - src/agentic_dev/local_execution.py
+            - tests/test_local_execution.py
+            - src/agentic_dev/artifact_policy.py
+            - tests/test_artifact_policy.py
+          summaries:
+            - Existing local execution persists role state and per-role audit YAML under reports/local_execution.
+          prior_task_outputs:
+            - define-subtask-schema
+            - validate-subtask-graph
+            - enforce-context-fit-gate
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_061/reports/**
+        expected_outputs:
+          - Persistent pending, ready, running, completed, failed, blocked, and cloud_redecomposition_required states.
+          - Audit records include model, token estimate, context budget, timestamps, outputs, failures, dependencies, and final state.
+        validation:
+          - Tests cover successful, failed, blocked, and redecomposition-required state files.
+        context_budget:
+          max_input_tokens: 24000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: execute-ready-subtasks
+        title: Add dependency-aware local execution
+        role: developer
+        depends_on:
+          - validate-subtask-graph
+          - enforce-context-fit-gate
+          - persist-subtask-state
+        requirement_ids:
+          - AC-006
+          - AC-025
+          - AC-026
+          - AC-027
+          - AC-030
+        required_context:
+          files:
+            - src/agentic_dev/local_execution.py
+            - tests/test_local_execution.py
+          summaries:
+            - Story 060 writable-path and resolved-path protections must remain intact for every sub-task.
+          prior_task_outputs:
+            - validate-subtask-graph
+            - enforce-context-fit-gate
+            - persist-subtask-state
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_061/reports/**
+        expected_outputs:
+          - Local execution runs only dependency-ready sub-tasks.
+          - Downstream tasks are blocked when dependencies fail or require cloud redecomposition.
+          - No cloud, Codex, or hidden implementation fallback is introduced.
+        validation:
+          - Tests cover dependency readiness, downstream blocking, writable-path enforcement, symlink protection, and no fallback calls.
+        context_budget:
+          max_input_tokens: 24000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: add-handoff-summaries
+        title: Add handoff summaries and dependency inputs
+        role: developer
+        depends_on:
+          - persist-subtask-state
+          - execute-ready-subtasks
+        requirement_ids:
+          - AC-021
+          - AC-022
+        required_context:
+          files:
+            - src/agentic_dev/local_execution.py
+            - src/agentic_dev/role_context.py
+            - tests/test_local_execution.py
+            - tests/test_role_context.py
+          summaries:
+            - Later tasks should consume declared dependency summaries and outputs instead of raw historical transcript when structured handoff is sufficient.
+          prior_task_outputs:
+            - persist-subtask-state
+            - execute-ready-subtasks
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_061/reports/**
+        expected_outputs:
+          - Concise structured handoff summaries for completed sub-tasks.
+          - Downstream context assembly uses only declared dependency outputs, decisions, and handoffs.
+        validation:
+          - Tests cover handoff persistence and downstream consumption.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: add-subtask-resume
+        title: Add resume behavior
+        role: developer
+        depends_on:
+          - persist-subtask-state
+          - execute-ready-subtasks
+          - add-handoff-summaries
+        requirement_ids:
+          - AC-023
+          - AC-024
+          - AC-029
+        required_context:
+          files:
+            - src/agentic_dev/local_execution.py
+            - tests/test_local_execution.py
+          summaries:
+            - Existing Story 060 resume skips completed roles and retries incomplete blocked roles.
+          prior_task_outputs:
+            - persist-subtask-state
+            - execute-ready-subtasks
+            - add-handoff-summaries
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_061/reports/**
+        expected_outputs:
+          - Resume skips completed sub-tasks and retries failed or blocked tasks only when their blocking condition is resolved.
+          - Deterministic dependency order is preserved across resumes.
+        validation:
+          - Tests cover completed-task skip, eligible retry, unresolved-block preservation, and deterministic order.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: extend-cli-reporting
+        title: Add CLI and operator reporting
+        role: developer
+        depends_on:
+          - execute-ready-subtasks
+          - add-handoff-summaries
+          - add-subtask-resume
+        requirement_ids:
+          - AC-029
+          - AC-030
+        required_context:
+          files:
+            - src/agentic_dev/cli.py
+            - src/agentic_dev/local_execution.py
+            - tests/test_local_execution.py
+          summaries:
+            - Extend the existing local-execute command instead of creating an unrelated parallel workflow.
+          prior_task_outputs:
+            - execute-ready-subtasks
+            - add-handoff-summaries
+            - add-subtask-resume
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_061/reports/**
+        expected_outputs:
+          - CLI output shows task readiness, dependency status, context estimate, context limit, blocked reason, and completion state.
+        validation:
+          - CLI tests assert operator-visible reporting for ready, completed, failed, blocked, and redecomposition-required tasks.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: validate-story-result
+        title: Add story-wide validation
+        role: test
+        depends_on:
+          - define-subtask-schema
+          - validate-subtask-graph
+          - resolve-context-budgets
+          - assemble-required-context
+          - enforce-context-fit-gate
+          - persist-subtask-state
+          - execute-ready-subtasks
+          - add-handoff-summaries
+          - add-subtask-resume
+          - extend-cli-reporting
+        requirement_ids:
+          - AC-028
+          - AC-030
+        required_context:
+          files:
+            - tests/test_local_execution.py
+            - tests/test_story_generator.py
+            - tests/e2e/test_agentic_workflow.py
+          summaries:
+            - Per-task success is not sufficient; final validation must compare combined outputs with original Story 061 requirements.
+          prior_task_outputs:
+            - define-subtask-schema
+            - validate-subtask-graph
+            - resolve-context-budgets
+            - assemble-required-context
+            - enforce-context-fit-gate
+            - persist-subtask-state
+            - execute-ready-subtasks
+            - add-handoff-summaries
+            - add-subtask-resume
+            - extend-cli-reporting
+          architecture_decisions: []
+        writable_paths:
+          - tests/**
+          - stories/story_061/reports/**
+        expected_outputs:
+          - Integration tests prove story-wide validation fails when a requirement is unmet even if all sub-tasks are marked completed.
+        validation:
+          - Tests cover all original Story 061 acceptance criteria and backward compatibility with Story 060.
+        context_budget:
+          max_input_tokens: 26000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: update-operator-docs
+        title: Documentation and operator guide
+        role: documentation
+        depends_on:
+          - validate-story-result
+        requirement_ids:
+          - AC-029
+          - AC-030
+        required_context:
+          files:
+            - README.md
+            - docs/command_map.md
+            - docs/local_models.md
+            - docs/runtime_config.md
+            - blueprints/blueprint.yaml
+          summaries:
+            - Documentation must explain cloud blueprint decomposition, maximum task-size requirements, fit rejection, redecomposition flow, resume behavior, and audit artifacts.
+          prior_task_outputs:
+            - validate-story-result
+          architecture_decisions: []
+        writable_paths:
+          - README.md
+          - docs/**
+          - stories/story_061/reports/**
+        expected_outputs:
+          - Operator documentation and a complete blueprint example for context-safe sub-task execution.
+        validation:
+          - Documentation tests and link checks present in the repository remain green.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: security-regression-review
+        title: Security and regression review
+        role: security_quality
+        depends_on:
+          - update-operator-docs
+        requirement_ids:
+          - AC-025
+          - AC-026
+          - AC-027
+          - AC-030
+        required_context:
+          files:
+            - src/agentic_dev/local_execution.py
+            - src/agentic_dev/artifact_policy.py
+            - tests/test_local_execution.py
+            - tests/test_artifact_policy.py
+          summaries:
+            - Verify path protections, no secret leakage, no cloud execution fallback, and Story 060 backward compatibility.
+          prior_task_outputs:
+            - update-operator-docs
+          architecture_decisions: []
+        writable_paths:
+          - stories/story_061/reports/**
+        expected_outputs:
+          - Security review report covering path safety, fallback prevention, artifact policy, and regression risk.
+        validation:
+          - pytest, Ruff, artifact-policy, runtime-config validation, and generation idempotency pass.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: final-local-review
+        title: Final local review
+        role: local_reviewer
+        depends_on:
+          - security-regression-review
+        requirement_ids:
+          - AC-028
+          - AC-029
+          - AC-030
+        required_context:
+          files:
+            - blueprints/blueprint.yaml
+            - stories/story_061/status.yaml
+            - stories/story_061/test_plan.yaml
+            - stories/story_061/reports/**
+          summaries:
+            - Review final diff, tests, acceptance-criteria coverage, audit artifacts, and backward compatibility before cloud review.
+          prior_task_outputs:
+            - security-regression-review
+          architecture_decisions: []
+        writable_paths:
+          - stories/story_061/reports/**
+        expected_outputs:
+          - Local review report that states whether Story 061 is ready for cloud or human review.
+        validation:
+          - Review confirms no direct main push, no local merge, no deployment, and no hidden implementation fallback.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+    acceptance_criteria:
+      - "AC-001: A blueprint can define multiple ordered sub-tasks for a story."
+      - "AC-002: Each sub-task has a stable unique ID."
+      - "AC-003: Each sub-task has a role assignment."
+      - "AC-004: Each sub-task can declare dependencies."
+      - "AC-005: Cycles and missing dependencies are rejected before execution."
+      - "AC-006: Only dependency-ready tasks may run."
+      - "AC-007: Each sub-task declares its required context."
+      - "AC-008: Each sub-task declares writable paths."
+      - "AC-009: Each sub-task declares expected outputs."
+      - "AC-010: Each sub-task declares validation requirements."
+      - "AC-011: Each local model has a context window and reserved output budget."
+      - "AC-012: The system computes a usable input budget."
+      - "AC-013: The system independently estimates the final assembled sub-task input size."
+      - "AC-014: All mandatory instructions remain present in the assembled prompt."
+      - "AC-015: Required context is never silently removed or truncated."
+      - "AC-016: A task that does not fit is blocked before model invocation."
+      - "AC-017: An oversized task receives a structured status indicating cloud redecomposition is required."
+      - "AC-018: No local agent is allowed to improvise a decomposition of an oversized cloud task unless explicitly permitted by a future blueprint feature."
+      - "AC-019: Successful task execution persists state."
+      - "AC-020: Failed task execution persists failure details."
+      - "AC-021: Each completed task persists a concise structured handoff summary."
+      - "AC-022: Later tasks may consume declared outputs and decisions from completed dependencies."
+      - "AC-023: Resume skips completed tasks."
+      - "AC-024: Resume retries blocked or failed tasks only when their blocking condition has been resolved."
+      - "AC-025: Writable-path restrictions remain enforced for every sub-task."
+      - "AC-026: Symlink and resolved-path protections from Story 060 remain intact."
+      - "AC-027: No cloud-model, Codex, or hidden implementation fallback is introduced into local execution."
+      - "AC-028: Final story validation checks all original requirements, not merely individual sub-task success."
+      - "AC-029: Audit output clearly shows task ordering, context estimates, execution decisions, and final status."
+      - "AC-030: Existing Story 060 behavior remains backward compatible for blueprints without sub-tasks."
+    not_in_scope:
+      - Live external model calls in tests.
+      - Cloud or Codex implementation fallback during local task execution.
+      - Automatic local decomposition of oversized cloud-authored tasks.
+      - Silent trimming of required instructions or required context.
+      - Deployment, publishing, release tagging, or production rollout.
+      - Automatic commits, merges, pushes, or pull request creation from local execution.
+    definition_of_done:
+      - Unit tests cover sub-task schema, dependency validation, context budget resolution, context assembly, fit gating, state persistence, handoffs, resume, CLI reporting, final validation, and Story 060 backward compatibility.
+      - Integration tests cover dependency-aware local execution and final story validation.
+      - Failure tests prove oversized tasks stop before model invocation and produce cloud_redecomposition_required status.
+      - Regression tests prove Story 060 local role execution, writable-path restrictions, and symlink protections remain intact.
+      - Documentation explains blueprint decomposition, maximum task-size contract, context-fit rejection, redecomposition, resume, and audit behavior.
+      - docker compose run --rm dev agentic generate-stories is idempotent.
+      - docker compose run --rm dev pytest passes.
+      - docker compose run --rm dev ruff check . passes.
+      - artifact-policy validation passes.
+      - runtime-config validation passes.
+    test_plan:
+      test_layers_version: 1
+      unit_tests:
+        required: true
+        action: add_or_update
+        frequency: every_commit
+        evidence_or_reason: Add focused tests for sub-task schema parsing, unique IDs, dependency graph validation, context budget math, mandatory context assembly, deterministic token estimates, over-budget blocking, state persistence, handoff records, resume behavior, CLI reporting, and Story 060 backward compatibility.
+      integration_tests:
+        required: true
+        action: add_or_update
+        frequency: every_pull_request
+        evidence_or_reason: Add integration coverage for dependency-aware local execution, downstream blocking, declared dependency outputs, and final story validation against the original requirement registry.
+      mock_e2e_tests:
+        required: true
+        action: add_or_update
+        frequency: before_merge
+        evidence_or_reason: Use fake local model clients to prove no cloud or Codex implementation fallback is invoked, oversized tasks are rejected before model calls, and resume skips completed tasks.
+      live_read_only_checks:
+        required: false
+        action: not_applicable_with_reason
+        frequency: scheduled_or_before_release
+        evidence_or_reason: Story 061 is local blueprint and execution behavior only; live read-only checks are not required.
+      remote_dev_smoke_tests:
+        required: false
+        action: not_applicable_with_reason
+        frequency: after_remote_dev_deploy
+        evidence_or_reason: No remote deployment or live external execution is introduced.
+    monitoring_plan:
+      logs_required:
+        - subtask_execution_order
+        - context_budget_resolution
+        - context_token_estimate
+        - context_fit_decision
+        - cloud_redecomposition_required
+        - dependency_blocked_task
+        - subtask_state_transition
+        - writable_path_violation
+        - final_story_validation_status
+      watch_for:
+        - missing_dependency_references
+        - dependency_cycles
+        - mandatory_context_removed
+        - required_context_truncated
+        - model_invocation_after_context_over_budget
+        - local_agent_redecomposition_attempt
+        - cloud_or_codex_fallback_attempt
+        - Story_060_regression
 
   - id: STORY-048
     slug: story_048_micro_local_agent_prompt_mode
