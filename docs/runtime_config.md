@@ -89,6 +89,70 @@ local_execution:
 blueprint-selected role. `--resume` skips completed roles by reading
 `stories/STORY_SLUG/reports/local_execution/state.yaml`.
 
+## Context-Safe Sub-Task Execution
+
+When a matching blueprint story declares `subtasks:`, `agentic local-execute`
+uses those cloud-authored sub-tasks instead of the legacy role sequence. This
+keeps Story 060 behavior backward compatible for blueprints without sub-tasks
+while allowing Story 061 stories to execute dependency-aware local work.
+
+Each sub-task must declare:
+
+- `id`, `title`, and `role`
+- `depends_on`
+- `requirement_ids`
+- `required_context.files`, `required_context.summaries`,
+  `required_context.prior_task_outputs`, and
+  `required_context.architecture_decisions`
+- `writable_paths`
+- `expected_outputs`
+- `validation`
+- `context_budget.max_input_tokens`
+- `context_budget.reserved_output_tokens`
+- `context_budget.required_context_must_fit: true`
+- `context_budget.allow_required_context_trimming: false`
+- `context_budget.oversized_task_policy: reject_for_cloud_redecomposition`
+
+The complete required prompt is assembled before any model call. It includes
+local safety instructions, role instructions, the original story goal,
+applicable acceptance criteria, required files, dependency handoffs, writable
+path rules, expected outputs, and validation instructions. The implementation
+uses a deterministic conservative estimate of one token per four UTF-8 bytes,
+rounded up, plus one token per prompt line for Markdown/YAML overhead. This is
+not a tokenizer-specific exact count; it is a stable preflight gate designed to
+fail closed.
+
+Usable input budget is:
+
+```text
+context_budget.max_input_tokens - context_budget.reserved_output_tokens
+```
+
+If the assembled prompt estimate exceeds that usable input budget, the task is
+not sent to the local model. The state records
+`cloud_redecomposition_required`, `context_over_budget`, the estimate, the
+usable limit, and `local_agent_may_redecompose: false`. Local agents do not
+split oversized cloud-authored tasks themselves.
+
+Sub-task state is written under:
+
+```text
+stories/STORY_SLUG/reports/local_execution/state.yaml
+stories/STORY_SLUG/reports/local_execution/tasks/TASK_ID/context.md
+stories/STORY_SLUG/reports/local_execution/tasks/TASK_ID/output.md
+stories/STORY_SLUG/reports/local_execution/tasks/TASK_ID/execution.yaml
+```
+
+Those files are runtime artifacts. They are useful for local review and cloud
+review packets, but normal artifact policy keeps generated runtime outputs out
+of commits unless a story explicitly requires a tracked placeholder.
+
+Resume recalculates dependency readiness deterministically. Completed tasks are
+skipped. Failed or blocked tasks retry only when the existing blocking condition
+can be resolved by the current blueprint and context. Tasks marked
+`cloud_redecomposition_required` do not retry unchanged; the cloud planner must
+decompose them further in the blueprint first.
+
 ## Codex Runtime Adapter
 
 The automatic Codex adapter is disabled by default:

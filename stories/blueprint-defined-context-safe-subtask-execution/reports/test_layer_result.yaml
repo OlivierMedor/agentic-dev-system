@@ -1,0 +1,54 @@
+story: blueprint-defined-context-safe-subtask-execution
+status: PASSED
+passed_checks:
+- unit_tests is addressed.
+- integration_tests is addressed.
+- mock_e2e_tests is addressed.
+- live_read_only_checks is addressed.
+- remote_dev_smoke_tests is addressed.
+failed_checks: []
+layers:
+  unit_tests:
+    status: PASSED
+    required: true
+    action: add_or_update
+    frequency: every_commit
+    evidence_or_reason: Add focused tests for sub-task schema parsing, unique IDs,
+      dependency graph validation, context budget math, mandatory context assembly,
+      deterministic token estimates, over-budget blocking, state persistence, handoff
+      records, resume behavior, CLI reporting, and Story 060 backward compatibility.
+    failed_checks: []
+  integration_tests:
+    status: PASSED
+    required: true
+    action: add_or_update
+    frequency: every_pull_request
+    evidence_or_reason: Add integration coverage for dependency-aware local execution,
+      downstream blocking, declared dependency outputs, and final story validation
+      against the original requirement registry.
+    failed_checks: []
+  mock_e2e_tests:
+    status: PASSED
+    required: true
+    action: add_or_update
+    frequency: before_merge
+    evidence_or_reason: Use fake local model clients to prove no cloud or Codex implementation
+      fallback is invoked, oversized tasks are rejected before model calls, and resume
+      skips completed tasks.
+    failed_checks: []
+  live_read_only_checks:
+    status: PASSED
+    required: false
+    action: not_applicable_with_reason
+    frequency: scheduled_or_before_release
+    evidence_or_reason: Story 061 is local blueprint and execution behavior only;
+      live read-only checks are not required.
+    failed_checks: []
+  remote_dev_smoke_tests:
+    status: PASSED
+    required: false
+    action: not_applicable_with_reason
+    frequency: after_remote_dev_deploy
+    evidence_or_reason: No remote deployment or live external execution is introduced.
+    failed_checks: []
+next_action: Continue to the quality gate or finalize-story workflow.
