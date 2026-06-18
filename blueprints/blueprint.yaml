@@ -1,4 +1,4 @@
-﻿project:
+project:
   name: agentic-dev-system
   type: agentic_development_tool
   description: Reusable agentic development workflow system.
