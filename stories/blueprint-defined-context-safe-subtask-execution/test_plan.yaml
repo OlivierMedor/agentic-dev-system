@@ -1,0 +1,34 @@
+test_layers_version: 1
+unit_tests:
+  required: true
+  action: add_or_update
+  frequency: every_commit
+  evidence_or_reason: Add focused tests for sub-task schema parsing, unique IDs, dependency
+    graph validation, context budget math, mandatory context assembly, deterministic
+    token estimates, over-budget blocking, state persistence, handoff records, resume
+    behavior, CLI reporting, and Story 060 backward compatibility.
+integration_tests:
+  required: true
+  action: add_or_update
+  frequency: every_pull_request
+  evidence_or_reason: Add integration coverage for dependency-aware local execution,
+    downstream blocking, declared dependency outputs, and final story validation against
+    the original requirement registry.
+mock_e2e_tests:
+  required: true
+  action: add_or_update
+  frequency: before_merge
+  evidence_or_reason: Use fake local model clients to prove no cloud or Codex implementation
+    fallback is invoked, oversized tasks are rejected before model calls, and resume
+    skips completed tasks.
+live_read_only_checks:
+  required: false
+  action: not_applicable_with_reason
+  frequency: scheduled_or_before_release
+  evidence_or_reason: Story 061 is local blueprint and execution behavior only; live
+    read-only checks are not required.
+remote_dev_smoke_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: after_remote_dev_deploy
+  evidence_or_reason: No remote deployment or live external execution is introduced.

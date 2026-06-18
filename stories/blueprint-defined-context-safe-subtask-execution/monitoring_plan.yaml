@@ -1,0 +1,19 @@
+logs_required:
+- subtask_execution_order
+- context_budget_resolution
+- context_token_estimate
+- context_fit_decision
+- cloud_redecomposition_required
+- dependency_blocked_task
+- subtask_state_transition
+- writable_path_violation
+- final_story_validation_status
+watch_for:
+- missing_dependency_references
+- dependency_cycles
+- mandatory_context_removed
+- required_context_truncated
+- model_invocation_after_context_over_budget
+- local_agent_redecomposition_attempt
+- cloud_or_codex_fallback_attempt
+- Story_060_regression
