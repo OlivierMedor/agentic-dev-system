@@ -112,6 +112,7 @@ command_policy:
     - docker compose run --rm dev agentic generate-stories
     - docker compose run --rm dev agentic prepare-story
     - docker compose run --rm dev agentic build-context
+    - docker compose run --rm dev agentic local-execute
     - docker compose run --rm dev agentic codex-task create
     - docker compose run --rm dev agentic workflow-run
     - docker compose run --rm dev agentic review-bundle
@@ -172,6 +173,17 @@ local_model_profiles:
   ollama:
     base_url: http://host.docker.internal:11434/v1
     api_key_hint: ollama
+
+local_execution:
+  global_default_model: gemma
+  role_defaults:
+    research: qwen3
+    planner: qwen3
+    developer: gemma
+    test: qwen3-coder
+    documentation: qwen3
+    security_quality: gemma
+    local_reviewer: gemma
 """
 
 
@@ -304,6 +316,7 @@ def validate_runtime_config(project_path: Path) -> RuntimeConfigValidationResult
             )
 
     parse_codex_runtime_config(config.get("codex_runtime"), errors)
+    validate_local_execution_config(config.get("local_execution"), errors)
 
     if errors:
         raise ValueError("Runtime config validation failed:\n- " + "\n- ".join(errors))
@@ -414,6 +427,36 @@ def parse_codex_runtime_config(
     )
 
 
+def validate_local_execution_config(section: Any, errors: list[str]) -> None:
+    if section is None:
+        return
+
+    if not isinstance(section, dict):
+        errors.append("local_execution must be a mapping.")
+        return
+
+    global_default_model = section.get("global_default_model")
+    if global_default_model is not None and not nonempty_string(global_default_model):
+        errors.append("local_execution.global_default_model must be a non-empty string.")
+
+    role_defaults = section.get("role_defaults")
+    if role_defaults is None:
+        return
+
+    if not isinstance(role_defaults, dict):
+        errors.append("local_execution.role_defaults must be a mapping.")
+        return
+
+    for role, model in role_defaults.items():
+        if not nonempty_string(role):
+            errors.append("local_execution.role_defaults keys must be non-empty strings.")
+            continue
+        if not nonempty_string(model):
+            errors.append(
+                f"local_execution.role_defaults.{role} must be a non-empty string.",
+            )
+
+
 def mapping_value(
     mapping: dict[str, Any],
     key: str,
@@ -464,3 +507,7 @@ def contains_command_pattern(commands: list[str], required_pattern: str) -> bool
 
 def normalize_text(value: str) -> str:
     return " ".join(value.lower().split())
+
+
+def nonempty_string(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())

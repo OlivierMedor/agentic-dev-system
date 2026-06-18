@@ -75,6 +75,19 @@ Validate the local runtime section:
 docker compose run --rm dev agentic local-model validate
 ```
 
+Inspect resolved local-execution models without running them:
+
+```powershell
+docker compose run --rm dev agentic local-execute --story STORY_SLUG --dry-run
+```
+
+Run or resume blueprint-selected local roles with local models only:
+
+```powershell
+docker compose run --rm dev agentic local-execute --story STORY_SLUG
+docker compose run --rm dev agentic local-execute --story STORY_SLUG --resume
+```
+
 Run a simple local call and save `reports/local_model_dry_run_report.md`:
 
 ```powershell
@@ -148,7 +161,11 @@ human review and configured cloud/human review in the loop.
 Local model support is intentionally bounded:
 
 - Local models do not replace Codex as the coding runtime yet.
-- Local model output is not applied to source files automatically.
+- `agentic local-execute` does not fall back to Codex or cloud code-generation models.
+- `local-agent` draft and prompt commands do not apply source changes automatically.
+- `agentic local-execute` applies only bounded writes that stay inside the
+  role's configured writable paths and records a blocked execution if a role
+  attempts to write outside them.
 - Model responses are never executed as shell commands.
 - The CLI does not commit, push, merge, deploy, or call GitHub APIs from local
   model output.

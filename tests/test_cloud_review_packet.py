@@ -121,6 +121,18 @@ def test_cloud_review_context_includes_story_and_present_evidence(tmp_path: Path
         "M src/agentic_dev/cloud_review_packet.py\n",
         encoding="utf-8",
     )
+    (review_bundle_path / "git_diff.patch").write_text(
+        "diff --git a/src/agentic_dev/cloud_review_packet.py b/src/agentic_dev/cloud_review_packet.py\n",
+        encoding="utf-8",
+    )
+    (review_bundle_path / "git_diff_staged.patch").write_text(
+        "diff --git a/README.md b/README.md\n",
+        encoding="utf-8",
+    )
+    (review_bundle_path / "untracked_file_contents.md").write_text(
+        "## `src/agentic_dev/local_execution.py`\n\n```text\ncontent\n```\n",
+        encoding="utf-8",
+    )
 
     create_cloud_review_packet(tmp_path, STORY)
 
@@ -134,6 +146,12 @@ def test_cloud_review_context_includes_story_and_present_evidence(tmp_path: Path
     assert "Tests and ruff passed." in context
     assert "## Git status summary" in context
     assert "M src/agentic_dev/cloud_review_packet.py" in context
+    assert "## Git diff patch" in context
+    assert "diff --git a/src/agentic_dev/cloud_review_packet.py" in context
+    assert "## Git staged diff" in context
+    assert "diff --git a/README.md" in context
+    assert "## Untracked file contents" in context
+    assert "src/agentic_dev/local_execution.py" in context
 
 
 def test_cloud_review_context_mentions_missing_optional_evidence_clearly(

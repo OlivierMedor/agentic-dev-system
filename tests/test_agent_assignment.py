@@ -10,6 +10,10 @@ def create_story(project_path: Path, story: str = "story_004_agent_assignment") 
     story_path = project_path / "stories" / story
     story_path.mkdir(parents=True)
     (story_path / "story.md").write_text("# Test Story\n", encoding="utf-8")
+    (story_path / "status.yaml").write_text(
+        "story_id: STORY-004\nslug: story-004-agent-assignment\n",
+        encoding="utf-8",
+    )
     return story_path
 
 
@@ -92,3 +96,105 @@ def test_missing_core_instruction_files_are_created(tmp_path: Path) -> None:
         instruction_file = story_path / agent["instruction_file"]
         assert instruction_file.exists()
         assert "## Role" in instruction_file.read_text(encoding="utf-8")
+
+
+def test_assign_agents_uses_blueprint_defined_roles_models_and_writable_paths(tmp_path: Path) -> None:
+    story = "story_004_agent_assignment"
+    story_path = create_story(tmp_path, story)
+    blueprints_path = tmp_path / "blueprints"
+    blueprints_path.mkdir()
+    (blueprints_path / "blueprint.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "stories": [
+                    {
+                        "id": "STORY-004",
+                        "slug": "story-004-agent-assignment",
+                        "agents": {
+                            "planner": {
+                                "model": "qwen3",
+                                "writable_paths": ["stories/**/reports/**"],
+                            },
+                            "developer": {
+                                "model": "gemma",
+                                "writable_paths": ["src/**", "stories/**/reports/**"],
+                            },
+                        },
+                    }
+                ]
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    assign_agents(tmp_path, story, force=True)
+
+    agent_plan = read_agent_plan(story_path)
+    assert agent_plan["execution_order"] == ["planner_agent", "developer_agent"]
+    assert [agent["id"] for agent in agent_plan["assigned_agents"]] == [
+        "planner_agent",
+        "developer_agent",
+    ]
+    assert agent_plan["assigned_agents"][0]["role"] == "planner"
+    assert agent_plan["assigned_agents"][0]["model"] == "qwen3"
+    assert agent_plan["assigned_agents"][1]["writable_paths"] == [
+        "src/**",
+        "stories/**/reports/**",
+    ]
+
+
+def test_assign_agents_matches_blueprint_story_id_and_preserves_execution_order(tmp_path: Path) -> None:
+    story = "story_060"
+    story_path = create_story(tmp_path, story)
+    (story_path / "status.yaml").write_text(
+        "story_id: story_060\nslug: blueprint-local-model-execution\n",
+        encoding="utf-8",
+    )
+    blueprints_path = tmp_path / "blueprints"
+    blueprints_path.mkdir()
+    (blueprints_path / "blueprint.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "stories": [
+                    {
+                        "id": "STORY-060",
+                        "story_id": "story_060",
+                        "slug": "blueprint-local-model-execution",
+                        "execution_order": ["documentation", "developer"],
+                        "agents": {
+                            "developer": {
+                                "writable_paths": ["src/**", "stories/story_060/reports/**"],
+                            },
+                            "documentation": {
+                                "model": "qwen/qwen3-coder-30b",
+                                "writable_paths": [
+                                    "README.md",
+                                    "docs/**",
+                                    "stories/story_060/reports/**",
+                                ],
+                            },
+                        },
+                    }
+                ]
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    assign_agents(tmp_path, story, force=True)
+
+    agent_plan = read_agent_plan(story_path)
+    assert agent_plan["execution_order"] == ["docs_agent", "developer_agent"]
+    assert [agent["id"] for agent in agent_plan["assigned_agents"]] == [
+        "docs_agent",
+        "developer_agent",
+    ]
+    assert agent_plan["assigned_agents"][0]["role"] == "documentation"
+    assert agent_plan["assigned_agents"][0]["model"] == "qwen/qwen3-coder-30b"
+    assert agent_plan["assigned_agents"][0]["writable_paths"] == [
+        "README.md",
+        "docs/**",
+        "stories/story_060/reports/**",
+    ]

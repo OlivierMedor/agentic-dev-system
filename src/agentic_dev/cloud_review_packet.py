@@ -23,7 +23,10 @@ OPTIONAL_EVIDENCE_FILES = [
     ("review_bundle/handoff.md", "Review bundle handoff"),
     ("review_bundle/git_status.txt", "Git status summary"),
     ("review_bundle/git_diff_stat.txt", "Git diff stat"),
+    ("review_bundle/git_diff.patch", "Git diff patch"),
+    ("review_bundle/git_diff_staged.patch", "Git staged diff"),
     ("review_bundle/untracked_files.txt", "Untracked file list"),
+    ("review_bundle/untracked_file_contents.md", "Untracked file contents"),
 ]
 
 

@@ -137,6 +137,9 @@ Local model runtime checks:
 
 ```powershell
 docker compose run --rm dev agentic local-model validate
+docker compose run --rm dev agentic local-execute --story STORY_SLUG --dry-run
+docker compose run --rm dev agentic local-execute --story STORY_SLUG --role documentation
+docker compose run --rm dev agentic local-execute --story STORY_SLUG --resume
 docker compose run --rm dev agentic local-model dry-run
 docker compose run --rm dev agentic local-agent run-prompt --prompt-file prompt.md --output-file reports/local_agent_output.md
 docker compose run --rm -e LOCAL_MODEL_API_KEY=lm-studio dev agentic local-agent draft --story story_045_local_agent_draft_runner --agent docs_agent --model-label gemma-4-26b --prompt-mode slim --force
@@ -146,6 +149,16 @@ docker compose run --rm dev agentic local-model scorecard-report
 docker compose run --rm dev agentic local-model scorecard-scaffold-scores
 docker compose run --rm dev agentic local-model scorecard-recommend
 ```
+
+`agentic local-execute` uses the assigned agents from `agent_plan.yaml`, so
+blueprint-defined agents remain authoritative. Each assigned agent may carry
+optional `role`, `model`, and `writable_paths` metadata in `agent_plan.yaml`.
+Model resolution is: blueprint role override, runtime role default, global
+local-model default, then blocked if unresolved. The command reuses role
+context packets, records per-role audit artifacts and resumable execution
+state, enforces writable paths before applying files, and does not fall back to
+Codex or cloud code-generation. Token-aware retries are deferred to Story 061,
+and cloud review / local repair loops are deferred to Story 062.
 
 ## Learn The Codebase
 
@@ -172,8 +185,8 @@ portfolio-ready v0.1 / early public version of the local workflow, with story
 generation, agent assignment, prompt packs, prepare, test-layer checks, review
 bundles, quality gates, local finalization, manual cloud review packet
 preparation, cloud review result recording, merge readiness, runtime config
-validation, queue handling, public-readiness checks, and project status
-reporting.
+validation, queue handling, public-readiness checks, project status reporting,
+and bounded local-model execution for blueprint-selected roles.
 
 LangGraph is currently used for safe local `workflow-preview` and
 `workflow-run` phases. It is not an autonomous agent executor.
@@ -194,10 +207,11 @@ runtime, or a story split; they are not automatic workflow failures.
 Use `docs/role_context_builder.md` to build focused context packets for each
 assigned agent before handing work to a configured runtime.
 Use `docs/runtime_config.md` to understand the tiered Codex-first runtime
-defaults and the command approval policy.
+defaults, local-execution model resolution order, and command approval policy.
 Use `docs/codex_runtime.md` to create Codex-ready task files from those role
 context packets and to configure the disabled-by-default automatic Codex
-adapter.
+adapter. The Docker smoke-check command shape is
+`codex exec --sandbox workspace-write -`.
 Use `docs/codex_task_execution.md` to run generated Codex task files manually or
 through the enabled adapter, one role at a time, without committing generated
 runtime artifacts.
@@ -243,7 +257,9 @@ blocks safely with `BLOCKED_CODEX_COMMAND_NOT_FOUND`.
 ## Tiered Codex Runtime Defaults
 
 `.agentic/agent_runtime.yaml` is the source of truth for agent provider and
-model choices. Blueprints describe the story work; they do not assign models.
+model choices. Blueprints describe the story work. For `agentic local-execute`,
+Story 060 adds a narrow blueprint override path for the local model assigned to
+an already-selected role.
 
 Codex is the primary runtime because this workflow is centered on repository
 changes, tests, review evidence, and local safety rules. The default worker tier
@@ -301,7 +317,7 @@ That file is ignored and blocked by policy. The public-safe example is
 - `docs/role_context_builder.md` explains focused role context packets for
   assigned story agents.
 - `docs/runtime_config.md` explains tiered Codex-first runtime defaults and
-  command approval policy.
+  local-execution model resolution.
 - `docs/codex_runtime.md` explains Codex-ready task files generated from role
   context packets.
 - `docs/codex_docker_runtime.md` explains the supported Docker Codex CLI and
