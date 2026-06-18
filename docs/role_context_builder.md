@@ -52,9 +52,21 @@ instruction, and the role evidence it is expected to inspect.
 This keeps context smaller while preserving traceability: each packet lists
 included files, skipped files, estimated character count, and warnings.
 
+## Reuse By `agentic local-execute`
+
+Story 060 reuses these packets for bounded local-model execution. The
+`agent_plan.yaml` for a story may now carry optional `role`, `model`, and
+`writable_paths` metadata copied from blueprint-defined agent configuration.
+`agentic local-execute` reads the assigned agents from that plan, resolves each
+role's model, then reuses the matching role context packet before calling the
+local model.
+
+This means the blueprint remains authoritative for which roles run, while role
+context remains the local, deterministic source of execution context.
+
 ## Runtime Connector Preparation
 
-The builder prepares for a future Codex runtime connector by separating prompt
+The builder prepares for future runtime connectors by separating prompt
 selection from context selection. A connector can receive:
 
 - a prompt pack file for role behavior

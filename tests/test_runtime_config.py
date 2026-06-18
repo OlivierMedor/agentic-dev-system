@@ -155,6 +155,18 @@ def test_default_runtime_config_uses_codex_first_tiered_defaults(tmp_path: Path)
         "stdin_from_task_file": True,
         "timeout_seconds": 1800,
     }
+    assert result.config["local_execution"] == {
+        "global_default_model": "gemma",
+        "role_defaults": {
+            "research": "qwen3",
+            "planner": "qwen3",
+            "developer": "gemma",
+            "test": "qwen3-coder",
+            "documentation": "qwen3",
+            "security_quality": "gemma",
+            "local_reviewer": "gemma",
+        },
+    }
 
 
 def test_checked_in_runtime_config_keeps_codex_runtime_disabled_by_default() -> None:
@@ -284,6 +296,19 @@ def test_validate_runtime_config_requires_codex_task_file_stdin(
         validate_runtime_config(tmp_path)
 
     assert "codex_runtime.stdin_from_task_file must be true" in str(error.value)
+
+
+def test_validate_runtime_config_rejects_invalid_local_execution_defaults(
+    tmp_path: Path,
+) -> None:
+    config = runtime_config_data()
+    config["local_execution"]["role_defaults"]["developer"] = ""
+    write_runtime_config(tmp_path, config)
+
+    with pytest.raises(ValueError) as error:
+        validate_runtime_config(tmp_path)
+
+    assert "local_execution.role_defaults.developer must be a non-empty string" in str(error.value)
 
 
 def test_show_runtime_config_returns_yaml_content(tmp_path: Path) -> None:

@@ -4,10 +4,12 @@
 which provider and model each agent role should use, and which commands are safe
 to run without repeated approval.
 
-Blueprint files describe what to build and why. They should not be the source of
-truth for provider or model assignment. Keeping model choices in
-`.agentic/agent_runtime.yaml` lets operators change runtime tiers without
-rewriting story scope or acceptance criteria.
+Blueprint files describe what to build and why. They are not the source of
+truth for provider wiring, Codex tiers, or local endpoint settings. Story 060
+adds one narrow exception: a blueprint role may optionally override the local
+model used by `agentic local-execute`. Runtime defaults still live in
+`.agentic/agent_runtime.yaml`, so operators can change normal role defaults
+without rewriting story scope or acceptance criteria.
 
 ## Codex-First Defaults
 
@@ -53,6 +55,39 @@ cloud model and records the result manually.
 draft helper. It is not the default docs runtime, not a final reviewer, and not
 required for normal workflow validation. Its `prompt_mode: micro` setting keeps
 local draft prompts intentionally small.
+
+## Blueprint-Driven Local Execution
+
+`agentic local-execute --story STORY_SLUG` uses the assigned roles from
+`agent_plan.yaml`, which may come from a blueprint-defined `agents:` section.
+The blueprint decides which roles participate, their execution order, optional
+local model overrides, and writable path boundaries.
+
+Model resolution for each role is:
+
+1. Blueprint role override
+2. `local_execution.role_defaults.<role>`
+3. `local_execution.global_default_model`
+4. blocked if no model resolves
+
+Example defaults:
+
+```yaml
+local_execution:
+  global_default_model: gemma
+  role_defaults:
+    research: qwen3
+    planner: qwen3
+    developer: gemma
+    test: qwen3-coder
+    documentation: qwen3
+    security_quality: gemma
+    local_reviewer: gemma
+```
+
+`agentic local-execute --dry-run` prints the resolved model and source for each
+blueprint-selected role. `--resume` skips completed roles by reading
+`stories/STORY_SLUG/reports/local_execution/state.yaml`.
 
 ## Codex Runtime Adapter
 

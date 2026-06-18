@@ -849,10 +849,12 @@ def call_local_model(
     config: LocalModelRuntimeConfig,
     prompt: str,
     http_client: LocalModelHttpClient | None = None,
+    *,
+    model: str | None = None,
 ) -> dict[str, Any]:
     client = http_client or UrllibLocalModelHttpClient()
     payload: dict[str, Any] = {
-        "model": config.model,
+        "model": model or config.model,
         "messages": [{"role": "user", "content": prompt}],
     }
 

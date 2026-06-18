@@ -1,0 +1,52 @@
+story: story_060
+status: PASSED
+passed_checks:
+- unit_tests is addressed.
+- integration_tests is addressed.
+- mock_e2e_tests is addressed.
+- live_read_only_checks is addressed.
+- remote_dev_smoke_tests is addressed.
+failed_checks: []
+layers:
+  unit_tests:
+    status: PASSED
+    required: true
+    action: add_or_update
+    frequency: every_commit
+    evidence_or_reason: Added focused tests for blueprint role assignment, local model
+      resolution, state persistence, resume behavior, and writable-path enforcement.
+    failed_checks: []
+  integration_tests:
+    status: PASSED
+    required: true
+    action: add_or_update
+    frequency: every_pull_request
+    evidence_or_reason: Local execution tests cover state updates, per-role artifacts,
+      and multi-role ordering with a fake local model client.
+    failed_checks: []
+  mock_e2e_tests:
+    status: PASSED
+    required: false
+    action: not_applicable_with_reason
+    frequency: manual_only
+    evidence_or_reason: Story 060 is covered through module-level integration behavior
+      and existing workflow tests.
+    failed_checks: []
+  live_read_only_checks:
+    status: PASSED
+    required: false
+    action: not_applicable_with_reason
+    frequency: manual_only
+    evidence_or_reason: Automated coverage uses fake local model clients. The live
+      Qwen documentation-role smoke test is recorded separately as local evidence
+      and is not required in CI.
+    failed_checks: []
+  remote_dev_smoke_tests:
+    status: PASSED
+    required: false
+    action: not_applicable_with_reason
+    frequency: after_remote_dev_deploy
+    evidence_or_reason: Story 060 does not change remote dev deployment or validation
+      behavior.
+    failed_checks: []
+next_action: Continue to the quality gate or finalize-story workflow.

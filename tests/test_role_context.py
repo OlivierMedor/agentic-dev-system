@@ -166,6 +166,7 @@ def test_missing_agent_plan_raises_clear_error(tmp_path: Path) -> None:
         build_role_context(tmp_path, STORY)
 
     assert "agent_plan.yaml" in str(error.value)
+    assert f"agentic assign-agents --story {STORY}" in str(error.value)
 
 
 def test_force_overwrites_existing_context(tmp_path: Path) -> None:

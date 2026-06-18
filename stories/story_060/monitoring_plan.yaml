@@ -1,0 +1,14 @@
+logs_required: true
+watch_for:
+  - local_runtime_unavailable
+  - unresolved_local_model
+  - malformed_local_model_response
+  - yaml_parsing_failure
+  - file_boundary_violation
+  - interrupted_local_execution
+  - resume_state_corruption
+  - accidental_codex_fallback
+  - accidental_cloud_generation_fallback
+  - unauthorized_file_application
+  - missing_role_context
+  - missing_agent_plan

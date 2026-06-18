@@ -14,6 +14,7 @@ from agentic_dev.artifact_policy import (
     is_generated_review_bundle_path,
     is_local_agent_context_output_path,
     is_local_agent_draft_output_path,
+    is_local_execution_output_path,
     is_local_model_raw_response_path,
     is_local_model_scorecard_result_path,
     is_local_model_scorecard_scoring_artifact_path,
@@ -116,6 +117,9 @@ def public_readiness_violation_reason(
     if is_codex_runtime_output_path(parts, filename):
         return "Codex runtime output files must remain untracked"
 
+    if is_local_execution_output_path(parts, filename):
+        return "local execution output files must remain untracked"
+
     if is_local_model_raw_response_path(parts, filename):
         return "local model raw response files must remain untracked"
 
@@ -212,6 +216,7 @@ def format_public_readiness_report(result: PublicReadinessResult) -> str:
             "- `stories/**/reports/role_context/*` except `.gitkeep`",
             "- `stories/**/reports/codex_tasks/*` except `.gitkeep`",
             "- `stories/**/reports/codex_runtime/*` except `.gitkeep`",
+            "- `stories/**/reports/local_execution/*` except `.gitkeep`",
             "- `*_raw_response.json`",
             "- `.agentic/local_model_scorecard/scorecard_scores.yaml`",
             "- `reports/local_model_scorecard_report.md`",

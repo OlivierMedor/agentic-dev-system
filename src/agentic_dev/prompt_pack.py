@@ -53,9 +53,6 @@ def generate_prompt_pack(project_path: Path, story: str, force: bool = False) ->
         raise FileNotFoundError(f"Story folder does not exist: {story_path}")
 
     agent_plan_path = story_path / "agent_plan.yaml"
-    if not agent_plan_path.exists():
-        raise FileNotFoundError(f"Required agent plan does not exist: {agent_plan_path}")
-
     agent_plan = load_agent_plan(agent_plan_path)
     assigned_agents = ordered_assigned_agents(agent_plan)
 
@@ -98,6 +95,9 @@ def generate_prompt_pack(project_path: Path, story: str, force: bool = False) ->
 
 
 def load_agent_plan(agent_plan_path: Path) -> dict[str, Any]:
+    if not agent_plan_path.exists():
+        raise FileNotFoundError(missing_agent_plan_message(agent_plan_path))
+
     with agent_plan_path.open("r", encoding="utf-8") as agent_plan_file:
         loaded = yaml.safe_load(agent_plan_file)
 
@@ -105,6 +105,23 @@ def load_agent_plan(agent_plan_path: Path) -> dict[str, Any]:
         raise ValueError("agent_plan.yaml must be a YAML mapping.")
 
     return loaded
+
+
+def missing_agent_plan_message(agent_plan_path: Path) -> str:
+    story = infer_story_name(agent_plan_path)
+    suggestion = (
+        f" Run `agentic assign-agents --story {story}` and try again."
+        if story
+        else ""
+    )
+    return f"Required agent plan does not exist: {agent_plan_path}.{suggestion}"
+
+
+def infer_story_name(agent_plan_path: Path) -> str | None:
+    parent = agent_plan_path.parent
+    if parent.name:
+        return parent.name
+    return None
 
 
 def ordered_assigned_agents(agent_plan: dict[str, Any]) -> list[dict[str, Any]]:

@@ -3645,6 +3645,75 @@ stories:
         - generated_prompt_execution
         - automatic_merge_or_deploy
 
+  - id: STORY-060
+    story_id: story_060
+    slug: blueprint-local-model-execution
+    title: Blueprint-Driven Local Model Execution
+    goal: Allow each blueprint-defined agent role to execute using a local model.
+    why: The system already prepares role-specific work, but Story 060 makes local-model execution the first-class local automation path for blueprint-selected roles.
+    agents:
+      research:
+        writable_paths:
+          - stories/story_060/reports/**
+      planner:
+        writable_paths:
+          - stories/story_060/reports/**
+      developer:
+        writable_paths:
+          - src/**
+          - stories/story_060/reports/**
+      test:
+        writable_paths:
+          - tests/**
+          - stories/story_060/reports/**
+      documentation:
+        model: qwen/qwen3-coder-30b
+        writable_paths:
+          - README.md
+          - docs/**
+          - stories/story_060/reports/**
+      security_quality:
+        writable_paths:
+          - stories/story_060/reports/**
+      local_reviewer:
+        writable_paths:
+          - stories/story_060/reports/**
+    execution_order:
+      - research
+      - planner
+      - developer
+      - test
+      - documentation
+      - security_quality
+      - local_reviewer
+    acceptance_criteria:
+      - Blueprint agents remain the authoritative list of roles to execute.
+      - A blueprint can assign a local model to each agent.
+      - Missing blueprint assignments use runtime role defaults.
+      - Missing role defaults use the global local-model default.
+      - No Codex or cloud code-generation fallback occurs.
+      - Role execution follows blueprint-defined order.
+      - Each role receives its role-specific context packet.
+      - Each role output is stored separately.
+      - Each call writes audit metadata.
+      - Writable-path restrictions are enforced.
+      - Execution failures are classified and recorded.
+      - Execution state survives interruption.
+      - Resume skips successfully completed roles.
+      - Dry-run shows the resolved model and source of resolution.
+      - Existing workflows remain backward compatible.
+    not_in_scope:
+      - Cloud code review.
+      - Local repair based on cloud feedback.
+      - Automatic story approval.
+      - Token-aware context reduction.
+      - Automatic Git commits, merges, or deployment.
+    definition_of_done:
+      - Unit tests pass.
+      - Ruff passes.
+      - Existing tests remain green.
+      - Documentation explains blueprint overrides and runtime defaults.
+
   - id: STORY-048
     slug: story_048_micro_local_agent_prompt_mode
     title: Add Micro Local-Agent Prompt Mode For Gemma Reliability

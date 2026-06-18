@@ -41,6 +41,8 @@ stories/**/reports/codex_tasks/*
 !stories/**/reports/codex_tasks/.gitkeep
 stories/**/reports/codex_runtime/*
 !stories/**/reports/codex_runtime/.gitkeep
+stories/**/reports/local_execution/*
+!stories/**/reports/local_execution/.gitkeep
 .agentic/support_queue/**/*.yaml
 .agentic/support_queue/**/*.md
 !.agentic/support_queue/**/.gitkeep

@@ -1,0 +1,26 @@
+test_layers_version: 1
+unit_tests:
+  required: true
+  action: add_or_update
+  frequency: every_commit
+  evidence_or_reason: Added focused tests for blueprint role assignment, local model resolution, state persistence, resume behavior, and writable-path enforcement.
+integration_tests:
+  required: true
+  action: add_or_update
+  frequency: every_pull_request
+  evidence_or_reason: Local execution tests cover state updates, per-role artifacts, and multi-role ordering with a fake local model client.
+mock_e2e_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: manual_only
+  evidence_or_reason: Story 060 is covered through module-level integration behavior and existing workflow tests.
+live_read_only_checks:
+  required: false
+  action: not_applicable_with_reason
+  frequency: manual_only
+  evidence_or_reason: Automated coverage uses fake local model clients. The live Qwen documentation-role smoke test is recorded separately as local evidence and is not required in CI.
+remote_dev_smoke_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: after_remote_dev_deploy
+  evidence_or_reason: Story 060 does not change remote dev deployment or validation behavior.

@@ -31,9 +31,9 @@ tests verify behavior
 ```
 
 Most commands start in `src/agentic_dev/cli.py`. The CLI parses the command,
-calls a focused module such as `quality_gate.py` or `review_bundle.py`, and that
-module writes reports or story files. Tests then check that the command behaves
-as expected.
+calls a focused module such as `quality_gate.py`, `review_bundle.py`, or
+`local_execution.py`, and that module writes reports or story files. Tests then
+check that the command behaves as expected.
 
 ## `.agentic/`
 
@@ -61,10 +61,14 @@ Look here when you need to know what CI runs for a pull request.
 
 `blueprints/` are the architect plans. The public blueprint file,
 `blueprints/blueprint.yaml`, lists approved stories with goals, acceptance
-criteria, test plans, and monitoring notes.
+criteria, test plans, monitoring notes, and optional agent metadata.
 
 `agentic generate-stories` reads the blueprint and creates matching folders
 under `stories/`.
+
+Story 060 extends this area with blueprint-defined agent selection for
+`agentic local-execute`. The blueprint can define the participating roles,
+execution order, optional local model overrides, and writable path boundaries.
 
 Private operator guidance may exist locally in
 `blueprints/agentic-architecture.md`. That file is intentionally ignored and
@@ -81,6 +85,7 @@ Useful starting points:
 - `docs/system_map.md` shows system diagrams.
 - `docs/command_map.md` maps commands to code and tests.
 - `docs/public_readiness.md` explains what must stay out of Git.
+- `docs/local_models.md` explains local execution and draft-model setup.
 
 ## `src/agentic_dev/`
 
@@ -97,6 +102,9 @@ Important pieces:
   check review evidence.
 - `role_context.py` builds focused role-specific context packets from story
   files, agent plans, rules, and local evidence.
+- `local_execution.py` runs blueprint-selected roles with local models only,
+  resolves each role model, reuses role context, normalizes fenced YAML model
+  output, enforces writable paths, and records resumable execution state.
 - `codex_runtime.py` turns role context packets into Codex-ready task files
   without invoking Codex.
 - Queue modules such as `support_queue.py` and `queue_management.py` manage
@@ -121,6 +129,9 @@ A typical story contains:
   normally keep only `.gitkeep` tracked.
 - `reports/codex_tasks/` for generated Codex task files that normally keep
   only `.gitkeep` tracked.
+- `reports/local_execution/` for resumable local-model execution state,
+  per-role audit YAML, and raw `output.md` responses that normally remain local
+  runtime evidence.
 - `review_bundle/`, `cloud_review_packet/`, and `remote_dev_validation/` as
   generated artifact folders that normally keep only `.gitkeep` tracked.
 
@@ -135,6 +146,8 @@ Most feature modules have a matching test file:
 - `src/agentic_dev/workflow_run.py` is checked by `tests/test_workflow_run.py`.
 - `src/agentic_dev/public_readiness.py` is checked by
   `tests/test_public_readiness.py`.
+- `src/agentic_dev/local_execution.py` is checked by
+  `tests/test_local_execution.py`.
 
 When adding or changing a feature, look for the matching test file first.
 

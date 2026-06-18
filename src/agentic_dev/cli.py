@@ -22,6 +22,7 @@ from agentic_dev.local_model_runtime import (
     run_local_model_dry_run,
     validate_local_model_runtime_config,
 )
+from agentic_dev.local_execution import run_local_execution
 from agentic_dev.local_model_scorecard import (
     create_local_model_scorecard,
     create_local_model_scorecard_report,
@@ -670,6 +671,36 @@ def main() -> None:
         type=int,
         default=DEFAULT_ROLE_CONTEXT_TARGET_CHARACTERS,
         help="Target maximum characters per context packet. Defaults to 8000.",
+    )
+
+    local_execute_parser = subparsers.add_parser(
+        "local-execute",
+        help="Execute assigned story roles with local models only.",
+    )
+    local_execute_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    local_execute_parser.add_argument(
+        "--story",
+        required=True,
+        help="Story folder name under the project's stories folder.",
+    )
+    local_execute_parser.add_argument(
+        "--role",
+        help="Optional single role to execute, such as developer or test.",
+    )
+    local_execute_parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume from the first required role that is not completed.",
+    )
+    local_execute_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show resolved models and execution order without executing roles.",
     )
 
     codex_task_parser = subparsers.add_parser(
@@ -1555,6 +1586,16 @@ def main() -> None:
                 all_agents=args.all,
                 force=args.force,
                 target_chars=args.target_chars,
+            )
+            print(result.terminal_summary)
+
+        if args.command == "local-execute":
+            result = run_local_execution(
+                args.project,
+                args.story,
+                role=args.role,
+                resume=args.resume,
+                dry_run=args.dry_run,
             )
             print(result.terminal_summary)
 

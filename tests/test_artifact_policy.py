@@ -26,6 +26,7 @@ def test_allowed_project_paths_do_not_violate_artifact_policy() -> None:
         "stories/story_051_role_specific_context_builder/reports/role_context/.gitkeep",
         "stories/story_052_codex_runtime_connector/reports/codex_tasks/.gitkeep",
         "stories/story_056/reports/codex_runtime/.gitkeep",
+        "stories/story_060/reports/local_execution/.gitkeep",
         ".agentic/improvement_queue/pending/.gitkeep",
         ".agentic/maintenance_queue/pending/.gitkeep",
         ".agentic/feature_queue/pending/.gitkeep",
@@ -181,6 +182,21 @@ def test_codex_runtime_output_files_are_blocked_except_gitkeep() -> None:
     ) == blocked_paths
 
 
+def test_local_execution_outputs_are_blocked_except_gitkeep() -> None:
+    blocked_paths = [
+        "stories/story_060/reports/local_execution/state.yaml",
+        "stories/story_060/reports/local_execution/developer/output.md",
+        "stories/story_060/reports/local_execution/developer/execution.yaml",
+    ]
+
+    assert violation_paths(
+        [
+            *blocked_paths,
+            "stories/story_060/reports/local_execution/.gitkeep",
+        ],
+    ) == blocked_paths
+
+
 def test_local_model_raw_response_files_are_blocked() -> None:
     blocked_paths = [
         "reports/debug_docs_agent_prompt_raw_response.json",
@@ -244,6 +260,7 @@ def test_multiple_violations_are_all_reported() -> None:
         "stories/story_051_role_specific_context_builder/reports/role_context/developer_agent_context.md",
         "stories/story_052_codex_runtime_connector/reports/codex_tasks/developer_agent_codex_task.md",
         "stories/story_056/reports/codex_runtime/developer_agent_stdout.txt",
+        "stories/story_060/reports/local_execution/developer/output.md",
         "reports/debug_docs_agent_prompt_raw_response.json",
         "reports/local_model_scorecard_report.md",
         ".agentic/local_model_scorecard/scorecard_scores.yaml",
@@ -265,6 +282,7 @@ def test_multiple_violations_are_all_reported() -> None:
         "stories/story_051_role_specific_context_builder/reports/role_context/developer_agent_context.md",
         "stories/story_052_codex_runtime_connector/reports/codex_tasks/developer_agent_codex_task.md",
         "stories/story_056/reports/codex_runtime/developer_agent_stdout.txt",
+        "stories/story_060/reports/local_execution/developer/output.md",
         "reports/debug_docs_agent_prompt_raw_response.json",
         "reports/local_model_scorecard_report.md",
         ".agentic/local_model_scorecard/scorecard_scores.yaml",

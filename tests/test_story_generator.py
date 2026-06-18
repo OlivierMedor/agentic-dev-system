@@ -5,7 +5,7 @@ import yaml
 
 from agentic_dev.cli import main
 from agentic_dev.scaffolding import CORE_AGENT_INSTRUCTIONS
-from agentic_dev.story_generator import generate_stories
+from agentic_dev.story_generator import format_status_yaml, generate_stories
 
 
 def write_blueprint(path: Path, story_slug: str = "story_010_example") -> None:
@@ -112,6 +112,21 @@ def test_generate_stories_creates_full_test_layer_template(tmp_path: Path) -> No
         assert test_plan[layer_name]["action"]
         assert test_plan[layer_name]["frequency"]
         assert test_plan[layer_name]["evidence_or_reason"]
+
+
+def test_format_status_yaml_uses_story_id_field_when_blueprint_has_display_id() -> None:
+    status = yaml.safe_load(
+        format_status_yaml(
+            {
+                "id": "STORY-060",
+                "story_id": "story_060",
+                "slug": "blueprint-local-model-execution",
+            }
+        )
+    )
+
+    assert status["story_id"] == "story_060"
+    assert "id" not in status
 
 
 def test_generate_stories_uses_default_blueprint_path(tmp_path: Path) -> None:

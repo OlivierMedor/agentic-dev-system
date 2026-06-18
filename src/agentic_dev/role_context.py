@@ -91,9 +91,6 @@ def build_role_context(
         raise ValueError("Use either --agent or --all, not both.")
 
     agent_plan_path = story_path / "agent_plan.yaml"
-    if not agent_plan_path.exists():
-        raise FileNotFoundError(f"Required agent plan does not exist: {agent_plan_path}")
-
     agent_plan = load_agent_plan(agent_plan_path)
     assigned_agents = ordered_assigned_agents(agent_plan)
     selected_agents = select_agents(assigned_agents, agent)

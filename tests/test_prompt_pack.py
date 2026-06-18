@@ -174,6 +174,7 @@ def test_missing_agent_plan_raises_clear_error(tmp_path: Path) -> None:
         generate_prompt_pack(tmp_path, STORY)
 
     assert "agent_plan.yaml" in str(error.value)
+    assert f"agentic assign-agents --story {STORY}" in str(error.value)
 
 
 def test_existing_prompt_files_are_not_overwritten_by_default(tmp_path: Path) -> None:

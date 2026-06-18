@@ -137,12 +137,14 @@ def format_story_markdown(story: dict[str, Any]) -> str:
 
 
 def format_status_yaml(story: dict[str, Any]) -> str:
-    story_id = text_value(story, "id", "UNKNOWN")
+    story_id = text_value(story, "story_id", text_value(story, "id", "UNKNOWN"))
+    slug = text_value(story, "slug", "")
 
-    return f"""story_id: {story_id}
-status: pending
-ready_for_review: false
-"""
+    lines = [f"story_id: {story_id}"]
+    if slug:
+        lines.append(f"slug: {slug}")
+    lines.extend(["status: pending", "ready_for_review: false"])
+    return "\n".join(lines) + "\n"
 
 
 def format_test_plan_yaml(story: dict[str, Any]) -> str:
