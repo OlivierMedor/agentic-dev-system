@@ -17,6 +17,7 @@ READY_FOR_REVIEW = "READY_FOR_REVIEW"
 REQUEST_CHANGES = "REQUEST_CHANGES"
 POST_MERGE_VERIFIED = "POST_MERGE_VERIFIED"
 POST_MERGE_FAILED = "POST_MERGE_FAILED"
+POST_MERGE_GIT_STATUS_COMMAND = ["git", "-c", "core.autocrlf=true", "status", "--short"]
 
 REQUIRED_STORY_FILES = [
     "story.md",
@@ -290,7 +291,7 @@ def run_post_merge_quality_gate(
 
     add_file_checks(story_path, REQUIRED_STORY_FILES, passed_checks, failed_checks)
 
-    git_status_before = command_runner(["git", "status", "--short"], project_path)
+    git_status_before = command_runner(POST_MERGE_GIT_STATUS_COMMAND, project_path)
     command_outputs["git_status_before"] = git_status_before.stdout.strip()
     if git_status_before.returncode != 0:
         failed_checks.append("git status failed before post-merge verification.")
@@ -326,7 +327,7 @@ def run_post_merge_quality_gate(
     else:
         passed_checks.append("Runtime config validation passed.")
 
-    git_status_after = command_runner(["git", "status", "--short"], project_path)
+    git_status_after = command_runner(POST_MERGE_GIT_STATUS_COMMAND, project_path)
     command_outputs["git_status_after"] = git_status_after.stdout.strip()
     if git_status_after.returncode != 0:
         failed_checks.append("git status failed after post-merge verification.")

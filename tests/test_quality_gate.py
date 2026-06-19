@@ -5,6 +5,7 @@ import yaml
 
 from agentic_dev.quality_gate import (
     POST_MERGE_FAILED,
+    POST_MERGE_GIT_STATUS_COMMAND,
     POST_MERGE_VERIFIED,
     READY_FOR_REVIEW,
     REQUEST_CHANGES,
@@ -309,7 +310,7 @@ def test_post_merge_quality_gate_succeeds_without_review_bundle(
 
     def runner(command: list[str], cwd: Path):  # noqa: ANN202
         assert cwd == tmp_path.resolve()
-        if command == ["git", "status", "--short"]:
+        if command == POST_MERGE_GIT_STATUS_COMMAND:
             return type("Result", (), {"returncode": 0, "stdout": "", "stderr": ""})()
         if command == ["pytest"]:
             return type("Result", (), {"returncode": 0, "stdout": "12 passed in 0.34s\n", "stderr": ""})()
@@ -352,7 +353,7 @@ def test_post_merge_quality_gate_fails_when_git_is_dirty_after_verification(tmp_
     def runner(command: list[str], cwd: Path):  # noqa: ANN202
         nonlocal calls
         calls += 1
-        if command == ["git", "status", "--short"]:
+        if command == POST_MERGE_GIT_STATUS_COMMAND:
             stdout = "" if calls == 1 else " M stories/story_062/reports/quality_gate_report.md\n"
             return type("Result", (), {"returncode": 0, "stdout": stdout, "stderr": ""})()
         if command == ["pytest"]:
@@ -387,7 +388,7 @@ def test_post_merge_quality_gate_fails_when_pytest_or_ruff_regeneration_fails(tm
     create_complete_story(tmp_path, story)
 
     def runner(command: list[str], cwd: Path):  # noqa: ANN202
-        if command == ["git", "status", "--short"]:
+        if command == POST_MERGE_GIT_STATUS_COMMAND:
             return type("Result", (), {"returncode": 0, "stdout": "", "stderr": ""})()
         if command == ["pytest"]:
             return type("Result", (), {"returncode": 1, "stdout": "1 failed, 11 passed\n", "stderr": ""})()
