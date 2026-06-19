@@ -1,6 +1,9 @@
 from pathlib import Path
 
-from agentic_dev.review_bundle import CommandResult, create_review_bundle
+import pytest
+
+from agentic_dev.cli import main
+from agentic_dev.review_bundle import CommandResult, ReviewBundleResult, create_review_bundle
 
 
 BASE_SHA = "5f0d9fda8b6b0a89ed6c6ef819a6937630d79d3e"
@@ -11,6 +14,7 @@ def passing_runner(command: list[str], cwd: Path) -> CommandResult:
     command_text = " ".join(command)
     outputs = {
         "git merge-base HEAD origin/main": f"{BASE_SHA}\n",
+        f"git merge-base HEAD {BASE_SHA}": f"{BASE_SHA}\n",
         "git rev-parse HEAD": f"{HEAD_SHA}\n",
         "git diff --stat": " src/agentic_dev/demo_subtasks.py | 10 +++++-----\n 1 file changed, 5 insertions(+), 5 deletions(-)\n",
         "git diff --cached": "diff --git a/README.md b/README.md\n",
@@ -80,6 +84,29 @@ def test_create_review_bundle_writes_expected_files(tmp_path: Path) -> None:
     assert f"- base sha: `{BASE_SHA}`" in handoff
     assert f"- head sha: `{HEAD_SHA}`" in handoff
     assert "committed diff present: yes" in handoff
+
+
+def test_create_review_bundle_accepts_explicit_base_sha_for_clean_branch(
+    tmp_path: Path,
+) -> None:
+    story = "story_002_review_bundle_command"
+    (tmp_path / "stories" / story).mkdir(parents=True)
+
+    result = create_review_bundle(tmp_path, story, base_ref=BASE_SHA, command_runner=passing_runner)
+
+    metadata = (result.review_bundle_path / "committed_diff_metadata.txt").read_text(
+        encoding="utf-8",
+    )
+    handoff = (result.review_bundle_path / "handoff.md").read_text(encoding="utf-8")
+
+    assert f"Requested base ref: `{BASE_SHA}`" in metadata
+    assert f"Resolved base ref: `{BASE_SHA}`" in metadata
+    assert f"Base SHA: `{BASE_SHA}`" in metadata
+    assert f"Head SHA: `{HEAD_SHA}`" in metadata
+    assert f"- requested base ref: `{BASE_SHA}`" in handoff
+    assert f"- resolved base ref: `{BASE_SHA}`" in handoff
+    assert f"- base sha: `{BASE_SHA}`" in handoff
+    assert f"- head sha: `{HEAD_SHA}`" in handoff
 
 
 def test_file_tree_excludes_noisy_folders(tmp_path: Path) -> None:
@@ -544,3 +571,64 @@ def test_create_review_bundle_records_committed_pr_diff_for_clean_branch(tmp_pat
     assert "src/agentic_dev/demo_subtasks.py" in committed_files
     assert "diff --git a/src/agentic_dev/demo_subtasks.py" in committed_patch
     assert "Status: PASSED" in committed_patch
+
+
+def test_cli_review_bundle_help_shows_base_ref_option(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr("sys.argv", ["agentic", "review-bundle", "--help"])
+
+    with pytest.raises(SystemExit) as error:
+        main()
+
+    assert error.value.code == 0
+    help_output = capsys.readouterr().out
+    assert "--base-ref" in help_output
+    assert "--story" in help_output
+
+
+def test_cli_review_bundle_passes_explicit_base_ref(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    story = "story_002_review_bundle_command"
+    story_path = tmp_path / "stories" / story
+    story_path.mkdir(parents=True)
+
+    captured: dict[str, str] = {}
+
+    def fake_create_review_bundle(
+        project_path: Path,
+        story_name: str,
+        *,
+        base_ref: str = "origin/main",
+        command_runner=None,
+    ) -> ReviewBundleResult:
+        captured["project_path"] = str(project_path)
+        captured["story"] = story_name
+        captured["base_ref"] = base_ref
+        review_bundle_path = story_path / "review_bundle"
+        review_bundle_path.mkdir(exist_ok=True)
+        return ReviewBundleResult(
+            review_bundle_path=review_bundle_path,
+            generated_files=[review_bundle_path / "handoff.md"],
+            pytest_passed=True,
+            ruff_passed=True,
+        )
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["agentic", "review-bundle", "--story", story, "--base-ref", BASE_SHA],
+    )
+    monkeypatch.setattr("agentic_dev.cli.create_review_bundle", fake_create_review_bundle)
+
+    main()
+
+    assert captured["project_path"] == str(tmp_path)
+    assert captured["story"] == story
+    assert captured["base_ref"] == BASE_SHA
+    output = capsys.readouterr().out
+    assert "Review bundle created at:" in output

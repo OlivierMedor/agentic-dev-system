@@ -127,6 +127,11 @@ def main() -> None:
         required=True,
         help="Story folder name under the project's stories folder.",
     )
+    review_bundle_parser.add_argument(
+        "--base-ref",
+        default="origin/main",
+        help="Base ref or base SHA used to capture the committed PR diff. Defaults to origin/main.",
+    )
 
     quality_gate_parser = subparsers.add_parser(
         "quality-gate",
@@ -1307,7 +1312,7 @@ def main() -> None:
                 print("\nNo new files created. Project already appears initialized.")
 
         if args.command == "review-bundle":
-            result = create_review_bundle(args.project, args.story)
+            result = create_review_bundle(args.project, args.story, base_ref=args.base_ref)
 
             print(f"Review bundle created at: {result.review_bundle_path}")
             print(f"pytest passed: {result.pytest_passed}")

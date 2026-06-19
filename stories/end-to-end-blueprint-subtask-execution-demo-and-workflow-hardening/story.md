@@ -81,4 +81,11 @@ Story 061 defines dependency-aware local sub-task execution, but the repository 
 - runtime-config validation passes.
 - hidden-Unicode hygiene validation passes.
 - Public-readiness validation passes when applicable to the repository state.
-- No implementation code is added beyond blueprint and generated workspace changes required to define Story 062.
+- agentic demo-subtasks is implemented.
+- Fake and local modes are implemented.
+- All four scenarios are validated.
+- Sandbox safety is implemented.
+- A real local-model demonstration passes.
+- Post-merge verification is implemented.
+- Tests and documentation are completed.
+- Backward compatibility is preserved for Stories 060 and 061.
