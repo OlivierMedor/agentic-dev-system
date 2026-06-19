@@ -13,6 +13,7 @@ from agentic_dev.runtime_config import default_runtime_config_text
 
 
 STORY = "story_060"
+SUBTASK_STORY = "story_061"
 
 
 class FakeLocalExecutionHttpClient:
@@ -137,6 +138,122 @@ Local models should execute assigned roles.
         encoding="utf-8",
     )
     return story_path
+
+
+def create_subtask_story(
+    project_path: Path,
+    *,
+    max_input_tokens: int = 12000,
+    include_second_task: bool = True,
+) -> Path:
+    story_path = project_path / "stories" / SUBTASK_STORY
+    (story_path / "reports").mkdir(parents=True)
+    (story_path / "instructions").mkdir()
+    (story_path / "story.md").write_text(
+        """# Story 061
+
+## Goal
+
+Execute context-safe sub-tasks.
+
+## Acceptance Criteria
+
+- AC-001: A blueprint can define multiple ordered sub-tasks for a story.
+- AC-002: Each sub-task has a stable unique ID.
+""",
+        encoding="utf-8",
+    )
+    (story_path / "status.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "story_id": SUBTASK_STORY,
+                "slug": "blueprint-defined-context-safe-subtask-execution",
+                "status": "prepared",
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    for name in ("developer_agent", "test_agent"):
+        (story_path / "instructions" / f"{name}.md").write_text(
+            f"# {name}\n\n## Role\n\nStay in role.\n",
+            encoding="utf-8",
+        )
+
+    subtasks = [
+        subtask_blueprint_entry(
+            "schema",
+            role="developer",
+            max_input_tokens=max_input_tokens,
+        ),
+    ]
+    if include_second_task:
+        subtasks.append(
+            subtask_blueprint_entry(
+                "tests",
+                role="test",
+                depends_on=["schema"],
+                prior_task_outputs=["schema"],
+                max_input_tokens=max_input_tokens,
+            )
+        )
+
+    (project_path / "blueprints").mkdir()
+    (project_path / "blueprints" / "blueprint.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "stories": [
+                    {
+                        "id": "STORY-061",
+                        "story_id": SUBTASK_STORY,
+                        "slug": "blueprint-defined-context-safe-subtask-execution",
+                        "goal": "Execute context-safe sub-tasks.",
+                        "acceptance_criteria": [
+                            "AC-001: A blueprint can define multiple ordered sub-tasks for a story.",
+                            "AC-002: Each sub-task has a stable unique ID.",
+                        ],
+                        "subtasks": subtasks,
+                    }
+                ]
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    return story_path
+
+
+def subtask_blueprint_entry(
+    task_id: str,
+    *,
+    role: str,
+    depends_on: list[str] | None = None,
+    prior_task_outputs: list[str] | None = None,
+    max_input_tokens: int = 12000,
+) -> dict[str, Any]:
+    return {
+        "id": task_id,
+        "title": f"{task_id} task",
+        "role": role,
+        "depends_on": depends_on or [],
+        "requirement_ids": ["AC-001", "AC-002"],
+        "required_context": {
+            "files": [f"stories/{SUBTASK_STORY}/story.md"],
+            "summaries": ["Use complete required context."],
+            "prior_task_outputs": prior_task_outputs or [],
+            "architecture_decisions": ["No cloud fallback."],
+        },
+        "writable_paths": ["src/**", f"stories/{SUBTASK_STORY}/reports/**"],
+        "expected_outputs": ["A local execution report."],
+        "validation": ["pytest passes."],
+        "context_budget": {
+            "max_input_tokens": max_input_tokens,
+            "reserved_output_tokens": 1000,
+            "required_context_must_fit": True,
+            "allow_required_context_trimming": False,
+            "oversized_task_policy": "reject_for_cloud_redecomposition",
+        },
+    }
 
 
 def read_yaml(path: Path) -> dict[str, Any]:
@@ -567,6 +684,188 @@ def test_local_execute_reports_configuration_error_for_invalid_runtime_config(tm
     assert result.status == "blocked"
     execution = read_yaml(story_path / "reports" / "local_execution" / "documentation" / "execution.yaml")
     assert execution["failure_type"] == "configuration_error"
+
+
+def test_subtask_local_execute_dry_run_reports_context_budget(tmp_path: Path) -> None:
+    write_runtime_config(tmp_path)
+    create_subtask_story(tmp_path)
+
+    result = run_local_execution(tmp_path, SUBTASK_STORY, dry_run=True)
+
+    assert result.status == "dry_run"
+    assert result.subtasks is not None
+    assert [task.task_id for task in result.subtasks] == ["schema", "tests"]
+    assert result.subtasks[0].model == "gemma"
+    assert result.subtasks[0].estimated_input_tokens is not None
+    assert result.subtasks[0].usable_input_tokens == 11000
+    assert "schema: ready" in result.terminal_summary
+
+
+def test_subtask_local_execute_blocks_oversized_task_before_model_call(tmp_path: Path) -> None:
+    write_runtime_config(tmp_path)
+    story_path = create_subtask_story(tmp_path, max_input_tokens=1100, include_second_task=False)
+    client = FakeLocalExecutionHttpClient([])
+
+    result = run_local_execution(tmp_path, SUBTASK_STORY, http_client=client)
+
+    assert result.status == "blocked"
+    assert client.calls == []
+    state = read_yaml(story_path / "reports" / "local_execution" / "state.yaml")
+    task_state = state["tasks"]["schema"]
+    assert task_state["status"] == "cloud_redecomposition_required"
+    assert task_state["failure_type"] == "context_over_budget"
+    assert task_state["local_agent_may_redecompose"] is False
+    assert state["cloud_redecomposition_required_tasks"] == ["schema"]
+
+
+def test_subtask_local_execute_runs_dependencies_and_persists_handoffs(tmp_path: Path) -> None:
+    write_runtime_config(tmp_path)
+    story_path = create_subtask_story(tmp_path)
+    client = FakeLocalExecutionHttpClient(
+        [
+            yaml.safe_dump(
+                {
+                    "report": "Schema report\n",
+                    "files": [{"path": "src/schema.py", "content": "SCHEMA = True\n"}],
+                    "handoff_summary": {
+                        "decisions": ["Added schema."],
+                        "files_changed": ["src/schema.py"],
+                        "outputs_produced": ["src/schema.py"],
+                        "tests_run": [],
+                        "unresolved_risks": [],
+                    },
+                },
+                sort_keys=False,
+            ),
+            yaml.safe_dump(
+                {
+                    "report": "Tests report\n",
+                    "files": [{"path": "src/tests_marker.py", "content": "TESTED = True\n"}],
+                    "handoff_summary": {
+                        "decisions": ["Validated schema."],
+                        "files_changed": ["src/tests_marker.py"],
+                        "outputs_produced": ["src/tests_marker.py"],
+                        "tests_run": ["pytest tests/test_subtask_execution.py"],
+                        "unresolved_risks": [],
+                    },
+                },
+                sort_keys=False,
+            ),
+        ]
+    )
+
+    result = run_local_execution(tmp_path, SUBTASK_STORY, http_client=client)
+
+    assert result.status == "completed"
+    assert [call["payload"]["model"] for call in client.calls] == ["gemma", "gemma"]
+    state = read_yaml(story_path / "reports" / "local_execution" / "state.yaml")
+    assert state["completed_tasks"] == ["schema", "tests"]
+    assert state["final_validation"]["status"] == "passed"
+    assert state["tasks"]["schema"]["handoff_summary"]["decisions"] == ["Added schema."]
+    assert state["tasks"]["schema"]["validation_result"]["status"] == "passed"
+    assert state["tasks"]["tests"]["validation_result"]["status"] == "passed"
+    tests_context = (
+        story_path
+        / "reports"
+        / "local_execution"
+        / "tasks"
+        / "tests"
+        / "context.md"
+    ).read_text(encoding="utf-8")
+    assert "Added schema." in tests_context
+
+
+def test_subtask_local_execute_blocks_when_final_requirement_coverage_is_incomplete(tmp_path: Path) -> None:
+    write_runtime_config(tmp_path)
+    story_path = create_subtask_story(tmp_path)
+    blueprint_path = tmp_path / "blueprints" / "blueprint.yaml"
+    blueprint = yaml.safe_load(blueprint_path.read_text(encoding="utf-8"))
+    blueprint["stories"][0]["acceptance_criteria"].append(
+        "AC-003: Each sub-task has a role assignment.",
+    )
+    blueprint_path.write_text(yaml.safe_dump(blueprint, sort_keys=False), encoding="utf-8")
+    client = FakeLocalExecutionHttpClient(
+        [
+            "report: |\n  Schema report\nfiles: []\nhandoff_summary:\n  decisions:\n    - schema done\n",
+            "report: |\n  Tests report\nfiles: []\nhandoff_summary:\n  decisions:\n    - tests done\n",
+        ]
+    )
+
+    result = run_local_execution(tmp_path, SUBTASK_STORY, http_client=client)
+
+    assert result.status == "blocked"
+    state = read_yaml(story_path / "reports" / "local_execution" / "state.yaml")
+    assert state["final_validation"]["status"] == "failed"
+    assert state["final_validation"]["missing_requirements"] == ["AC-003"]
+
+
+def test_subtask_local_execute_resume_skips_completed_tasks(tmp_path: Path) -> None:
+    write_runtime_config(tmp_path)
+    story_path = create_subtask_story(tmp_path)
+    first_client = FakeLocalExecutionHttpClient(
+        [
+            "report: |\n  Schema report\nfiles: []\nhandoff_summary:\n  decisions:\n    - schema done\n",
+            "not: valid: yaml\n",
+        ]
+    )
+
+    first_result = run_local_execution(tmp_path, SUBTASK_STORY, http_client=first_client)
+
+    assert first_result.status == "blocked"
+    state = read_yaml(story_path / "reports" / "local_execution" / "state.yaml")
+    assert state["completed_tasks"] == ["schema"]
+
+    second_client = FakeLocalExecutionHttpClient(
+        [
+            "report: |\n  Tests report\nfiles: []\nhandoff_summary:\n  decisions:\n    - tests done\n",
+        ]
+    )
+    second_result = run_local_execution(tmp_path, SUBTASK_STORY, resume=True, http_client=second_client)
+
+    assert second_result.status == "completed"
+    assert len(second_client.calls) == 1
+    final_state = read_yaml(story_path / "reports" / "local_execution" / "state.yaml")
+    assert final_state["tasks"]["schema"]["attempt"] == 1
+    assert final_state["tasks"]["tests"]["attempt"] == 2
+
+
+def test_subtask_local_execute_propagates_dependency_failure(tmp_path: Path) -> None:
+    write_runtime_config(tmp_path)
+    story_path = create_subtask_story(tmp_path)
+    client = FakeLocalExecutionHttpClient(["not: valid: yaml\n"])
+
+    result = run_local_execution(tmp_path, SUBTASK_STORY, http_client=client)
+
+    assert result.status == "blocked"
+    state = read_yaml(story_path / "reports" / "local_execution" / "state.yaml")
+    assert state["tasks"]["schema"]["status"] == "failed"
+    assert state["tasks"]["tests"]["status"] == "blocked"
+    assert state["tasks"]["tests"]["failure_type"] == "blocked_by_dependency"
+
+
+def test_subtask_local_execute_enforces_writable_paths_and_symlink_safety(tmp_path: Path) -> None:
+    write_runtime_config(tmp_path)
+    story_path = create_subtask_story(tmp_path, include_second_task=False)
+    outside = tmp_path.parent / f"{tmp_path.name}_outside.py"
+    outside.write_text("original\n", encoding="utf-8")
+    src_path = tmp_path / "src"
+    src_path.mkdir()
+    create_symlink(outside, src_path / "linked.py")
+    client = FakeLocalExecutionHttpClient(
+        [
+            "report: |\n  Bad write\nfiles:\n  - path: src/good.py\n    content: |\n      ok\n  - path: src/linked.py\n    content: |\n      escaped\n",
+        ]
+    )
+
+    result = run_local_execution(tmp_path, SUBTASK_STORY, http_client=client)
+
+    assert result.status == "blocked"
+    task_execution = read_yaml(
+        story_path / "reports" / "local_execution" / "tasks" / "schema" / "execution.yaml"
+    )
+    assert task_execution["failure_type"] == "file_boundary_violation"
+    assert not (tmp_path / "src" / "good.py").exists()
+    assert outside.read_text(encoding="utf-8") == "original\n"
 
 
 def test_cli_local_execute_dry_run_defaults_project_to_current_directory(

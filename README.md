@@ -157,8 +157,11 @@ Model resolution is: blueprint role override, runtime role default, global
 local-model default, then blocked if unresolved. The command reuses role
 context packets, records per-role audit artifacts and resumable execution
 state, enforces writable paths before applying files, and does not fall back to
-Codex or cloud code-generation. Token-aware retries are deferred to Story 061,
-and cloud review / local repair loops are deferred to Story 062.
+Codex or cloud code-generation. When a blueprint declares `subtasks`, the same
+command executes dependency-ready, context-safe sub-tasks only after the full
+required prompt fits the task's usable local-model input budget. Oversized
+sub-tasks are blocked for cloud redecomposition instead of being trimmed or
+split locally. Cloud review and local repair loops are deferred to Story 062.
 
 ## Learn The Codebase
 
@@ -207,7 +210,8 @@ runtime, or a story split; they are not automatic workflow failures.
 Use `docs/role_context_builder.md` to build focused context packets for each
 assigned agent before handing work to a configured runtime.
 Use `docs/runtime_config.md` to understand the tiered Codex-first runtime
-defaults, local-execution model resolution order, and command approval policy.
+defaults, local-execution model resolution order, context-safe sub-task
+execution, and command approval policy.
 Use `docs/codex_runtime.md` to create Codex-ready task files from those role
 context packets and to configure the disabled-by-default automatic Codex
 adapter. The Docker smoke-check command shape is

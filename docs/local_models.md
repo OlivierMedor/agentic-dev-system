@@ -88,6 +88,56 @@ docker compose run --rm dev agentic local-execute --story STORY_SLUG
 docker compose run --rm dev agentic local-execute --story STORY_SLUG --resume
 ```
 
+For stories whose blueprint declares `subtasks:`, the same command executes
+dependency-ready sub-tasks instead of the legacy role sequence. A dry run shows
+each task ID, role, resolved model, estimated input tokens, usable input budget,
+and readiness.
+
+Example sub-task shape:
+
+```yaml
+subtasks:
+  - id: define-subtask-schema
+    title: Define blueprint sub-task schema
+    role: developer
+    depends_on: []
+    requirement_ids:
+      - AC-001
+    required_context:
+      files:
+        - src/agentic_dev/local_execution.py
+      summaries:
+        - Preserve Story 060 behavior for blueprints without subtasks.
+      prior_task_outputs: []
+      architecture_decisions:
+        - No cloud or Codex implementation fallback.
+    writable_paths:
+      - src/**
+      - tests/**
+      - stories/story_061/reports/**
+    expected_outputs:
+      - Schema helpers and tests.
+    validation:
+      - Unit tests pass.
+    context_budget:
+      max_input_tokens: 24000
+      reserved_output_tokens: 4000
+      required_context_must_fit: true
+      allow_required_context_trimming: false
+      oversized_task_policy: reject_for_cloud_redecomposition
+```
+
+The local runner assembles the full required prompt before calling a model. It
+does not trim mandatory instructions or required context. It estimates input
+size deterministically, reserves output capacity, and blocks any oversized task
+with `cloud_redecomposition_required` before model invocation. Local agents are
+not allowed to decompose oversized cloud-planned tasks; the cloud planner must
+produce smaller blueprint tasks.
+
+Completed sub-tasks persist concise handoff summaries. Downstream tasks may
+consume only the dependency outputs and summaries declared in
+`required_context.prior_task_outputs`, not unrestricted raw chat history.
+
 Run a simple local call and save `reports/local_model_dry_run_report.md`:
 
 ```powershell
@@ -166,6 +216,13 @@ Local model support is intentionally bounded:
 - `agentic local-execute` applies only bounded writes that stay inside the
   role's configured writable paths and records a blocked execution if a role
   attempts to write outside them.
+- For blueprint sub-tasks, the same writable-path and resolved-path checks are
+  applied per task. Symlink escapes and unsafe multi-file outputs are blocked
+  before any partial write is applied.
+- Oversized sub-tasks are rejected before local model invocation and returned
+  for cloud redecomposition.
+- Required instructions and required context are never silently trimmed.
+- Local agents may not improvise decomposition of cloud-authored sub-tasks.
 - Model responses are never executed as shell commands.
 - The CLI does not commit, push, merge, deploy, or call GitHub APIs from local
   model output.
