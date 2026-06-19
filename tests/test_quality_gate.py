@@ -3,7 +3,15 @@ from pathlib import Path
 import pytest
 import yaml
 
-from agentic_dev.quality_gate import READY_FOR_REVIEW, REQUEST_CHANGES, run_quality_gate
+from agentic_dev.quality_gate import (
+    POST_MERGE_FAILED,
+    POST_MERGE_VERIFIED,
+    READY_FOR_REVIEW,
+    REQUEST_CHANGES,
+    run_quality_gate,
+    run_quality_gate_mode,
+)
+from agentic_dev.runtime_config import default_runtime_config_text
 from agentic_dev.test_layers import TEST_LAYER_FAILED, TEST_LAYER_PASSED
 
 
@@ -288,3 +296,120 @@ def test_failed_checks_are_listed_clearly(tmp_path: Path) -> None:
         assert failure in result.failed_checks
         assert failure in yaml_result["failed_checks"]
         assert f"- {failure}" in markdown_report
+
+
+def test_post_merge_quality_gate_succeeds_without_review_bundle(
+    tmp_path: Path,
+) -> None:
+    story = "story_062"
+    create_complete_story(tmp_path, story)
+    review_bundle_path = tmp_path / "stories" / story / "review_bundle"
+    for path in review_bundle_path.glob("*"):
+        path.unlink()
+
+    def runner(command: list[str], cwd: Path):  # noqa: ANN202
+        assert cwd == tmp_path.resolve()
+        if command == ["git", "status", "--short"]:
+            return type("Result", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+        if command == ["pytest"]:
+            return type("Result", (), {"returncode": 0, "stdout": "12 passed in 0.34s\n", "stderr": ""})()
+        if command == ["ruff", "check", "."]:
+            return type("Result", (), {"returncode": 0, "stdout": "All checks passed!\n", "stderr": ""})()
+        raise AssertionError(command)
+
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir()
+    (tmp_path / ".agentic").mkdir()
+    (tmp_path / ".agentic" / "agent_runtime.yaml").write_text(
+        default_runtime_config_text(),
+        encoding="utf-8",
+    )
+
+    result = run_quality_gate_mode(
+        tmp_path,
+        story,
+        mode="post-merge",
+        command_runner=runner,
+        artifact_policy_checker=lambda _project_path: type("ArtifactResult", (), {"passed": True})(),
+        runtime_config_validator=lambda _project_path: None,
+    )
+
+    assert result.status == POST_MERGE_VERIFIED
+    assert "Regenerated pytest evidence passed." in result.passed_checks
+    assert "Regenerated Ruff evidence passed." in result.passed_checks
+    assert result.result_path is None
+    assert result.report_path is None
+
+
+def test_post_merge_quality_gate_fails_when_git_is_dirty_after_verification(tmp_path: Path) -> None:
+    story = "story_062"
+    create_complete_story(tmp_path, story)
+
+    calls = 0
+
+    def runner(command: list[str], cwd: Path):  # noqa: ANN202
+        nonlocal calls
+        calls += 1
+        if command == ["git", "status", "--short"]:
+            stdout = "" if calls == 1 else " M stories/story_062/reports/quality_gate_report.md\n"
+            return type("Result", (), {"returncode": 0, "stdout": stdout, "stderr": ""})()
+        if command == ["pytest"]:
+            return type("Result", (), {"returncode": 0, "stdout": "12 passed in 0.34s\n", "stderr": ""})()
+        if command == ["ruff", "check", "."]:
+            return type("Result", (), {"returncode": 0, "stdout": "All checks passed!\n", "stderr": ""})()
+        raise AssertionError(command)
+
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir()
+    (tmp_path / ".agentic").mkdir()
+    (tmp_path / ".agentic" / "agent_runtime.yaml").write_text(
+        default_runtime_config_text(),
+        encoding="utf-8",
+    )
+
+    result = run_quality_gate_mode(
+        tmp_path,
+        story,
+        mode="post-merge",
+        command_runner=runner,
+        artifact_policy_checker=lambda _project_path: type("ArtifactResult", (), {"passed": True})(),
+        runtime_config_validator=lambda _project_path: None,
+    )
+
+    assert result.status == POST_MERGE_FAILED
+    assert "Post-merge verification modified or created repo files." in result.failed_checks
+
+
+def test_post_merge_quality_gate_fails_when_pytest_or_ruff_regeneration_fails(tmp_path: Path) -> None:
+    story = "story_062"
+    create_complete_story(tmp_path, story)
+
+    def runner(command: list[str], cwd: Path):  # noqa: ANN202
+        if command == ["git", "status", "--short"]:
+            return type("Result", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+        if command == ["pytest"]:
+            return type("Result", (), {"returncode": 1, "stdout": "1 failed, 11 passed\n", "stderr": ""})()
+        if command == ["ruff", "check", "."]:
+            return type("Result", (), {"returncode": 1, "stdout": "Found 1 error.\n", "stderr": ""})()
+        raise AssertionError(command)
+
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir()
+    (tmp_path / ".agentic").mkdir()
+    (tmp_path / ".agentic" / "agent_runtime.yaml").write_text(
+        default_runtime_config_text(),
+        encoding="utf-8",
+    )
+
+    result = run_quality_gate_mode(
+        tmp_path,
+        story,
+        mode="post-merge",
+        command_runner=runner,
+        artifact_policy_checker=lambda _project_path: type("ArtifactResult", (), {"passed": True})(),
+        runtime_config_validator=lambda _project_path: None,
+    )
+
+    assert result.status == POST_MERGE_FAILED
+    assert "Regenerated pytest evidence failed." in result.failed_checks
+    assert "Regenerated Ruff evidence failed." in result.failed_checks

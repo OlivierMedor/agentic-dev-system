@@ -140,6 +140,9 @@ docker compose run --rm dev agentic local-model validate
 docker compose run --rm dev agentic local-execute --story STORY_SLUG --dry-run
 docker compose run --rm dev agentic local-execute --story STORY_SLUG --role documentation
 docker compose run --rm dev agentic local-execute --story STORY_SLUG --resume
+docker compose run --rm dev agentic demo-subtasks --mode fake --scenario success
+docker compose run --rm dev agentic demo-subtasks --mode fake --scenario resume --keep-workspace
+docker compose run --rm dev agentic demo-subtasks --mode local --scenario success
 docker compose run --rm dev agentic local-model dry-run
 docker compose run --rm dev agentic local-agent run-prompt --prompt-file prompt.md --output-file reports/local_agent_output.md
 docker compose run --rm -e LOCAL_MODEL_API_KEY=lm-studio dev agentic local-agent draft --story story_045_local_agent_draft_runner --agent docs_agent --model-label gemma-4-26b --prompt-mode slim --force
@@ -162,6 +165,10 @@ command executes dependency-ready, context-safe sub-tasks only after the full
 required prompt fits the task's usable local-model input budget. Oversized
 sub-tasks are blocked for cloud redecomposition instead of being trimmed or
 split locally. Cloud review and local repair loops are deferred to Story 062.
+
+`agentic demo-subtasks` is the Story 062 operator proof for that same sub-task pipeline. It creates a disposable Python sandbox, seeds a blueprint-defined calculator fixture, and then runs the shared Story 061 parser, dependency graph, readiness checks, context assembly, context-fit gate, writable-path enforcement, handoff persistence, resume state, and final requirement validation. `--mode fake` is deterministic and CI-safe. `--mode local` uses only the configured local OpenAI-compatible runtime and never falls back to cloud or Codex execution. Supported scenarios are `success`, `oversized`, `resume`, and `dependency-failure`. By default the sandbox is deleted automatically. Use `--keep-workspace` only when you need to inspect the preserved sandbox path.
+
+For review readiness, `agentic quality-gate --mode pre-merge` still checks the committed story evidence and review bundle. Story 062 also adds `agentic quality-gate --mode post-merge`, which is a clean-checkout verification path that regenerates current pytest and Ruff evidence, reruns policy and runtime-config checks, does not require committed runtime review artifacts, and fails if the checkout becomes dirty.
 
 ## Learn The Codebase
 

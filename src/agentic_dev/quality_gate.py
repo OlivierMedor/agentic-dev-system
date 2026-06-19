@@ -2,15 +2,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import yaml
 
+from agentic_dev.artifact_policy import check_artifact_policy
+from agentic_dev.review_bundle import CommandRunner, run_command
+from agentic_dev.runtime_config import validate_runtime_config
 from agentic_dev.test_layers import TEST_LAYER_PASSED, load_yaml_mapping
 from agentic_dev.test_layers import test_plan_uses_test_layer_schema
 
 
 READY_FOR_REVIEW = "READY_FOR_REVIEW"
 REQUEST_CHANGES = "REQUEST_CHANGES"
+POST_MERGE_VERIFIED = "POST_MERGE_VERIFIED"
+POST_MERGE_FAILED = "POST_MERGE_FAILED"
 
 REQUIRED_STORY_FILES = [
     "story.md",
@@ -38,8 +44,10 @@ class QualityGateResult:
     failed_checks: list[str]
     ready_for_review: bool
     next_action: str
-    result_path: Path
-    report_path: Path
+    result_path: Path | None
+    report_path: Path | None
+    mode: str = "pre-merge"
+    command_outputs: dict[str, str] | None = None
 
 
 def text_file_contains(path: Path, expected_text: str) -> bool:
@@ -54,26 +62,14 @@ def pytest_passed(output_path: Path) -> bool:
     if not output_path.exists():
         return False
 
-    content = output_path.read_text(encoding="utf-8", errors="replace")
-    lines = [line.strip().lower() for line in content.splitlines()]
-
-    if "status: passed" in lines or "pytest: passed" in lines or "passed" in lines:
-        return True
-
-    return any(" passed in " in line and " failed" not in line for line in lines)
+    return pytest_passed_output_text(output_path.read_text(encoding="utf-8", errors="replace"))
 
 
 def ruff_passed(output_path: Path) -> bool:
     if not output_path.exists():
         return False
 
-    content = output_path.read_text(encoding="utf-8", errors="replace")
-    lines = [line.strip().lower() for line in content.splitlines()]
-
-    if "status: passed" in lines or "ruff: passed" in lines:
-        return True
-
-    return "all checks passed" in content.lower()
+    return ruff_passed_output_text(output_path.read_text(encoding="utf-8", errors="replace"))
 
 
 def add_file_checks(
@@ -127,6 +123,7 @@ def add_test_layer_checks(
 def write_yaml_result(path: Path, result: QualityGateResult) -> None:
     data = {
         "story": result.story,
+        "mode": result.mode,
         "status": result.status,
         "passed_checks": result.passed_checks,
         "failed_checks": result.failed_checks,
@@ -181,6 +178,32 @@ def write_markdown_report(path: Path, result: QualityGateResult) -> None:
 
 
 def run_quality_gate(project_path: Path, story: str) -> QualityGateResult:
+    return run_quality_gate_mode(project_path, story, mode="pre-merge")
+
+
+def run_quality_gate_mode(
+    project_path: Path,
+    story: str,
+    *,
+    mode: str,
+    command_runner: CommandRunner = run_command,
+    artifact_policy_checker: Any = check_artifact_policy,
+    runtime_config_validator: Any = validate_runtime_config,
+) -> QualityGateResult:
+    if mode == "pre-merge":
+        return run_pre_merge_quality_gate(project_path, story)
+    if mode == "post-merge":
+        return run_post_merge_quality_gate(
+            project_path,
+            story,
+            command_runner=command_runner,
+            artifact_policy_checker=artifact_policy_checker,
+            runtime_config_validator=runtime_config_validator,
+        )
+    raise ValueError("quality gate mode must be pre-merge or post-merge.")
+
+
+def run_pre_merge_quality_gate(project_path: Path, story: str) -> QualityGateResult:
     project_path = project_path.resolve()
     story_path = project_path / "stories" / story
 
@@ -222,6 +245,7 @@ def run_quality_gate(project_path: Path, story: str) -> QualityGateResult:
 
     result = QualityGateResult(
         story=story,
+        mode="pre-merge",
         status=status,
         passed_checks=passed_checks,
         failed_checks=failed_checks,
@@ -235,3 +259,103 @@ def run_quality_gate(project_path: Path, story: str) -> QualityGateResult:
     write_markdown_report(result.report_path, result)
 
     return result
+
+
+def run_post_merge_quality_gate(
+    project_path: Path,
+    story: str,
+    *,
+    command_runner: CommandRunner,
+    artifact_policy_checker: Any,
+    runtime_config_validator: Any,
+) -> QualityGateResult:
+    project_path = project_path.resolve()
+    story_path = project_path / "stories" / story
+
+    if not story_path.exists():
+        raise FileNotFoundError(f"Story folder does not exist: {story_path}")
+    if not story_path.is_dir():
+        raise ValueError(f"Story path is not a folder: {story_path}")
+
+    passed_checks: list[str] = []
+    failed_checks: list[str] = []
+    command_outputs: dict[str, str] = {}
+
+    add_file_checks(story_path, REQUIRED_STORY_FILES, passed_checks, failed_checks)
+
+    git_status_before = command_runner(["git", "status", "--short"], project_path)
+    command_outputs["git_status_before"] = git_status_before.stdout.strip()
+    if git_status_before.returncode != 0:
+        failed_checks.append("git status failed before post-merge verification.")
+    elif git_status_before.stdout.strip():
+        failed_checks.append("Post-merge verification requires a clean checkout before running.")
+    else:
+        passed_checks.append("Git checkout is clean before verification.")
+
+    pytest_result = command_runner(["pytest"], project_path)
+    command_outputs["pytest"] = (pytest_result.stdout + pytest_result.stderr).strip()
+    if pytest_result.returncode == 0 and pytest_passed_output_text(command_outputs["pytest"]):
+        passed_checks.append("Regenerated pytest evidence passed.")
+    else:
+        failed_checks.append("Regenerated pytest evidence failed.")
+
+    ruff_result = command_runner(["ruff", "check", "."], project_path)
+    command_outputs["ruff"] = (ruff_result.stdout + ruff_result.stderr).strip()
+    if ruff_result.returncode == 0 and ruff_passed_output_text(command_outputs["ruff"]):
+        passed_checks.append("Regenerated Ruff evidence passed.")
+    else:
+        failed_checks.append("Regenerated Ruff evidence failed.")
+
+    artifact_result = artifact_policy_checker(project_path)
+    if artifact_result.passed:
+        passed_checks.append("Artifact policy passed.")
+    else:
+        failed_checks.append("Artifact policy failed.")
+
+    try:
+        runtime_config_validator(project_path)
+    except (FileNotFoundError, ValueError) as error:
+        failed_checks.append(f"Runtime config validation failed: {error}")
+    else:
+        passed_checks.append("Runtime config validation passed.")
+
+    git_status_after = command_runner(["git", "status", "--short"], project_path)
+    command_outputs["git_status_after"] = git_status_after.stdout.strip()
+    if git_status_after.returncode != 0:
+        failed_checks.append("git status failed after post-merge verification.")
+    elif git_status_after.stdout.strip():
+        failed_checks.append("Post-merge verification modified or created repo files.")
+    else:
+        passed_checks.append("Git checkout remained clean after verification.")
+
+    passed = not failed_checks
+    return QualityGateResult(
+        story=story,
+        mode="post-merge",
+        status=POST_MERGE_VERIFIED if passed else POST_MERGE_FAILED,
+        passed_checks=passed_checks,
+        failed_checks=failed_checks,
+        ready_for_review=False,
+        next_action=(
+            "Record the clean-checkout verification result."
+            if passed
+            else "Fix the regenerated failing checks and rerun post-merge verification."
+        ),
+        result_path=None,
+        report_path=None,
+        command_outputs=command_outputs,
+    )
+
+
+def pytest_passed_output_text(output: str) -> bool:
+    lines = [line.strip().lower() for line in output.splitlines()]
+    if "status: passed" in lines or "pytest: passed" in lines or "passed" in lines:
+        return True
+    return any(" passed in " in line and " failed" not in line for line in lines)
+
+
+def ruff_passed_output_text(output: str) -> bool:
+    lines = [line.strip().lower() for line in output.splitlines()]
+    if "status: passed" in lines or "ruff: passed" in lines:
+        return True
+    return "all checks passed" in output.lower()

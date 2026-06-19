@@ -68,6 +68,8 @@ The command checks Git-tracked files only. It prints a pass/fail summary and wri
 `reports/public_readiness_report.md`. It does not delete files, call cloud models, commit, push,
 merge, or deploy.
 
+Story 062 adds a clean-checkout verification path through `agentic quality-gate --mode post-merge`. That mode regenerates pytest and Ruff evidence for verification but does not require committed `stories/**/review_bundle/*` runtime artifacts and must leave Git clean when it finishes. Pre-merge review readiness still depends on the normal committed story evidence.
+
 ## Before Making The Repo Public
 
 Run these checks before any public-release decision:
