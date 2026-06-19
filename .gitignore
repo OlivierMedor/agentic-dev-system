@@ -57,6 +57,8 @@ stories/**/reports/local_execution/*
 reports/project_status_report.md
 reports/public_readiness_report.md
 reports/local_model_dry_run_report.md
+stories/**/reports/post_merge_quality_gate_result.yaml
+stories/**/reports/post_merge_quality_gate_report.md
 **/*_raw_response.json
 reports/local_model_scorecard_report.md
 reports/local_model_role_recommendations.md
