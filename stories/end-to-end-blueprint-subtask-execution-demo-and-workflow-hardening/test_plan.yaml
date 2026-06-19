@@ -1,0 +1,36 @@
+test_layers_version: 1
+unit_tests:
+  required: true
+  action: add_or_update
+  frequency: every_commit
+  evidence_or_reason: Cover fake adapter determinism, scenario parsing, real-adapter
+    interface compatibility, safe temp workspace creation, cleanup on success and
+    failure, keep-workspace mode, path traversal rejection, symlink escape rejection,
+    unsafe multi-file atomicity, CLI exit codes, operator output, and pre-merge versus
+    post-merge quality-gate behavior.
+integration_tests:
+  required: true
+  action: add_or_update
+  frequency: every_pull_request
+  evidence_or_reason: Cover success, oversized, resume, dependency-failure, final
+    validation, sandbox-only writes, clean Git status after post-merge verification,
+    and Story 060 and Story 061 regressions.
+mock_e2e_tests:
+  required: true
+  action: add_or_update
+  frequency: before_merge
+  evidence_or_reason: Run fake-mode demo execution in CI without local runtime availability
+    and prove the same sub-task execution path is used across scenarios.
+live_read_only_checks:
+  required: false
+  action: not_applicable_with_reason
+  frequency: manual_only
+  evidence_or_reason: Real local-model mode depends on optional operator-provided
+    Ollama or LM Studio-compatible runtime setup and is validated through manual local
+    execution guidance rather than mandatory CI checks.
+remote_dev_smoke_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: after_remote_dev_deploy
+  evidence_or_reason: Story 062 adds no remote deployment behavior and focuses on
+    local demo execution plus local verification modes.

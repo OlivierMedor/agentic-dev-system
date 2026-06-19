@@ -4397,6 +4397,831 @@ stories:
         - cloud_or_codex_fallback_attempt
         - Story_060_regression
 
+  - id: STORY-062
+    story_id: story_062
+    slug: end-to-end-blueprint-subtask-execution-demo-and-workflow-hardening
+    title: Story 062 - End-to-End Blueprint Subtask Execution Demo and Workflow Hardening
+    goal: Define a complete blueprint for a safe end-to-end demo that proves Story 061 sub-task execution works in practice with the same dependency-aware pipeline in deterministic fake mode and real local-model mode, while also fixing post-merge quality-gate verification so clean checkouts do not require committed runtime review artifacts.
+    why: Story 061 defines dependency-aware local sub-task execution, but the repository still needs a practical, operator-friendly proof that the workflow works end to end in CI-safe fake mode and manual local-runtime mode. The same story also needs to harden the quality-gate evidence lifecycle so merged-code verification regenerates ephemeral evidence instead of incorrectly failing on clean checkouts.
+    agents:
+      developer:
+        writable_paths:
+          - src/**
+          - tests/**
+          - docs/**
+          - stories/story_062/reports/**
+      test:
+        writable_paths:
+          - tests/**
+          - stories/story_062/reports/**
+      documentation:
+        writable_paths:
+          - README.md
+          - docs/**
+          - stories/story_062/reports/**
+      security_quality:
+        writable_paths:
+          - stories/story_062/reports/**
+      local_reviewer:
+        writable_paths:
+          - stories/story_062/reports/**
+    execution_order:
+      - developer
+      - test
+      - documentation
+      - security_quality
+      - local_reviewer
+    local_execution_constraints:
+      decomposition_authority: cloud_planner
+      required_context_must_fit: true
+      allow_required_context_trimming: false
+      oversized_task_policy: reject_for_cloud_redecomposition
+      local_agent_may_redecompose: false
+      require_independent_token_estimate: true
+      require_final_story_validation: true
+      maximum_task_size_contract: The complete required prompt for every Story 062 demo sub-task, including system instructions, role instructions, fixture schema, sandbox rules, dependency handoffs, validation steps, output contract, and no-fallback constraints, must fit within the assigned model's usable input-token budget. Oversized tasks must be rejected for cloud redecomposition before any local or fake model invocation.
+      forbidden_fallbacks:
+        - cloud_model_implementation
+        - codex_implementation
+        - hidden_implementation_fallback
+      required_failure_states:
+        dependency_missing: A declared dependency does not reference a known demo sub-task ID.
+        dependency_cycle: The demo sub-task graph contains a cycle.
+        context_budget_invalid: The assigned model budget does not leave a positive usable input limit.
+        context_over_budget: The independently estimated complete prompt exceeds the usable input budget.
+        cloud_redecomposition_required: The demo sub-task is too large for local execution and must be returned to the cloud planner for finer decomposition.
+        blocked_by_dependency: A dependency is failed, blocked, or waiting for cloud redecomposition.
+        file_boundary_violation: A requested demo write escapes the sandbox root or violates declared writable boundaries.
+        sandbox_escape_attempt: A proposed output path uses symlinks, traversal, or absolute-path escape outside the sandbox root.
+    subtasks:
+      - id: define-demo-fixture-schema
+        title: Define demo fixture and scenario schema
+        role: developer
+        depends_on: []
+        requirement_ids:
+          - AC-001
+          - AC-009
+          - AC-010
+          - AC-012
+          - AC-21
+          - AC-37
+          - AC-38
+        required_context:
+          files:
+            - blueprints/blueprint.yaml
+            - src/agentic_dev/story_blueprint.py
+            - src/agentic_dev/local_execution.py
+            - tests/test_story_generator.py
+            - tests/test_local_execution.py
+          summaries:
+            - Story 061 already defines dependency-aware sub-task execution and bounded context-fit rules that Story 062 must reuse instead of replacing.
+            - The demo fixture must be small, deterministic in fake mode, CI-safe, and limited to disposable sandbox content.
+          prior_task_outputs: []
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_062/reports/**
+        expected_outputs:
+          - Schema for the calculator demo blueprint, supported scenarios, deterministic fake responses, and expected sandbox file set.
+          - Validation coverage for malformed scenario definitions and scenario-to-fixture consistency rules.
+        validation:
+          - Tests reject invalid scenario declarations and mismatched fixture expectations.
+          - Story 061 blueprint parsing expectations remain compatible.
+        context_budget:
+          max_input_tokens: 24000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: implement-safe-sandbox-lifecycle
+        title: Implement safe sandbox lifecycle
+        role: developer
+        depends_on:
+          - define-demo-fixture-schema
+        requirement_ids:
+          - AC-005
+          - AC-006
+          - AC-007
+          - AC-008
+          - AC-24
+          - AC-25
+        required_context:
+          files:
+            - src/agentic_dev/local_execution.py
+            - src/agentic_dev/artifact_policy.py
+            - tests/test_local_execution.py
+            - tests/test_artifact_policy.py
+          summaries:
+            - Story 060 and Story 061 already enforce writable-path and resolved-path protections that the demo sandbox must preserve and narrow further.
+          prior_task_outputs:
+            - define-demo-fixture-schema
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_062/reports/**
+        expected_outputs:
+          - Safe temporary workspace creation and cleanup with canonical resolved-path checks, symlink escape prevention, and optional workspace preservation.
+          - Atomic rejection when any proposed write path is unsafe.
+        validation:
+          - Tests cover cleanup on success, cleanup on failure, keep-workspace mode, traversal rejection, symlink escape rejection, and no partial writes on unsafe multi-file output.
+        context_budget:
+          max_input_tokens: 24000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: add-deterministic-fake-model-adapter
+        title: Add deterministic fake model adapter
+        role: developer
+        depends_on:
+          - define-demo-fixture-schema
+        requirement_ids:
+          - AC-002
+          - AC-009
+          - AC-010
+          - AC-011
+          - AC-012
+          - AC-37
+        required_context:
+          files:
+            - src/agentic_dev/local_model_runtime.py
+            - src/agentic_dev/local_execution.py
+            - tests/test_local_model_runtime.py
+            - tests/test_local_execution.py
+          summaries:
+            - Fake mode must exercise the same sub-task execution path as local-runtime mode and differ only at the model adapter boundary.
+          prior_task_outputs:
+            - define-demo-fixture-schema
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_062/reports/**
+        expected_outputs:
+          - Deterministic structured fake adapter outputs for success, failure, oversized, resume, and dependency-blocking scenarios.
+          - Adapter tests proving no network, no cloud access, and stable outputs across runs.
+        validation:
+          - Tests prove deterministic behavior, interface compatibility with the real runtime adapter, and zero dependency on external services.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: materialize-demo-blueprint
+        title: Add demo blueprint materialization
+        role: developer
+        depends_on:
+          - define-demo-fixture-schema
+          - implement-safe-sandbox-lifecycle
+        requirement_ids:
+          - AC-005
+          - AC-006
+          - AC-021
+          - AC-24
+        required_context:
+          files:
+            - src/agentic_dev/story_generator.py
+            - src/agentic_dev/local_execution.py
+            - tests/test_story_generator.py
+            - tests/test_local_execution.py
+          summaries:
+            - The demo must materialize a small calculator fixture and sub-task blueprint entirely inside the isolated sandbox.
+          prior_task_outputs:
+            - define-demo-fixture-schema
+            - implement-safe-sandbox-lifecycle
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_062/reports/**
+        expected_outputs:
+          - Fixture materialization for a small calculator project with initial files, sub-task blueprint, and scenario-specific inputs confined to the sandbox.
+        validation:
+          - Tests prove all created files resolve inside the sandbox root and the main repository stays unchanged.
+        context_budget:
+          max_input_tokens: 24000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: integrate-fake-mode-execution
+        title: Integrate fake-mode execution
+        role: developer
+        depends_on:
+          - implement-safe-sandbox-lifecycle
+          - add-deterministic-fake-model-adapter
+          - materialize-demo-blueprint
+        requirement_ids:
+          - AC-002
+          - AC-003
+          - AC-013
+          - AC-014
+          - AC-015
+          - AC-016
+          - AC-017
+          - AC-023
+          - AC-037
+        required_context:
+          files:
+            - src/agentic_dev/local_execution.py
+            - src/agentic_dev/cli.py
+            - tests/test_local_execution.py
+            - tests/test_story_generator.py
+          summaries:
+            - Fake mode must drive the same dependency-aware Story 061 execution pipeline, including state persistence, handoffs, fit checks, resume, and final validation.
+          prior_task_outputs:
+            - implement-safe-sandbox-lifecycle
+            - add-deterministic-fake-model-adapter
+            - materialize-demo-blueprint
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_062/reports/**
+        expected_outputs:
+          - CI-safe fake-mode execution wired through the shared pipeline with deterministic task ordering and sandbox file changes.
+        validation:
+          - Tests cover success, oversized, resume, dependency-failure, and downstream blocking scenarios in fake mode.
+        context_budget:
+          max_input_tokens: 24000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: integrate-local-runtime-mode
+        title: Integrate real local-model mode
+        role: developer
+        depends_on:
+          - implement-safe-sandbox-lifecycle
+          - materialize-demo-blueprint
+          - integrate-fake-mode-execution
+        requirement_ids:
+          - AC-003
+          - AC-004
+          - AC-026
+          - AC-027
+        required_context:
+          files:
+            - src/agentic_dev/local_model_runtime.py
+            - src/agentic_dev/runtime_config.py
+            - src/agentic_dev/local_execution.py
+            - tests/test_local_model_runtime.py
+            - tests/test_runtime_config.py
+          summaries:
+            - Local mode must use an existing supported local runtime path such as Ollama or LM Studio-compatible endpoints with no cloud or Codex fallback.
+          prior_task_outputs:
+            - implement-safe-sandbox-lifecycle
+            - materialize-demo-blueprint
+            - integrate-fake-mode-execution
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_062/reports/**
+        expected_outputs:
+          - Local runtime adapter wiring for the same demo workflow, with clear operator guidance when no supported local runtime is configured.
+        validation:
+          - Mock-backed integration tests prove the local adapter interface is reused and missing runtime configuration fails clearly.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: implement-success-scenario
+        title: Implement success scenario
+        role: developer
+        depends_on:
+          - integrate-fake-mode-execution
+          - integrate-local-runtime-mode
+        requirement_ids:
+          - AC-020
+          - AC-021
+          - AC-022
+          - AC-023
+        required_context:
+          files:
+            - src/agentic_dev/local_execution.py
+            - tests/test_local_execution.py
+            - tests/e2e/test_agentic_workflow.py
+          summaries:
+            - The success path must create a calculator module, unit tests, CLI, and final validation result by making real sandbox-only file changes.
+          prior_task_outputs:
+            - integrate-fake-mode-execution
+            - integrate-local-runtime-mode
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_062/reports/**
+        expected_outputs:
+          - Success scenario coverage proving the calculator fixture is updated in sub-task dependency order and passes final validation.
+        validation:
+          - Scenario tests prove generated fixture tests pass and the final validation checks original requirements rather than task completion flags alone.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: implement-oversized-scenario
+        title: Implement oversized-task scenario
+        role: developer
+        depends_on:
+          - integrate-fake-mode-execution
+        requirement_ids:
+          - AC-017
+          - AC-018
+          - AC-019
+        required_context:
+          files:
+            - src/agentic_dev/local_execution.py
+            - src/agentic_dev/role_context.py
+            - tests/test_local_execution.py
+          summaries:
+            - Oversized tasks must be blocked before any model invocation and persist redecomposition-required state without silently trimming required context.
+          prior_task_outputs:
+            - integrate-fake-mode-execution
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_062/reports/**
+        expected_outputs:
+          - Oversized scenario coverage with preserved context estimate, usable limit, and cloud-redecomposition-required status.
+        validation:
+          - Tests prove no model call occurs and downstream tasks remain blocked.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: implement-resume-scenario
+        title: Implement resume scenario
+        role: developer
+        depends_on:
+          - integrate-fake-mode-execution
+        requirement_ids:
+          - AC-014
+          - AC-015
+        required_context:
+          files:
+            - src/agentic_dev/local_execution.py
+            - tests/test_local_execution.py
+          summaries:
+            - Resume must skip completed tasks, reuse persisted handoffs, and continue deterministic dependency order without rerunning already completed work.
+          prior_task_outputs:
+            - integrate-fake-mode-execution
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_062/reports/**
+        expected_outputs:
+          - Resume scenario coverage for interrupted execution and continuation without duplicate task execution.
+        validation:
+          - Tests prove completed tasks are skipped and persisted handoff summaries are reused on resume.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: implement-dependency-failure-scenario
+        title: Implement dependency-failure scenario
+        role: developer
+        depends_on:
+          - integrate-fake-mode-execution
+        requirement_ids:
+          - AC-016
+          - AC-017
+        required_context:
+          files:
+            - src/agentic_dev/local_execution.py
+            - tests/test_local_execution.py
+          summaries:
+            - Failed dependencies must block downstream tasks with explicit persisted state and operator-readable reporting.
+          prior_task_outputs:
+            - integrate-fake-mode-execution
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_062/reports/**
+        expected_outputs:
+          - Dependency-failure scenario coverage proving downstream tasks do not run after an upstream failure.
+        validation:
+          - Tests assert failure state persistence, blocking summaries, and no unexpected reruns.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: add-demo-subtasks-cli
+        title: Add agentic demo-subtasks CLI
+        role: developer
+        depends_on:
+          - implement-success-scenario
+          - implement-oversized-scenario
+          - implement-resume-scenario
+          - implement-dependency-failure-scenario
+        requirement_ids:
+          - AC-001
+          - AC-013
+          - AC-023
+          - AC-038
+        required_context:
+          files:
+            - src/agentic_dev/cli.py
+            - src/agentic_dev/local_execution.py
+            - docs/command_map.md
+            - tests/test_local_execution.py
+          summaries:
+            - The operator command must create a temporary sandbox, default to fake mode, show concise per-task progress, run final validation, and optionally preserve the workspace for inspection.
+          prior_task_outputs:
+            - implement-success-scenario
+            - implement-oversized-scenario
+            - implement-resume-scenario
+            - implement-dependency-failure-scenario
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - docs/**
+          - stories/story_062/reports/**
+        expected_outputs:
+          - One-command demo workflow with mode, scenario, and workspace controls aligned with repository CLI conventions.
+        validation:
+          - CLI tests cover fake default mode, explicit local mode, keep-workspace, scenario selection, concise operator output, and meaningful exit codes.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: add-post-merge-quality-gate-mode
+        title: Add post-merge verification mode
+        role: developer
+        depends_on: []
+        requirement_ids:
+          - AC-028
+          - AC-029
+          - AC-030
+          - AC-031
+          - AC-032
+          - AC-033
+          - AC-040
+        required_context:
+          files:
+            - src/agentic_dev/cli.py
+            - src/agentic_dev/artifact_policy.py
+            - src/agentic_dev/public_readiness.py
+            - tests/test_artifact_policy.py
+            - tests/test_public_readiness.py
+          summaries:
+            - Pre-merge review readiness and post-merge verification must stay in one coherent quality-gate design, but post-merge mode must regenerate fresh pytest and Ruff evidence instead of depending on committed runtime review artifacts.
+          prior_task_outputs: []
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - docs/**
+          - stories/story_062/reports/**
+        expected_outputs:
+          - Repository-consistent quality-gate mode split between pre-merge review readiness and post-merge verification.
+          - Fresh evidence generation that leaves tracked story reports untouched and the working tree clean.
+        validation:
+          - Tests prove pre-merge still requires review evidence, post-merge regenerates pytest and Ruff evidence, clean checkouts succeed, and failed regenerated evidence still fails verification.
+        context_budget:
+          max_input_tokens: 24000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: add-end-to-end-integration-coverage
+        title: Add end-to-end integration coverage
+        role: test
+        depends_on:
+          - define-demo-fixture-schema
+          - implement-safe-sandbox-lifecycle
+          - add-deterministic-fake-model-adapter
+          - materialize-demo-blueprint
+          - integrate-fake-mode-execution
+          - integrate-local-runtime-mode
+          - implement-success-scenario
+          - implement-oversized-scenario
+          - implement-resume-scenario
+          - implement-dependency-failure-scenario
+          - add-demo-subtasks-cli
+          - add-post-merge-quality-gate-mode
+        requirement_ids:
+          - AC-002
+          - AC-003
+          - AC-004
+          - AC-005
+          - AC-006
+          - AC-007
+          - AC-008
+          - AC-009
+          - AC-010
+          - AC-011
+          - AC-012
+          - AC-013
+          - AC-014
+          - AC-015
+          - AC-016
+          - AC-017
+          - AC-018
+          - AC-019
+          - AC-020
+          - AC-021
+          - AC-022
+          - AC-023
+          - AC-024
+          - AC-025
+          - AC-026
+          - AC-027
+          - AC-028
+          - AC-029
+          - AC-030
+          - AC-031
+          - AC-032
+          - AC-033
+          - AC-034
+          - AC-035
+          - AC-036
+          - AC-037
+        required_context:
+          files:
+            - tests/test_local_execution.py
+            - tests/test_story_generator.py
+            - tests/e2e/test_agentic_workflow.py
+            - src/agentic_dev/local_execution.py
+          summaries:
+            - Coverage must prove sandbox-only writes, deterministic fake-mode behavior, adapter compatibility, post-merge verification behavior, and Story 060/061 regression safety.
+          prior_task_outputs:
+            - define-demo-fixture-schema
+            - implement-safe-sandbox-lifecycle
+            - add-deterministic-fake-model-adapter
+            - materialize-demo-blueprint
+            - integrate-fake-mode-execution
+            - integrate-local-runtime-mode
+            - implement-success-scenario
+            - implement-oversized-scenario
+            - implement-resume-scenario
+            - implement-dependency-failure-scenario
+            - add-demo-subtasks-cli
+            - add-post-merge-quality-gate-mode
+          architecture_decisions: []
+        writable_paths:
+          - tests/**
+          - stories/story_062/reports/**
+        expected_outputs:
+          - End-to-end test coverage for fake demo execution, scenario behavior, cleanup, post-merge verification, and Story 060/061 backward compatibility.
+        validation:
+          - Test suites cover fake adapter determinism, sandbox lifecycle, CLI exit codes, operator output, post-merge clean-checkout behavior, and CI-safe fake mode without local runtime availability.
+        context_budget:
+          max_input_tokens: 26000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: document-demo-and-quality-gate-modes
+        title: Documentation and operator guide
+        role: documentation
+        depends_on:
+          - add-end-to-end-integration-coverage
+        requirement_ids:
+          - AC-038
+          - AC-039
+          - AC-040
+        required_context:
+          files:
+            - README.md
+            - docs/command_map.md
+            - docs/local_models.md
+            - docs/runtime_config.md
+            - docs/public_readiness.md
+            - blueprints/blueprint.yaml
+          summaries:
+            - Documentation must explain fake and local modes, temporary sandbox behavior, cleanup and preservation, no-cloud fallback, oversized-task blocking, resume, CI usage, and pre-merge versus post-merge verification.
+          prior_task_outputs:
+            - add-end-to-end-integration-coverage
+          architecture_decisions: []
+        writable_paths:
+          - README.md
+          - docs/**
+          - stories/story_062/reports/**
+        expected_outputs:
+          - Operator documentation for demo-subtasks, runtime prerequisites, sandbox safety, scenarios, and quality-gate modes with example output.
+        validation:
+          - Documentation-related tests and link checks remain green.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: security-and-quality-review
+        title: Security and quality review
+        role: security_quality
+        depends_on:
+          - document-demo-and-quality-gate-modes
+        requirement_ids:
+          - AC-005
+          - AC-006
+          - AC-007
+          - AC-008
+          - AC-024
+          - AC-025
+          - AC-026
+          - AC-027
+          - AC-028
+          - AC-029
+          - AC-030
+          - AC-031
+          - AC-032
+          - AC-033
+          - AC-034
+          - AC-035
+          - AC-036
+          - AC-037
+        required_context:
+          files:
+            - src/agentic_dev/local_execution.py
+            - src/agentic_dev/local_model_runtime.py
+            - src/agentic_dev/artifact_policy.py
+            - src/agentic_dev/public_readiness.py
+            - tests/test_local_execution.py
+            - tests/test_artifact_policy.py
+          summaries:
+            - Review path safety, cleanup, fake/local mode parity, no fallback behavior, artifact lifecycle, regression coverage, and CI safety.
+          prior_task_outputs:
+            - document-demo-and-quality-gate-modes
+          architecture_decisions: []
+        writable_paths:
+          - stories/story_062/reports/**
+        expected_outputs:
+          - Security and quality review report for sandbox safety, runtime isolation, evidence lifecycle, and backward compatibility.
+        validation:
+          - pytest, Ruff, artifact-policy, runtime-config, generation idempotency, hidden-Unicode hygiene, and applicable public-readiness validation pass.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: final-local-review
+        title: Final local review
+        role: local_reviewer
+        depends_on:
+          - security-and-quality-review
+        requirement_ids:
+          - AC-028
+          - AC-029
+          - AC-030
+          - AC-038
+          - AC-039
+          - AC-040
+        required_context:
+          files:
+            - blueprints/blueprint.yaml
+            - stories/story_062/status.yaml
+            - stories/story_062/test_plan.yaml
+            - stories/story_062/reports/**
+          summaries:
+            - Review the final diff, acceptance-criteria coverage, fake/local mode parity, sandbox safety, and post-merge verification design before cloud or human review.
+          prior_task_outputs:
+            - security-and-quality-review
+          architecture_decisions: []
+        writable_paths:
+          - stories/story_062/reports/**
+        expected_outputs:
+          - Local review report that states whether Story 062 is ready for implementation and review.
+        validation:
+          - Review confirms no direct push to main, no local merge, no deployment, no hidden fallback, and no implementation scope beyond blueprint and generated workspace.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+    acceptance_criteria:
+      - "AC-001: `agentic demo-subtasks` exists."
+      - "AC-002: Fake mode works without network or local model availability."
+      - "AC-003: Local mode uses the existing supported local runtime."
+      - "AC-004: Both modes share the same execution pipeline."
+      - "AC-005: The demo creates a temporary sandbox."
+      - "AC-006: The demo never writes outside the sandbox."
+      - "AC-007: Symlink escape is blocked."
+      - "AC-008: Unsafe multi-file output produces no partial writes."
+      - "AC-009: The fake adapter is deterministic."
+      - "AC-010: The fake adapter can simulate success."
+      - "AC-011: The fake adapter can simulate failure."
+      - "AC-012: The fake adapter can simulate oversized-task behavior."
+      - "AC-013: The demo executes sub-tasks in deterministic dependency order."
+      - "AC-014: Completed tasks persist handoff summaries."
+      - "AC-015: Resume skips completed tasks."
+      - "AC-016: Failed dependencies block downstream tasks."
+      - "AC-017: Oversized tasks are blocked before model invocation."
+      - "AC-018: Oversized tasks persist cloud-redecomposition-required state."
+      - "AC-019: Required context is not silently trimmed."
+      - "AC-020: Final story validation checks original requirements."
+      - "AC-021: The calculator fixture produces real files."
+      - "AC-022: Generated fixture tests pass in the success scenario."
+      - "AC-023: The CLI output is concise and operator-readable."
+      - "AC-024: The workspace is cleaned automatically by default."
+      - "AC-025: `--keep-workspace` preserves it for inspection."
+      - "AC-026: Local mode fails clearly when no local runtime is configured."
+      - "AC-027: No cloud or Codex fallback is used."
+      - "AC-028: Post-merge quality verification works on a fresh clean checkout."
+      - "AC-029: Post-merge verification regenerates pytest and Ruff evidence."
+      - "AC-030: Post-merge verification does not require committed runtime artifacts."
+      - "AC-031: Post-merge verification leaves Git clean."
+      - "AC-032: Pre-merge quality-gate behavior remains intact."
+      - "AC-033: Failed regenerated evidence causes verification failure."
+      - "AC-034: Story 060 remains backward compatible."
+      - "AC-035: Story 061 remains backward compatible."
+      - "AC-036: Existing CI behavior remains stable."
+      - "AC-037: The demo is safe for GitHub Actions in fake mode."
+      - "AC-038: Documentation explains fake and local modes."
+      - "AC-039: Documentation explains sandbox safety."
+      - "AC-040: Documentation explains pre-merge versus post-merge verification."
+    not_in_scope:
+      - Story 062 implementation beyond blueprint and generated workspace changes required to represent the story.
+      - Any cloud-model or Codex implementation fallback.
+      - Runtime-generated demo workspaces, runtime review bundles, caches, or machine-specific artifacts committed to Git.
+      - Arbitrary writes to the main repository tree, user home directories, or any path outside the disposable sandbox.
+      - Deployment, publishing, release tagging, direct pushes to main, local merges to main, or force-pushes.
+    definition_of_done:
+      - The blueprint defines the end-to-end demo, sandbox model, scenario matrix, and post-merge quality-gate design with explicit dependency-aware sub-tasks.
+      - Acceptance criteria cover fake mode, local mode, shared execution path, sandbox safety, resume, dependency blocking, oversized-task handling, and post-merge verification behavior.
+      - The generated Story 062 workspace is created by agentic generate-stories and generation is idempotent across two runs.
+      - docker compose run --rm dev pytest passes.
+      - docker compose run --rm dev ruff check . passes.
+      - artifact-policy validation passes.
+      - runtime-config validation passes.
+      - hidden-Unicode hygiene validation passes.
+      - Public-readiness validation passes when applicable to the repository state.
+      - No implementation code is added beyond blueprint and generated workspace changes required to define Story 062.
+    test_plan:
+      test_layers_version: 1
+      unit_tests:
+        required: true
+        action: add_or_update
+        frequency: every_commit
+        evidence_or_reason: Cover fake adapter determinism, scenario parsing, real-adapter interface compatibility, safe temp workspace creation, cleanup on success and failure, keep-workspace mode, path traversal rejection, symlink escape rejection, unsafe multi-file atomicity, CLI exit codes, operator output, and pre-merge versus post-merge quality-gate behavior.
+      integration_tests:
+        required: true
+        action: add_or_update
+        frequency: every_pull_request
+        evidence_or_reason: Cover success, oversized, resume, dependency-failure, final validation, sandbox-only writes, clean Git status after post-merge verification, and Story 060 and Story 061 regressions.
+      mock_e2e_tests:
+        required: true
+        action: add_or_update
+        frequency: before_merge
+        evidence_or_reason: Run fake-mode demo execution in CI without local runtime availability and prove the same sub-task execution path is used across scenarios.
+      live_read_only_checks:
+        required: false
+        action: not_applicable_with_reason
+        frequency: manual_only
+        evidence_or_reason: Real local-model mode depends on optional operator-provided Ollama or LM Studio-compatible runtime setup and is validated through manual local execution guidance rather than mandatory CI checks.
+      remote_dev_smoke_tests:
+        required: false
+        action: not_applicable_with_reason
+        frequency: after_remote_dev_deploy
+        evidence_or_reason: Story 062 adds no remote deployment behavior and focuses on local demo execution plus local verification modes.
+    monitoring_plan:
+      logs_required:
+        - demo_workspace_location
+        - selected_demo_mode
+        - selected_demo_scenario
+        - demo_task_execution_order
+        - task_model_or_adapter
+        - task_context_estimate
+        - task_context_budget
+        - task_state_transition
+        - task_handoff_creation
+        - sandbox_cleanup_result
+        - final_story_validation_status
+        - post_merge_evidence_generation
+      watch_for:
+        - sandbox_escape_attempt
+        - unsafe_multi_file_partial_write
+        - fake_mode_nondeterminism
+        - local_runtime_fallback_attempt
+        - context_fit_bypass
+        - rerun_of_completed_task_on_resume
+        - downstream_task_ran_after_dependency_failure
+        - post_merge_verification_modified_tracked_reports
+        - Story_060_regression
+        - Story_061_regression
+
   - id: STORY-048
     slug: story_048_micro_local_agent_prompt_mode
     title: Add Micro Local-Agent Prompt Mode For Gemma Reliability

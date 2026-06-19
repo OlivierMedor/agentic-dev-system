@@ -1,0 +1,24 @@
+logs_required:
+- demo_workspace_location
+- selected_demo_mode
+- selected_demo_scenario
+- demo_task_execution_order
+- task_model_or_adapter
+- task_context_estimate
+- task_context_budget
+- task_state_transition
+- task_handoff_creation
+- sandbox_cleanup_result
+- final_story_validation_status
+- post_merge_evidence_generation
+watch_for:
+- sandbox_escape_attempt
+- unsafe_multi_file_partial_write
+- fake_mode_nondeterminism
+- local_runtime_fallback_attempt
+- context_fit_bypass
+- rerun_of_completed_task_on_resume
+- downstream_task_ran_after_dependency_failure
+- post_merge_verification_modified_tracked_reports
+- Story_060_regression
+- Story_061_regression
