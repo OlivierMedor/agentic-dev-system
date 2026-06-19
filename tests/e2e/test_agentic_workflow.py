@@ -102,11 +102,16 @@ def write_simulated_review_bundle_evidence(story_path: Path) -> None:
 def fake_review_bundle_command_runner(command: list[str], cwd: Path) -> CommandResult:
     command_text = " ".join(command)
     outputs = {
+        "git merge-base HEAD origin/main": "5f0d9fda8b6b0a89ed6c6ef819a6937630d79d3e\n",
+        "git rev-parse HEAD": "c2ec13bfefe6e8cf35d2f6ac4dc2f3a20193b47a\n",
         "git status --short": "",
         "git log --oneline -5": "abc123 Mock commit\n",
         "git diff --stat": "",
         "git diff --cached": "",
         "git diff": "",
+        "git diff --stat 5f0d9fda8b6b0a89ed6c6ef819a6937630d79d3e..HEAD": "",
+        "git diff --name-only 5f0d9fda8b6b0a89ed6c6ef819a6937630d79d3e..HEAD": "",
+        "git diff 5f0d9fda8b6b0a89ed6c6ef819a6937630d79d3e..HEAD": "",
         "git ls-files --others --exclude-standard": "",
         "pytest": "1 passed in 0.01s\n",
         "ruff check .": "All checks passed!\n",

@@ -843,6 +843,25 @@ def test_subtask_local_execute_propagates_dependency_failure(tmp_path: Path) -> 
     assert state["tasks"]["tests"]["failure_type"] == "blocked_by_dependency"
 
 
+def test_subtask_local_execute_classifies_markdown_prose_response_as_malformed_response(tmp_path: Path) -> None:
+    write_runtime_config(tmp_path)
+    story_path = create_subtask_story(tmp_path, include_second_task=False)
+    response_text = """# Task Report\n\n**Story:** story_061\n\nImplemented the task in prose instead of YAML.\n"""
+    client = FakeLocalExecutionHttpClient([response_text])
+
+    result = run_local_execution(tmp_path, SUBTASK_STORY, http_client=client)
+
+    assert result.status == "blocked"
+    execution = read_yaml(
+        story_path / "reports" / "local_execution" / "tasks" / "schema" / "execution.yaml"
+    )
+    assert execution["failure_type"] == "malformed_response"
+    assert "not valid YAML" in execution["summary"]
+    assert (
+        story_path / "reports" / "local_execution" / "tasks" / "schema" / "output.md"
+    ).read_text(encoding="utf-8") == response_text
+
+
 def test_subtask_local_execute_enforces_writable_paths_and_symlink_safety(tmp_path: Path) -> None:
     write_runtime_config(tmp_path)
     story_path = create_subtask_story(tmp_path, include_second_task=False)

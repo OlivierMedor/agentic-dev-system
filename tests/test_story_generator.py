@@ -81,6 +81,60 @@ def test_generate_stories_reads_yaml_and_creates_expected_workspace(tmp_path: Pa
     assert "generator_errors" in monitoring_plan
 
 
+def test_generate_stories_renders_implementation_review_scope_when_present(
+    tmp_path: Path,
+) -> None:
+    blueprint_path = tmp_path / "blueprints" / "blueprint.yaml"
+    blueprint_path.parent.mkdir(parents=True, exist_ok=True)
+    blueprint_path.write_text(
+        """stories:
+  - id: STORY-062
+    slug: story_062_implementation_scope
+    title: Story 062 Scope
+    goal: Verify implementation scope rendering.
+    why_it_matters: It proves implementation review metadata can be rendered.
+    acceptance_criteria:
+      - Show implementation review scope.
+    implementation_scope:
+      - agentic demo-subtasks
+      - deterministic fake-model mode
+      - real local-model mode
+    not_in_scope:
+      - Historical blueprint note.
+    definition_of_done:
+      - agentic demo-subtasks implemented.
+      - fake and local modes implemented.
+      - all four scenarios validated.
+      - sandbox safety implemented.
+      - real local-model demonstration passed.
+      - post-merge verification implemented.
+      - tests and documentation completed.
+      - backward compatibility preserved.
+""",
+        encoding="utf-8",
+    )
+
+    generate_stories(tmp_path)
+
+    story_markdown = (
+        tmp_path / "stories" / "story_062_implementation_scope" / "story.md"
+    ).read_text(encoding="utf-8")
+
+    assert "## Implementation Review Scope" in story_markdown
+    assert "agentic demo-subtasks" in story_markdown
+    assert "deterministic fake-model mode" in story_markdown
+    assert "## Historical Blueprint Notes" in story_markdown
+    assert "## Not In Scope" not in story_markdown
+    assert "agentic demo-subtasks implemented." in story_markdown
+    assert "fake and local modes implemented." in story_markdown
+    assert "all four scenarios validated." in story_markdown
+    assert "sandbox safety implemented." in story_markdown
+    assert "real local-model demonstration passed." in story_markdown
+    assert "post-merge verification implemented." in story_markdown
+    assert "tests and documentation completed." in story_markdown
+    assert "backward compatibility preserved." in story_markdown
+
+
 def test_generate_stories_creates_full_test_layer_template(tmp_path: Path) -> None:
     blueprint_path = tmp_path / "blueprints" / "blueprint.yaml"
     story_slug = "story_014_test_layers"
@@ -145,6 +199,50 @@ def test_generate_stories_supports_project_and_blueprint_overrides(tmp_path: Pat
     generate_stories(project_path, custom_blueprint)
 
     assert_story_workspace_exists(project_path, "story_012_custom")
+
+
+def test_generate_stories_is_idempotent_for_story_062_blueprint(tmp_path: Path) -> None:
+    blueprint_path = tmp_path / "blueprints" / "blueprint.yaml"
+    blueprint_path.parent.mkdir(parents=True, exist_ok=True)
+    blueprint_path.write_text(
+        """stories:
+  - id: STORY-062
+    slug: story_062_idempotent
+    title: Story 062 Idempotent Check
+    goal: Verify Story 062 generation is stable across repeated runs.
+    why_it_matters: It proves canonical generation keeps the same story metadata.
+    acceptance_criteria:
+      - Generated story includes the Story 062 implementation review scope.
+    implementation_scope:
+      - agentic demo-subtasks
+      - deterministic fake-model mode
+      - real local-model mode
+    definition_of_done:
+      - agentic demo-subtasks implemented.
+      - fake and local modes implemented.
+      - all four scenarios validated.
+      - sandbox safety implemented.
+      - real local-model demonstration passed.
+      - post-merge verification implemented.
+      - tests and documentation completed.
+      - backward compatibility preserved.
+""",
+        encoding="utf-8",
+    )
+
+    first_run = generate_stories(tmp_path)
+    second_run = generate_stories(tmp_path)
+
+    story_path = tmp_path / "stories" / "story_062_idempotent"
+    story_markdown = (story_path / "story.md").read_text(encoding="utf-8")
+    status_yaml = (story_path / "status.yaml").read_text(encoding="utf-8")
+
+    assert first_run
+    assert second_run == []
+    assert "## Implementation Review Scope" in story_markdown
+    assert "agentic demo-subtasks implemented." in story_markdown
+    assert "status: pending" in status_yaml
+    assert "ready_for_review: false" in status_yaml
 
 
 def test_generate_stories_does_not_overwrite_existing_story_markdown(tmp_path: Path) -> None:

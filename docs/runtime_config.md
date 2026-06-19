@@ -153,6 +153,8 @@ can be resolved by the current blueprint and context. Tasks marked
 `cloud_redecomposition_required` do not retry unchanged; the cloud planner must
 decompose them further in the blueprint first.
 
+Story 062's `agentic demo-subtasks` command reuses this exact sub-task execution path. Fake and local demo modes share the same blueprint parser, dependency ordering, readiness checks, context assembly, context-fit gate, writable-path validation, state file layout, handoff summaries, resume behavior, and story-wide final validation. Only the model adapter changes between deterministic fake responses and the configured local OpenAI-compatible runtime.
+
 ## Codex Runtime Adapter
 
 The automatic Codex adapter is disabled by default:

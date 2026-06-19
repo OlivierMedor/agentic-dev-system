@@ -111,29 +111,64 @@ def format_story_markdown(story: dict[str, Any]) -> str:
     title = text_value(story, "title", "Untitled Story")
     goal = text_value(story, "goal", "TODO")
     why_it_matters = text_value(story, "why_it_matters", text_value(story, "why", "TODO"))
+    implementation_scope = story.get("implementation_scope")
 
-    return f"""# {story_id}: {title}
+    sections = [
+        f"# {story_id}: {title}",
+        "",
+        "## Goal",
+        "",
+        goal,
+        "",
+        "## Why This Matters",
+        "",
+        why_it_matters,
+        "",
+        "## Acceptance Criteria",
+        "",
+        format_markdown_list(story.get("acceptance_criteria")),
+        "",
+    ]
 
-## Goal
+    if isinstance(implementation_scope, list) and implementation_scope:
+        sections.extend(
+            [
+                "## Implementation Review Scope",
+                "",
+                format_markdown_list(implementation_scope),
+                "",
+            ],
+        )
 
-{goal}
+        if story.get("not_in_scope") is not None:
+            sections.extend(
+                [
+                    "## Historical Blueprint Notes",
+                    "",
+                    format_markdown_list(story.get("not_in_scope")),
+                    "",
+                ],
+            )
+    else:
+        sections.extend(
+            [
+                "## Not In Scope",
+                "",
+                format_markdown_list(story.get("not_in_scope")),
+                "",
+            ],
+        )
 
-## Why This Matters
+    sections.extend(
+        [
+            "## Definition of Done",
+            "",
+            format_markdown_list(story.get("definition_of_done")),
+            "",
+        ],
+    )
 
-{why_it_matters}
-
-## Acceptance Criteria
-
-{format_markdown_list(story.get("acceptance_criteria"))}
-
-## Not In Scope
-
-{format_markdown_list(story.get("not_in_scope"))}
-
-## Definition of Done
-
-{format_markdown_list(story.get("definition_of_done"))}
-"""
+    return "\n".join(sections) + "\n"
 
 
 def format_status_yaml(story: dict[str, Any]) -> str:

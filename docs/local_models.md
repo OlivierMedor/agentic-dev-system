@@ -138,6 +138,20 @@ Completed sub-tasks persist concise handoff summaries. Downstream tasks may
 consume only the dependency outputs and summaries declared in
 `required_context.prior_task_outputs`, not unrestricted raw chat history.
 
+Story 062 adds `agentic demo-subtasks` as an end-to-end operator demo for that same path. The default `--mode fake` adapter is deterministic, requires no network or local runtime, and is safe for CI. `--mode local` reuses the same parser, dependency graph, context-fit gate, writable-path enforcement, state persistence, handoff persistence, resume logic, and final validation, but swaps in the configured local OpenAI-compatible runtime adapter. There is no cloud fallback and no Codex fallback.
+
+Demo commands:
+
+```powershell
+docker compose run --rm dev agentic demo-subtasks --mode fake --scenario success
+docker compose run --rm dev agentic demo-subtasks --mode fake --scenario oversized
+docker compose run --rm dev agentic demo-subtasks --mode fake --scenario resume --keep-workspace
+docker compose run --rm dev agentic demo-subtasks --mode fake --scenario dependency-failure
+docker compose run --rm dev agentic demo-subtasks --mode local --scenario success
+```
+
+The demo creates a temporary Python project, writes all generated files inside that sandbox only, rejects absolute-path escapes, path traversal, and symlink escapes, and refuses unsafe multi-file responses before any partial write is applied. By default it cleans up the sandbox on success or failure. `--keep-workspace` preserves it and prints the preserved path for inspection. Custom `--workspace-root` values are accepted only under safe temp roots.
+
 Run a simple local call and save `reports/local_model_dry_run_report.md`:
 
 ```powershell

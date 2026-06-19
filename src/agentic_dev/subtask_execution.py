@@ -29,6 +29,7 @@ MANDATORY_CONTEXT_SECTIONS = (
     "writable_path_rules",
     "expected_output_contract",
     "validation_instructions",
+    "response_contract",
 )
 
 
@@ -312,6 +313,11 @@ def assemble_subtask_context(
             "blueprint validation",
             yaml.safe_dump(task.validation, sort_keys=False).strip(),
         ),
+        ContextSection(
+            "response_contract",
+            "shared local sub-task execution contract",
+            response_contract_text(task),
+        ),
     ]
     prompt = format_subtask_prompt(story_name, task, sections)
     missing = missing_mandatory_sections(prompt)
@@ -402,6 +408,46 @@ def resolve_required_files(project_path: Path, file_pattern: str) -> list[dict[s
         relative = path.resolve().relative_to(project_path.resolve()).as_posix()
         results.append({"path": relative, "content": path.read_text(encoding="utf-8")})
     return results
+
+
+def response_contract_text(task: BlueprintSubtask) -> str:
+    return """Return YAML only. Do not include prose before or after the YAML document.
+You may return raw YAML or a single outer ```yaml fenced YAML document.
+The YAML must have exactly this shape:
+
+report: |
+  concise markdown summary for this task only
+files:
+  - path: relative/path/inside/allowed/writable/paths
+    content: |
+      full file content
+handoff_summary:
+  decisions:
+    - concise downstream decision
+  files_changed:
+    - relative/path/inside/allowed/writable/paths
+  outputs_produced:
+    - relative/path/inside/allowed/writable/paths
+  tests_run:
+    - optional validation command or evidence
+  unresolved_risks:
+    - optional remaining risk
+  available_to_dependents: true
+
+Rules:
+- Return files for this task only.
+- Use sandbox-relative POSIX paths only.
+- Do not use absolute paths.
+- Do not use parent-directory traversal such as ..
+- Every file entry must contain the complete final file contents.
+- Every file path must stay within the allowed writable paths for this task.
+- If no file should be written for this task, return files: [].
+- Keep the report focused on work completed for this task only.
+- The handoff_summary must be a YAML mapping with all listed fields.
+- Expected outputs for this task: {expected_outputs}.
+""".format(
+        expected_outputs=", ".join(task.expected_outputs) if task.expected_outputs else "none declared",
+    )
 
 
 def format_subtask_prompt(

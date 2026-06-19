@@ -8,6 +8,7 @@ from agentic_dev.artifact_policy import check_artifact_policy, format_artifact_p
 from agentic_dev.cloud_review_packet import create_cloud_review_packet
 from agentic_dev.cloud_review_result import record_cloud_review
 from agentic_dev.codex_runtime import create_codex_tasks
+from agentic_dev.demo_subtasks import add_demo_subtasks_arguments, run_demo_subtasks
 from agentic_dev.finalize_story import finalize_story
 from agentic_dev.feature_scan import create_feature_scan_packet, record_feature_suggestions
 from agentic_dev.improvement_scan import (
@@ -47,7 +48,7 @@ from agentic_dev.public_readiness import (
     format_public_readiness_terminal_report,
     run_public_readiness,
 )
-from agentic_dev.quality_gate import run_quality_gate
+from agentic_dev.quality_gate import run_quality_gate_mode
 from agentic_dev.queue_management import (
     ALL_QUEUE_STATUSES,
     ALL_QUEUE_TYPES,
@@ -126,6 +127,11 @@ def main() -> None:
         required=True,
         help="Story folder name under the project's stories folder.",
     )
+    review_bundle_parser.add_argument(
+        "--base-ref",
+        default="origin/main",
+        help="Base ref or base SHA used to capture the committed PR diff. Defaults to origin/main.",
+    )
 
     quality_gate_parser = subparsers.add_parser(
         "quality-gate",
@@ -141,6 +147,12 @@ def main() -> None:
         "--story",
         required=True,
         help="Story folder name under the project's stories folder.",
+    )
+    quality_gate_parser.add_argument(
+        "--mode",
+        choices=["pre-merge", "post-merge"],
+        default="pre-merge",
+        help="Use pre-merge review readiness checks or clean-checkout post-merge verification.",
     )
 
     test_layers_parser = subparsers.add_parser(
@@ -702,6 +714,12 @@ def main() -> None:
         action="store_true",
         help="Show resolved models and execution order without executing roles.",
     )
+
+    demo_subtasks_parser = subparsers.add_parser(
+        "demo-subtasks",
+        help="Run the Story 062 sandboxed subtask execution demo.",
+    )
+    add_demo_subtasks_arguments(demo_subtasks_parser)
 
     codex_task_parser = subparsers.add_parser(
         "codex-task",
@@ -1294,7 +1312,7 @@ def main() -> None:
                 print("\nNo new files created. Project already appears initialized.")
 
         if args.command == "review-bundle":
-            result = create_review_bundle(args.project, args.story)
+            result = create_review_bundle(args.project, args.story, base_ref=args.base_ref)
 
             print(f"Review bundle created at: {result.review_bundle_path}")
             print(f"pytest passed: {result.pytest_passed}")
@@ -1304,13 +1322,19 @@ def main() -> None:
                 print(f"  - {path}")
 
         if args.command == "quality-gate":
-            result = run_quality_gate(args.project, args.story)
+            result = run_quality_gate_mode(args.project, args.story, mode=args.mode)
 
+            print(f"Quality gate mode: {result.mode}")
             print(f"Quality gate status: {result.status}")
             print(f"Ready for review: {result.ready_for_review}")
-            print(f"Result written to: {result.result_path}")
-            print(f"Report written to: {result.report_path}")
+            if result.result_path is not None:
+                print(f"Result written to: {result.result_path}")
+            if result.report_path is not None:
+                print(f"Report written to: {result.report_path}")
             print(f"Next action: {result.next_action}")
+
+            if result.status not in {"READY_FOR_REVIEW", "POST_MERGE_VERIFIED"}:
+                parser.exit(status=1)
 
         if args.command == "test-layers":
             result = run_test_layers(args.project, args.story)
@@ -1598,6 +1622,18 @@ def main() -> None:
                 dry_run=args.dry_run,
             )
             print(result.terminal_summary)
+
+        if args.command == "demo-subtasks":
+            result = run_demo_subtasks(
+                args.project,
+                mode=args.mode,
+                scenario=args.scenario,
+                keep_workspace=args.keep_workspace,
+                workspace_root=args.workspace_root,
+            )
+            print(result.terminal_summary)
+            if result.exit_code != 0:
+                parser.exit(status=result.exit_code)
 
         if args.command == "codex-task":
             if args.codex_task_command == "create":

@@ -51,10 +51,21 @@ Story 061 defines dependency-aware local sub-task execution, but the repository 
 - AC-039: Documentation explains sandbox safety.
 - AC-040: Documentation explains pre-merge versus post-merge verification.
 
-## Not In Scope
+## Implementation Review Scope
 
-- Story 062 implementation beyond blueprint and generated workspace changes required to represent the story.
-- Any cloud-model or Codex implementation fallback.
+- `agentic demo-subtasks`
+- deterministic fake-model mode
+- real local-model mode using the existing runtime adapter
+- safe temporary sandbox execution
+- success, oversized, resume, and dependency-failure scenarios
+- real file changes inside the sandbox
+- post-merge story verification that regenerates evidence
+- no requirement to commit runtime review artifacts
+- no cloud or Codex fallback
+- full backward compatibility with Stories 060 and 061
+
+## Historical Blueprint Notes
+
 - Runtime-generated demo workspaces, runtime review bundles, caches, or machine-specific artifacts committed to Git.
 - Arbitrary writes to the main repository tree, user home directories, or any path outside the disposable sandbox.
 - Deployment, publishing, release tagging, direct pushes to main, local merges to main, or force-pushes.
@@ -70,4 +81,11 @@ Story 061 defines dependency-aware local sub-task execution, but the repository 
 - runtime-config validation passes.
 - hidden-Unicode hygiene validation passes.
 - Public-readiness validation passes when applicable to the repository state.
-- No implementation code is added beyond blueprint and generated workspace changes required to define Story 062.
+- agentic demo-subtasks is implemented.
+- Fake and local modes are implemented.
+- All four scenarios are validated.
+- Sandbox safety is implemented.
+- A real local-model demonstration passes.
+- Post-merge verification is implemented.
+- Tests and documentation are completed.
+- Backward compatibility is preserved for Stories 060 and 061.
