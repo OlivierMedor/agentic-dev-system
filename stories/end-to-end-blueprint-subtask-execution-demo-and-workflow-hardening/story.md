@@ -40,7 +40,7 @@ Story 061 defines dependency-aware local sub-task execution, but the repository 
 - AC-028: Post-merge quality verification works on a fresh clean checkout.
 - AC-029: Post-merge verification regenerates pytest and Ruff evidence.
 - AC-030: Post-merge verification does not require committed runtime artifacts.
-- AC-031: Post-merge verification leaves Git clean.
+- AC-031: Post-merge verification leaves Git clean and does not rewrite tracked story reports unexpectedly.
 - AC-032: Pre-merge quality-gate behavior remains intact.
 - AC-033: Failed regenerated evidence causes verification failure.
 - AC-034: Story 060 remains backward compatible.
