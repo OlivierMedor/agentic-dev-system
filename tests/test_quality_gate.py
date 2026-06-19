@@ -302,7 +302,7 @@ def test_post_merge_quality_gate_succeeds_without_review_bundle(
     tmp_path: Path,
 ) -> None:
     story = "story_062"
-    create_complete_story(tmp_path, story)
+    story_path = create_complete_story(tmp_path, story)
     review_bundle_path = tmp_path / "stories" / story / "review_bundle"
     for path in review_bundle_path.glob("*"):
         path.unlink()
@@ -337,8 +337,10 @@ def test_post_merge_quality_gate_succeeds_without_review_bundle(
     assert result.status == POST_MERGE_VERIFIED
     assert "Regenerated pytest evidence passed." in result.passed_checks
     assert "Regenerated Ruff evidence passed." in result.passed_checks
-    assert result.result_path is None
-    assert result.report_path is None
+    assert result.result_path == story_path / "reports" / "post_merge_quality_gate_result.yaml"
+    assert result.report_path == story_path / "reports" / "post_merge_quality_gate_report.md"
+    assert result.result_path.exists()
+    assert result.report_path.exists()
 
 
 def test_post_merge_quality_gate_fails_when_git_is_dirty_after_verification(tmp_path: Path) -> None:

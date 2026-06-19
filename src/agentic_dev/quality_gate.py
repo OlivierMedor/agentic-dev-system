@@ -142,12 +142,19 @@ def format_check_list(checks: list[str]) -> str:
 
 
 def write_markdown_report(path: Path, result: QualityGateResult) -> None:
-    explanation = (
-        "The quality gate checks that the story has the required planning files, "
-        "workflow reports, review bundle files, passing pytest output, passing Ruff output, "
-        "and local reviewer approval. If any required item is missing or failed, the story "
-        "should stay in REQUEST_CHANGES until the evidence is fixed."
-    )
+    if result.mode == "post-merge":
+        explanation = (
+            "Post-merge verification regenerates pytest and Ruff evidence on a clean checkout, "
+            "checks the artifact policy and runtime config, and confirms Git stayed clean "
+            "before and after verification. It does not decide merge readiness."
+        )
+    else:
+        explanation = (
+            "The quality gate checks that the story has the required planning files, "
+            "workflow reports, review bundle files, passing pytest output, passing Ruff output, "
+            "and local reviewer approval. If any required item is missing or failed, the story "
+            "should stay in REQUEST_CHANGES until the evidence is fixed."
+        )
 
     content = f"""# Quality Gate Report
 
@@ -329,7 +336,9 @@ def run_post_merge_quality_gate(
         passed_checks.append("Git checkout remained clean after verification.")
 
     passed = not failed_checks
-    return QualityGateResult(
+    reports_path = story_path / "reports"
+    reports_path.mkdir(parents=True, exist_ok=True)
+    result = QualityGateResult(
         story=story,
         mode="post-merge",
         status=POST_MERGE_VERIFIED if passed else POST_MERGE_FAILED,
@@ -341,10 +350,14 @@ def run_post_merge_quality_gate(
             if passed
             else "Fix the regenerated failing checks and rerun post-merge verification."
         ),
-        result_path=None,
-        report_path=None,
+        result_path=reports_path / "post_merge_quality_gate_result.yaml",
+        report_path=reports_path / "post_merge_quality_gate_report.md",
         command_outputs=command_outputs,
     )
+
+    write_yaml_result(result.result_path, result)
+    write_markdown_report(result.report_path, result)
+    return result
 
 
 def pytest_passed_output_text(output: str) -> bool:

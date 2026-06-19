@@ -129,6 +129,22 @@ def test_cloud_review_context_includes_story_and_present_evidence(tmp_path: Path
         "diff --git a/README.md b/README.md\n",
         encoding="utf-8",
     )
+    (review_bundle_path / "committed_diff_metadata.txt").write_text(
+        "# Committed PR Diff Metadata\n\nBase SHA: `abc123`\nHead SHA: `def456`\n",
+        encoding="utf-8",
+    )
+    (review_bundle_path / "committed_diff_stat.txt").write_text(
+        "Command: git diff --stat abc123..HEAD\n",
+        encoding="utf-8",
+    )
+    (review_bundle_path / "committed_changed_files.txt").write_text(
+        "Command: git diff --name-only abc123..HEAD\nsrc/agentic_dev/cloud_review_packet.py\n",
+        encoding="utf-8",
+    )
+    (review_bundle_path / "committed_diff.patch").write_text(
+        "Command: git diff abc123..HEAD\n",
+        encoding="utf-8",
+    )
     (review_bundle_path / "untracked_file_contents.md").write_text(
         "## `src/agentic_dev/local_execution.py`\n\n```text\ncontent\n```\n",
         encoding="utf-8",
@@ -150,8 +166,34 @@ def test_cloud_review_context_includes_story_and_present_evidence(tmp_path: Path
     assert "diff --git a/src/agentic_dev/cloud_review_packet.py" in context
     assert "## Git staged diff" in context
     assert "diff --git a/README.md" in context
+    assert "## Committed PR diff metadata" in context
+    assert "Base SHA: `abc123`" in context
+    assert "## Committed PR diff stat" in context
+    assert "## Committed PR changed files" in context
+    assert "## Committed PR diff patch" in context
     assert "## Untracked file contents" in context
     assert "src/agentic_dev/local_execution.py" in context
+
+
+def test_cloud_review_context_includes_story_implementation_scope_and_no_not_in_scope_heading(
+    tmp_path: Path,
+) -> None:
+    story_content = (
+        "# STORY-062\n\n"
+        "## Implementation Review Scope\n\n"
+        "- agentic demo-subtasks\n"
+        "- deterministic fake-model mode\n"
+        "- real local-model mode using the existing runtime adapter\n"
+    )
+    story_path = create_story(tmp_path, story_content=story_content)
+
+    create_cloud_review_packet(tmp_path, STORY)
+
+    context = read_packet_file(story_path, "cloud_review_context.md")
+    assert "## Implementation Review Scope" in context
+    assert "agentic demo-subtasks" in context
+    assert "deterministic fake-model mode" in context
+    assert "## Not In Scope" not in context
 
 
 def test_cloud_review_context_mentions_missing_optional_evidence_clearly(

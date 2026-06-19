@@ -81,6 +81,45 @@ def test_generate_stories_reads_yaml_and_creates_expected_workspace(tmp_path: Pa
     assert "generator_errors" in monitoring_plan
 
 
+def test_generate_stories_renders_implementation_review_scope_when_present(
+    tmp_path: Path,
+) -> None:
+    blueprint_path = tmp_path / "blueprints" / "blueprint.yaml"
+    blueprint_path.parent.mkdir(parents=True, exist_ok=True)
+    blueprint_path.write_text(
+        """stories:
+  - id: STORY-062
+    slug: story_062_implementation_scope
+    title: Story 062 Scope
+    goal: Verify implementation scope rendering.
+    why_it_matters: It proves implementation review metadata can be rendered.
+    acceptance_criteria:
+      - Show implementation review scope.
+    implementation_scope:
+      - agentic demo-subtasks
+      - deterministic fake-model mode
+      - real local-model mode
+    not_in_scope:
+      - Historical blueprint note.
+    definition_of_done:
+      - Story markdown includes the implementation review scope section.
+""",
+        encoding="utf-8",
+    )
+
+    generate_stories(tmp_path)
+
+    story_markdown = (
+        tmp_path / "stories" / "story_062_implementation_scope" / "story.md"
+    ).read_text(encoding="utf-8")
+
+    assert "## Implementation Review Scope" in story_markdown
+    assert "agentic demo-subtasks" in story_markdown
+    assert "deterministic fake-model mode" in story_markdown
+    assert "## Historical Blueprint Notes" in story_markdown
+    assert "## Not In Scope" not in story_markdown
+
+
 def test_generate_stories_creates_full_test_layer_template(tmp_path: Path) -> None:
     blueprint_path = tmp_path / "blueprints" / "blueprint.yaml"
     story_slug = "story_014_test_layers"

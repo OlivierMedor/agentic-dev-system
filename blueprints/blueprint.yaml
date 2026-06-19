@@ -4403,6 +4403,17 @@ stories:
     title: Story 062 - End-to-End Blueprint Subtask Execution Demo and Workflow Hardening
     goal: Define a complete blueprint for a safe end-to-end demo that proves Story 061 sub-task execution works in practice with the same dependency-aware pipeline in deterministic fake mode and real local-model mode, while also fixing post-merge quality-gate verification so clean checkouts do not require committed runtime review artifacts.
     why: Story 061 defines dependency-aware local sub-task execution, but the repository still needs a practical, operator-friendly proof that the workflow works end to end in CI-safe fake mode and manual local-runtime mode. The same story also needs to harden the quality-gate evidence lifecycle so merged-code verification regenerates ephemeral evidence instead of incorrectly failing on clean checkouts.
+    implementation_scope:
+      - agentic demo-subtasks
+      - deterministic fake-model mode
+      - real local-model mode using the existing runtime adapter
+      - safe temporary sandbox execution
+      - success, oversized, resume, and dependency-failure scenarios
+      - real file changes inside the sandbox
+      - post-merge story verification that regenerates evidence
+      - no requirement to commit runtime review artifacts
+      - no cloud or Codex fallback
+      - full backward compatibility with Stories 060 and 061
     agents:
       developer:
         writable_paths:
@@ -5153,7 +5164,6 @@ stories:
       - "AC-039: Documentation explains sandbox safety."
       - "AC-040: Documentation explains pre-merge versus post-merge verification."
     not_in_scope:
-      - Story 062 implementation beyond blueprint and generated workspace changes required to represent the story.
       - Any cloud-model or Codex implementation fallback.
       - Runtime-generated demo workspaces, runtime review bundles, caches, or machine-specific artifacts committed to Git.
       - Arbitrary writes to the main repository tree, user home directories, or any path outside the disposable sandbox.
