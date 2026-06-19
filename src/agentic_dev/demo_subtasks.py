@@ -418,6 +418,16 @@ def demo_blueprint_story(scenario: str) -> dict[str, Any]:
                 prior_task_outputs=[],
                 oversized=oversized,
                 expected_outputs=["calculator/__init__.py", "calculator/core.py"],
+                summaries=[
+                    "Implement only add and subtract helpers for this demo.",
+                    "Use integer inputs and integer return values for add and subtract.",
+                ],
+                validation=[
+                    "Return complete file contents for calculator/__init__.py and calculator/core.py.",
+                    "Export only add and subtract from calculator/__init__.py.",
+                    "Implement def add(left: int, right: int) -> int and def subtract(left: int, right: int) -> int.",
+                    "Produce a concise handoff summary for downstream tasks.",
+                ],
             ),
             demo_subtask(
                 "calculator-tests",
@@ -427,6 +437,15 @@ def demo_blueprint_story(scenario: str) -> dict[str, Any]:
                 prior_task_outputs=["calculator-module"],
                 oversized=False,
                 expected_outputs=["tests/test_calculator.py"],
+                summaries=[
+                    "Write pytest tests for add and subtract only.",
+                    "The generated CLI contract is validated separately and should not change the test scope.",
+                ],
+                validation=[
+                    "Return complete file contents for tests/test_calculator.py.",
+                    "Add pytest coverage for add(2, 3) == 5 and subtract(5, 3) == 2.",
+                    "Produce a concise handoff summary for downstream tasks.",
+                ],
             ),
             demo_subtask(
                 "calculator-cli",
@@ -436,6 +455,17 @@ def demo_blueprint_story(scenario: str) -> dict[str, Any]:
                 prior_task_outputs=["calculator-module"],
                 oversized=False,
                 expected_outputs=["calculator/cli.py"],
+                summaries=[
+                    "Implement a minimal CLI that adds two integers.",
+                    "The CLI must support exactly: python -m calculator.cli 2 3 and print 5 with no label.",
+                ],
+                validation=[
+                    "Return complete file contents for calculator/cli.py.",
+                    "Accept exactly two positional integer arguments named left and right.",
+                    "Call add(left, right) and print the numeric result only.",
+                    "Do not require an operation selector argument.",
+                    "Produce a concise handoff summary for downstream tasks.",
+                ],
             ),
             demo_subtask(
                 "validation-report",
@@ -445,6 +475,15 @@ def demo_blueprint_story(scenario: str) -> dict[str, Any]:
                 prior_task_outputs=["calculator-tests", "calculator-cli"],
                 oversized=False,
                 expected_outputs=["stories/demo_subtasks/reports/final_validation.md"],
+                summaries=[
+                    "Summarize the expected validation commands for pytest and the CLI smoke test.",
+                    "The CLI smoke test command is python -m calculator.cli 2 3 and it must print 5.",
+                ],
+                validation=[
+                    "Return complete file contents for stories/demo_subtasks/reports/final_validation.md.",
+                    "Mention pytest -q and python -m calculator.cli 2 3 as the final validation commands.",
+                    "Produce a concise handoff summary for downstream tasks.",
+                ],
             ),
         ],
     }
@@ -459,6 +498,8 @@ def demo_subtask(
     prior_task_outputs: list[str],
     oversized: bool,
     expected_outputs: list[str],
+    summaries: list[str] | None = None,
+    validation: list[str] | None = None,
 ) -> dict[str, Any]:
     max_input_tokens = 1100 if oversized else 6000
     reserved_output_tokens = 1000 if oversized else 1000
@@ -473,6 +514,7 @@ def demo_subtask(
             "summaries": [
                 "Keep all writes inside the temporary demo sandbox.",
                 "Use dependency handoffs from completed tasks when available.",
+                *(summaries or []),
             ],
             "prior_task_outputs": prior_task_outputs,
             "architecture_decisions": [
@@ -486,7 +528,7 @@ def demo_subtask(
             "stories/demo_subtasks/reports/**",
         ],
         "expected_outputs": expected_outputs,
-        "validation": ["Produce a concise handoff summary for downstream tasks."],
+        "validation": validation or ["Produce a concise handoff summary for downstream tasks."],
         "context_budget": {
             "max_input_tokens": max_input_tokens,
             "reserved_output_tokens": reserved_output_tokens,

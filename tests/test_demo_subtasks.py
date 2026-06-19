@@ -17,7 +17,8 @@ from agentic_dev.demo_subtasks import (
     materialize_demo_project,
     run_demo_subtasks,
 )
-from agentic_dev.local_execution import run_local_execution
+from agentic_dev.local_execution import load_blueprint_story, run_local_execution
+from agentic_dev.subtask_execution import assemble_subtask_context, parse_blueprint_subtasks
 
 
 def read_yaml(path: Path) -> dict:
@@ -104,6 +105,21 @@ def test_demo_subtasks_dependency_failure_blocks_downstream_tasks(tmp_path: Path
     assert state["tasks"]["calculator-module"]["status"] == "failed"
     assert state["tasks"]["calculator-tests"]["failure_type"] == "blocked_by_dependency"
     assert state["tasks"]["calculator-cli"]["failure_type"] == "blocked_by_dependency"
+
+
+def test_demo_subtasks_cli_prompt_declares_exact_local_validation_contract(tmp_path: Path) -> None:
+    sandbox_root = tmp_path / "sandbox"
+    materialize_demo_project(tmp_path, sandbox_root, mode=FAKE_MODE, scenario=SUCCESS_SCENARIO)
+    story_path = sandbox_root / "stories" / DEMO_STORY
+    blueprint_story = load_blueprint_story(sandbox_root, story_path)
+    cli_task = [task for task in parse_blueprint_subtasks(blueprint_story) if task.id == "calculator-cli"][0]
+
+    assembled = assemble_subtask_context(sandbox_root, story_path, DEMO_STORY, blueprint_story, cli_task, {})
+
+    assert "python -m calculator.cli 2 3" in assembled.prompt
+    assert "print the numeric result only." in assembled.prompt
+    assert "Do not require an operation selector argument." in assembled.prompt
+    assert "Accept exactly two positional integer arguments named left and right." in assembled.prompt
 
 
 def test_demo_subtasks_local_mode_reports_runtime_unavailable_by_default(tmp_path: Path) -> None:

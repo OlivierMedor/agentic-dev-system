@@ -164,6 +164,12 @@ def test_context_assembly_preserves_mandatory_sections(tmp_path: Path) -> None:
     assert "## system_and_safety_instructions" in assembled.prompt
     assert "## role_instructions" in assembled.prompt
     assert "## required_context" in assembled.prompt
+    assert "## response_contract" in assembled.prompt
+    assert "Return YAML only." in assembled.prompt
+    assert "You may return raw YAML or a single outer ```yaml fenced YAML document." in assembled.prompt
+    assert "The YAML must have exactly this shape:" in assembled.prompt
+    assert "handoff_summary:" in assembled.prompt
+    assert "Expected outputs for this task: Implementation and tests." in assembled.prompt
     assert assembled.estimated_input_tokens == estimate_input_tokens(assembled.prompt)
 
 
