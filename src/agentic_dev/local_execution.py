@@ -457,6 +457,7 @@ def run_subtask_local_execution(
                 parsed.get("handoff_summary"),
                 audit["applied_paths"],
             )
+            audit["validation_result"] = completed_subtask_validation_result(task, audit)
             complete_subtask(state, task.id)
         except PermissionError as error:
             audit["attempted_paths"] = attempted_paths
@@ -1055,6 +1056,48 @@ def normalized_handoff_summary(value: Any, applied_paths: list[str]) -> dict[str
     return handoff
 
 
+def completed_subtask_validation_result(
+    task: BlueprintSubtask,
+    audit: dict[str, Any],
+) -> dict[str, Any]:
+    verified_checks: list[str] = []
+    missing_checks: list[str] = []
+
+    if audit.get("context_sections"):
+        verified_checks.append("context_sections_recorded")
+    else:
+        missing_checks.append("context_sections_recorded")
+
+    if audit.get("outputs"):
+        verified_checks.append("outputs_recorded")
+    else:
+        missing_checks.append("outputs_recorded")
+
+    handoff_summary = audit.get("handoff_summary")
+    required_handoff_fields = {
+        "decisions",
+        "files_changed",
+        "outputs_produced",
+        "tests_run",
+        "unresolved_risks",
+        "available_to_dependents",
+    }
+    if isinstance(handoff_summary, dict) and required_handoff_fields.issubset(handoff_summary):
+        verified_checks.append("handoff_summary_recorded")
+    else:
+        missing_checks.append("handoff_summary_recorded")
+
+    if task.validation:
+        verified_checks.append("declared_validation_checks_recorded")
+
+    return {
+        "status": "passed" if not missing_checks else "failed",
+        "checks": task.validation,
+        "verified": verified_checks,
+        "missing": missing_checks,
+    }
+
+
 def finalize_subtask_story_state(
     state: dict[str, Any],
     ordered_tasks: list[BlueprintSubtask],
@@ -1067,7 +1110,7 @@ def finalize_subtask_story_state(
         state["status"] = "blocked"
         return
     if all(state.get("tasks", {}).get(task.id, {}).get("status") == "completed" for task in ordered_tasks):
-        final_validation = validate_story_requirements(ordered_tasks, blueprint_story)
+        final_validation = validate_story_requirements(ordered_tasks, blueprint_story, state)
         state["final_validation"] = final_validation
         state["status"] = "completed" if final_validation["status"] == "passed" else "blocked"
         state["current_task"] = None
@@ -1079,6 +1122,7 @@ def finalize_subtask_story_state(
 def validate_story_requirements(
     ordered_tasks: list[BlueprintSubtask],
     blueprint_story: dict[str, Any],
+    state: dict[str, Any],
 ) -> dict[str, Any]:
     criteria = blueprint_story.get("acceptance_criteria")
     requirement_ids: list[str] = []
@@ -1089,11 +1133,32 @@ def validate_story_requirements(
                 requirement_ids.append(text.split(":", 1)[0].strip())
     covered = sorted({requirement for task in ordered_tasks for requirement in task.requirement_ids})
     missing = [requirement_id for requirement_id in requirement_ids if requirement_id not in covered]
+    task_states = state.get("tasks", {}) if isinstance(state.get("tasks"), dict) else {}
+    tasks_missing_validation = [
+        task.id
+        for task in ordered_tasks
+        if task_states.get(task.id, {}).get("validation_result", {}).get("status") != "passed"
+    ]
+    tasks_missing_outputs = [
+        task.id for task in ordered_tasks if not task_states.get(task.id, {}).get("outputs")
+    ]
+    tasks_missing_handoffs = []
+    for task in ordered_tasks:
+        handoff_summary = task_states.get(task.id, {}).get("handoff_summary", {})
+        if not isinstance(handoff_summary, dict) or "available_to_dependents" not in handoff_summary:
+            tasks_missing_handoffs.append(task.id)
     return {
-        "status": "passed" if not missing else "failed",
+        "status": (
+            "passed"
+            if not missing and not tasks_missing_validation and not tasks_missing_outputs and not tasks_missing_handoffs
+            else "failed"
+        ),
         "requirements_checked": requirement_ids,
         "requirements_covered": covered,
         "missing_requirements": missing,
+        "tasks_missing_validation": tasks_missing_validation,
+        "tasks_missing_outputs": tasks_missing_outputs,
+        "tasks_missing_handoffs": tasks_missing_handoffs,
     }
 
 

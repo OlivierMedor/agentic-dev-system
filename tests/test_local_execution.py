@@ -762,6 +762,8 @@ def test_subtask_local_execute_runs_dependencies_and_persists_handoffs(tmp_path:
     assert state["completed_tasks"] == ["schema", "tests"]
     assert state["final_validation"]["status"] == "passed"
     assert state["tasks"]["schema"]["handoff_summary"]["decisions"] == ["Added schema."]
+    assert state["tasks"]["schema"]["validation_result"]["status"] == "passed"
+    assert state["tasks"]["tests"]["validation_result"]["status"] == "passed"
     tests_context = (
         story_path
         / "reports"
@@ -771,6 +773,30 @@ def test_subtask_local_execute_runs_dependencies_and_persists_handoffs(tmp_path:
         / "context.md"
     ).read_text(encoding="utf-8")
     assert "Added schema." in tests_context
+
+
+def test_subtask_local_execute_blocks_when_final_requirement_coverage_is_incomplete(tmp_path: Path) -> None:
+    write_runtime_config(tmp_path)
+    story_path = create_subtask_story(tmp_path)
+    blueprint_path = tmp_path / "blueprints" / "blueprint.yaml"
+    blueprint = yaml.safe_load(blueprint_path.read_text(encoding="utf-8"))
+    blueprint["stories"][0]["acceptance_criteria"].append(
+        "AC-003: Each sub-task has a role assignment.",
+    )
+    blueprint_path.write_text(yaml.safe_dump(blueprint, sort_keys=False), encoding="utf-8")
+    client = FakeLocalExecutionHttpClient(
+        [
+            "report: |\n  Schema report\nfiles: []\nhandoff_summary:\n  decisions:\n    - schema done\n",
+            "report: |\n  Tests report\nfiles: []\nhandoff_summary:\n  decisions:\n    - tests done\n",
+        ]
+    )
+
+    result = run_local_execution(tmp_path, SUBTASK_STORY, http_client=client)
+
+    assert result.status == "blocked"
+    state = read_yaml(story_path / "reports" / "local_execution" / "state.yaml")
+    assert state["final_validation"]["status"] == "failed"
+    assert state["final_validation"]["missing_requirements"] == ["AC-003"]
 
 
 def test_subtask_local_execute_resume_skips_completed_tasks(tmp_path: Path) -> None:
