@@ -13,6 +13,8 @@ SCANNED_PATHS = (
     Path("src"),
     Path("tests"),
     Path("blueprints/blueprint.yaml"),
+    Path("docs/cloud_queue_operator_guide.md"),
+    Path("stories/structured-cloud-escalation-and-manual-packet-queue"),
     Path("stories/blueprint-defined-context-safe-subtask-execution"),
 )
 

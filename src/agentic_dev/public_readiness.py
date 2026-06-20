@@ -213,7 +213,7 @@ def format_public_readiness_report(result: PublicReadinessResult) -> str:
             "- `stories/**/cloud_review_packet/*` except `.gitkeep`",
             "- `stories/**/remote_dev_validation/*` except `.gitkeep`",
             "- `.agentic/support_queue/**/*.yaml` and `*.md` runtime files",
-            "- `.agentic/cloud_queue/**/*.yaml`, `*.json`, `*.md`, and `*.zip` runtime files",
+            "- `.agentic/cloud_queue/**` runtime files except `.gitkeep`",
             "- `.agentic/feature_scan/*.md` and `*.yaml` runtime files",
             "- `.agentic/local_model_scorecard/results/**`",
             "- `stories/**/reports/local_agent_drafts/*` except `.gitkeep`",
