@@ -1,4 +1,9 @@
 story_id: story_063
 slug: structured-cloud-escalation-and-manual-packet-queue
-status: pending
-ready_for_review: false
+title: Story 063 - Structured Cloud Escalation and Manual Packet Queue
+status: ready_for_review
+ready_for_review: true
+branch: story/063-structured-cloud-escalation-queue
+phase: implementation
+review_status: not_started
+merge_ready: false

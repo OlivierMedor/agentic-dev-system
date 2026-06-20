@@ -1,0 +1,11 @@
+status: ready_for_review
+ready_for_review: true
+validation:
+  pytest: passed
+  ruff: passed
+  artifact_policy: passed
+  runtime_config: passed
+  public_readiness: passed
+  generate_stories_idempotent: passed
+  unicode_hygiene: passed
+
