@@ -48,6 +48,8 @@ human merge decision
 
 For diagrams of the full system, see `docs/system_map.md`. For the
 beginner-friendly operator flow, see `docs/golden_path.md`.
+For the manual-first cloud escalation queue, see
+`docs/cloud_queue_operator_guide.md`.
 
 ## Quick Demo
 
@@ -111,6 +113,9 @@ docker compose run --rm dev agentic build-context --story STORY_SLUG --all --for
 docker compose run --rm dev agentic codex-task create --story STORY_SLUG --all --force
 docker compose run --rm dev agentic workflow-run --story STORY_SLUG --phase local-finalize --execute
 docker compose run --rm dev agentic workflow-run --story STORY_SLUG --phase cloud-review-prep --execute
+docker compose run --rm dev agentic cloud-queue create --story STORY_SLUG --title "Explain the blocker"
+docker compose run --rm dev agentic cloud-queue export --all-ready
+docker compose run --rm dev agentic cloud-queue import --file OUTPUT_FILE
 docker compose run --rm dev agentic record-cloud-review --story STORY_SLUG --result-file OUTPUT_FILE
 docker compose run --rm dev agentic merge-readiness --story STORY_SLUG
 docker compose run --rm dev agentic project-status
@@ -165,6 +170,11 @@ command executes dependency-ready, context-safe sub-tasks only after the full
 required prompt fits the task's usable local-model input budget. Oversized
 sub-tasks are blocked for cloud redecomposition instead of being trimmed or
 split locally. Cloud review and local repair loops are deferred to Story 062.
+
+`agentic cloud-queue` is the manual-first path for local blockers. It packages
+requests, exports batches, imports manual responses, classifies them
+independently, and records checksum-locked approvals without paid API calls or
+automatic application of imported content.
 
 `agentic demo-subtasks` is the Story 062 operator proof for that same sub-task pipeline. It creates a disposable Python sandbox, seeds a blueprint-defined calculator fixture, and then runs the shared Story 061 parser, dependency graph, readiness checks, context assembly, context-fit gate, writable-path enforcement, handoff persistence, resume state, and final requirement validation. `--mode fake` is deterministic and CI-safe. `--mode local` uses only the configured local OpenAI-compatible runtime and never falls back to cloud or Codex execution. Supported scenarios are `success`, `oversized`, `resume`, and `dependency-failure`. By default the sandbox is deleted automatically. Use `--keep-workspace` only when you need to inspect the preserved sandbox path.
 
