@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import shutil
 import subprocess
@@ -671,9 +672,13 @@ def extract_task_id(prompt: str) -> str:
 
 
 def run_demo_validation(sandbox_root: Path) -> DemoValidationResult:
+    env = os.environ.copy()
+    # Nested validation should not inherit unrelated pytest plugins from the outer test process.
+    env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
     pytest_result = subprocess.run(
-        ["python", "-m", "pytest", "-q"],
+        ["python", "-m", "pytest", "-q", "--capture=no"],
         cwd=sandbox_root,
+        env=env,
         capture_output=True,
         text=True,
         encoding="utf-8",
