@@ -48,6 +48,12 @@ stories/**/reports/local_execution/*
 !.agentic/support_queue/**/.gitkeep
 .agentic/cloud_queue/**
 !.agentic/cloud_queue/**/.gitkeep
+.agentic/cloud_applications/**
+!.agentic/cloud_applications/**/.gitkeep
+.agentic/runtime_plans/**
+!.agentic/runtime_plans/**/.gitkeep
+.agentic/execution_leases/**
+!.agentic/execution_leases/**/.gitkeep
 tmp/
 .agentic/feature_scan/*.md
 .agentic/feature_scan/*.yaml

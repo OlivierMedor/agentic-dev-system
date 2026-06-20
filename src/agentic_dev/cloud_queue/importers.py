@@ -14,6 +14,7 @@ from agentic_dev.cloud_queue.classification import (
     VALIDATED_SAFE,
     classify_response,
 )
+from agentic_dev.cloud_queue.imports import save_imported_response
 from agentic_dev.cloud_queue.models import (
     CloudQueueAuditEvent,
     CloudQueueImportResult,
@@ -162,6 +163,7 @@ def import_single_response(
     normalized_checksum = checksum_text(json.dumps(response.normalized_response, sort_keys=True))
     approval_binding = approval_checksum(response.normalized_response)
     packet_checksum = response.checksum or checksum_text(raw_text)
+    save_imported_response(project_path, response)
 
     imported_request = CloudQueueRequest.from_dict(
         {

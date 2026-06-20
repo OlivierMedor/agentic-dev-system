@@ -33,7 +33,6 @@ DEMO_SCENARIOS = {
 }
 SAFE_TEMP_ROOTS = {
     Path(tempfile.gettempdir()).resolve(),
-    Path("C:/tmp").resolve(),
 }
 TASK_SEQUENCE = [
     "calculator-module",
@@ -280,6 +279,8 @@ def failed_demo_result(sandbox_root: Path) -> LocalExecutionResult:
 
 def create_demo_sandbox(workspace_root: Path | None) -> Path:
     root = validate_workspace_root(workspace_root) if workspace_root is not None else None
+    if root is not None:
+        Path(root).mkdir(parents=True, exist_ok=True)
     sandbox = Path(tempfile.mkdtemp(prefix="agentic-demo-subtasks-", dir=root))
     return sandbox.resolve()
 
@@ -289,7 +290,6 @@ def validate_workspace_root(workspace_root: Path) -> str:
     if not any(is_relative_to(resolved, safe_root) for safe_root in SAFE_TEMP_ROOTS):
         roots = ", ".join(str(root) for root in sorted(SAFE_TEMP_ROOTS))
         raise ValueError(f"Workspace root must stay inside a safe temp root: {roots}")
-    resolved.mkdir(parents=True, exist_ok=True)
     return str(resolved)
 
 
