@@ -133,3 +133,9 @@ local_execution:
     documentation: qwen/qwen3-coder-30b
     security_quality: gemma
     local_reviewer: gemma
+
+cloud_escalation:
+  enabled: true
+  default_mode: manual
+  automated_provider_enabled: false
+  provider: none

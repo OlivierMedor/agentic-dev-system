@@ -17,6 +17,9 @@ def test_allowed_project_paths_do_not_violate_artifact_policy() -> None:
         "stories/story_011_artifact_policy_guard/cloud_review_packet/.gitkeep",
         "stories/story_011_artifact_policy_guard/remote_dev_validation/.gitkeep",
         ".agentic/support_queue/pending/.gitkeep",
+        ".agentic/cloud_queue/requests/.gitkeep",
+        ".agentic/cloud_queue/exports/.gitkeep",
+        ".agentic/cloud_queue/audit/.gitkeep",
         ".agentic/feature_scan/.gitkeep",
         ".agentic/local_model_scorecard/prompts/developer_agent_prompt.md",
         ".agentic/local_model_scorecard/scorecard_template.yaml",
@@ -83,6 +86,24 @@ def test_support_queue_runtime_files_are_blocked_except_gitkeep() -> None:
     ]
 
     assert violation_paths([*blocked_paths, ".agentic/support_queue/pending/.gitkeep"]) == blocked_paths
+
+
+def test_cloud_queue_runtime_files_are_blocked_except_gitkeep() -> None:
+    blocked_paths = [
+        ".agentic/cloud_queue/requests/cloud-req-0001.yaml",
+        ".agentic/cloud_queue/exports/cloud-batch-0001/manifest.yaml",
+        ".agentic/cloud_queue/audit/cloud-event-000001.yaml",
+        ".agentic/cloud_queue/exports/cloud-batch-0001/cloud_queue_packet.zip",
+    ]
+
+    assert violation_paths(
+        [
+            *blocked_paths,
+            ".agentic/cloud_queue/requests/.gitkeep",
+            ".agentic/cloud_queue/exports/.gitkeep",
+            ".agentic/cloud_queue/audit/.gitkeep",
+        ],
+    ) == blocked_paths
 
 
 def test_feature_scan_runtime_files_are_blocked_except_gitkeep() -> None:

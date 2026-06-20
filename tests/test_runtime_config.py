@@ -168,6 +168,12 @@ def test_default_runtime_config_uses_codex_first_tiered_defaults(tmp_path: Path)
             "local_reviewer": "gemma",
         },
     }
+    assert result.config["cloud_escalation"] == {
+        "enabled": True,
+        "default_mode": "manual",
+        "automated_provider_enabled": False,
+        "provider": "none",
+    }
 
 
 def test_checked_in_runtime_config_keeps_codex_runtime_disabled_by_default() -> None:
@@ -178,6 +184,10 @@ def test_checked_in_runtime_config_keeps_codex_runtime_disabled_by_default() -> 
     assert config["codex_runtime"]["args"] == ["exec", "--sandbox", "workspace-write", "-"]
     assert config["codex_runtime"]["stdin_from_task_file"] is True
     assert config["codex_runtime"]["docker_isolation_acknowledged"] is False
+    assert config["cloud_escalation"]["enabled"] is True
+    assert config["cloud_escalation"]["default_mode"] == "manual"
+    assert config["cloud_escalation"]["automated_provider_enabled"] is False
+    assert config["cloud_escalation"]["provider"] == "none"
 
 
 def test_validate_runtime_config_fails_for_missing_required_agent(tmp_path: Path) -> None:

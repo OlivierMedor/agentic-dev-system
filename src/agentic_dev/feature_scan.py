@@ -341,12 +341,12 @@ def read_docs_context(project_path: Path, missing_optional_files: list[str]) -> 
     if not doc_files:
         return "No docs files were found.", "No docs content was included."
 
-    docs_list = "\n".join(f"- {path.relative_to(project_path)}" for path in doc_files)
+    docs_list = "\n".join(f"- {path.relative_to(project_path).as_posix()}" for path in doc_files)
     content_sections: list[str] = []
     for path in doc_files:
         if path.suffix.lower() not in TEXT_DOCUMENT_SUFFIXES:
             continue
-        relative_path = path.relative_to(project_path)
+        relative_path = path.relative_to(project_path).as_posix()
         content_sections.extend(
             [
                 f"### {relative_path}",

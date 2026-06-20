@@ -46,6 +46,9 @@ def init_project(project_path: Path) -> list[Path]:
         project_path / ".agentic" / "support_queue" / "answered",
         project_path / ".agentic" / "support_queue" / "escalated_to_human",
         project_path / ".agentic" / "support_queue" / "closed",
+        project_path / ".agentic" / "cloud_queue" / "requests",
+        project_path / ".agentic" / "cloud_queue" / "exports",
+        project_path / ".agentic" / "cloud_queue" / "audit",
         project_path / "blueprints",
         project_path / "stories",
         project_path / "stories" / "story_001_project_setup",
@@ -155,6 +158,9 @@ which approval mode is expected, and which commands require human approval.
         project_path / ".agentic" / "support_queue" / "answered" / ".gitkeep": "",
         project_path / ".agentic" / "support_queue" / "escalated_to_human" / ".gitkeep": "",
         project_path / ".agentic" / "support_queue" / "closed" / ".gitkeep": "",
+        project_path / ".agentic" / "cloud_queue" / "requests" / ".gitkeep": "",
+        project_path / ".agentic" / "cloud_queue" / "exports" / ".gitkeep": "",
+        project_path / ".agentic" / "cloud_queue" / "audit" / ".gitkeep": "",
     }
 
     for file_path, content in files.items():

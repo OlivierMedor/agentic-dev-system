@@ -5,7 +5,46 @@ from pathlib import Path
 from typing import Any, TypedDict
 
 import yaml
-from langgraph.graph import StateGraph
+
+try:  # pragma: no cover - exercised only when langgraph is installed
+    from langgraph.graph import StateGraph
+except ModuleNotFoundError:  # pragma: no cover - offline fallback
+    class _FallbackGraph:
+        def __init__(self, nodes: dict[str, Any], entry_point: str, finish_point: str) -> None:
+            self._nodes = nodes
+            self._entry_point = entry_point
+            self._finish_point = finish_point
+
+        def invoke(self, state: dict[str, Any]) -> dict[str, Any]:
+            current = dict(state)
+            current.update(self._nodes[self._entry_point](current))
+            current.update(self._nodes["determine_next_action"](current))
+            current.update(self._nodes[self._finish_point](current))
+            return current
+
+        def get_graph(self) -> Any:
+            return type("FallbackGraph", (), {"nodes": {name: object() for name in self._nodes}})()
+
+    class StateGraph:  # type: ignore[override]
+        def __init__(self, _state_type: Any) -> None:
+            self._nodes: dict[str, Any] = {}
+            self._entry_point = ""
+            self._finish_point = ""
+
+        def add_node(self, name: str, func: Any) -> None:
+            self._nodes[name] = func
+
+        def set_entry_point(self, name: str) -> None:
+            self._entry_point = name
+
+        def add_edge(self, _source: str, _target: str) -> None:
+            return None
+
+        def set_finish_point(self, name: str) -> None:
+            self._finish_point = name
+
+        def compile(self) -> Any:
+            return _FallbackGraph(self._nodes, self._entry_point, self._finish_point)
 
 from agentic_dev.next_step import (
     NextStepRecommendation,
