@@ -1,0 +1,31 @@
+test_layers_version: 1
+unit_tests:
+  required: true
+  action: add_or_update
+  frequency: every_commit
+  evidence_or_reason: Cover application schemas, revision schemas, lease schemas,
+    state-machine transitions, checksum binding, and configuration defaults for explicit
+    apply and resume.
+integration_tests:
+  required: true
+  action: add_or_update
+  frequency: every_pull_request
+  evidence_or_reason: Cover eligibility, dry run, transactional apply, resume, rollback,
+    stale revision rejection, and Story 061 through Story 063 regressions.
+mock_e2e_tests:
+  required: true
+  action: add_or_update
+  frequency: before_merge
+  evidence_or_reason: Use deterministic offline fixtures to prove application planning,
+    revision publication, resume eligibility, and rollback without cloud calls.
+live_read_only_checks:
+  required: false
+  action: not_applicable_with_reason
+  frequency: manual_only
+  evidence_or_reason: Story 064 is local-only, offline-first, and does not require
+    live cloud credentials or provider network access.
+remote_dev_smoke_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: after_remote_dev_deploy
+  evidence_or_reason: Story 064 does not add remote deployment behavior.

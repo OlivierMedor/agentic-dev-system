@@ -6358,3 +6358,738 @@ stories:
         - model_output_executed
         - secret_exposure
         - cloud_model_call
+
+  - id: STORY-064
+    story_id: story_064
+    slug: safe-cloud-response-application-and-local-resume
+    title: Story 064 - Safe Cloud Response Application and Local Execution Resume
+    goal: Allow a validated or explicitly approved cloud response from Story 063 to be applied safely to the runtime execution plan and unblock local execution.
+    why: Story 063 safely imports and classifies cloud responses, but the repository still needs a transactional, revision-bound application layer that can convert an eligible response into an immutable runtime-plan update without rewriting the canonical blueprint.
+    agents:
+      developer:
+        writable_paths:
+          - src/**
+          - tests/**
+          - docs/**
+          - stories/story_064/reports/**
+      test:
+        writable_paths:
+          - tests/**
+          - stories/story_064/reports/**
+      documentation:
+        writable_paths:
+          - README.md
+          - docs/**
+          - stories/story_064/reports/**
+      security_quality:
+        writable_paths:
+          - stories/story_064/reports/**
+      local_reviewer:
+        writable_paths:
+          - stories/story_064/reports/**
+    execution_order:
+      - developer
+      - test
+      - documentation
+      - security_quality
+      - local_reviewer
+    local_execution_constraints:
+      decomposition_authority: cloud_planner
+      required_context_must_fit: true
+      allow_required_context_trimming: false
+      oversized_task_policy: reject_for_cloud_redecomposition
+      local_agent_may_redecompose: false
+      require_independent_token_estimate: true
+      require_final_story_validation: true
+      auto_apply_validated_safe: false
+      auto_resume_after_apply: false
+      require_dry_run_before_apply: true
+      preserve_canonical_blueprint: true
+      require_atomic_application: true
+      require_revision_bound_leases: true
+      allow_paid_provider_calls: false
+      allow_network_access: false
+      allow_automatic_git_revert: false
+      allow_automatic_merge: false
+      maximum_task_size_contract: The complete required prompt for a Story 064 application task, including request and response checksums, approval binding, runtime revision checks, graph diffing, resume logic, rollback constraints, writable-path rules, and audit requirements, must fit within the assigned model's usable input-token budget. Oversized tasks must be returned to the cloud planner for finer decomposition before any local application or resume attempt.
+      forbidden_fallbacks:
+        - cloud_model_implementation
+        - paid_provider_call
+        - hidden_implementation_fallback
+      required_failure_states:
+        application_validation_failed: The proposed application plan failed validation.
+        stale_application_plan: The source runtime revision changed after planning.
+        duplicate_application: The response or application was already applied.
+        approval_missing: The response required approval but none was present.
+        approval_checksum_mismatch: The approval checksum did not match the normalized response.
+        request_checksum_mismatch: The request checksum no longer matched the active runtime plan.
+        response_checksum_mismatch: The normalized response checksum no longer matched the imported response.
+        dependency_cycle: The proposed task graph contains a cycle.
+        dependency_missing: The proposed task graph references a missing dependency.
+        writable_path_violation: The application expands writable paths or touches a forbidden path.
+        transaction_failed: The runtime revision could not be written or activated atomically.
+        resume_blocked: Local execution cannot resume from the active runtime revision.
+        rollback_failed: The prior runtime revision could not be restored safely.
+        recovery_required: The plan or active pointer is incomplete or corrupt and needs operator recovery.
+    subtasks:
+      - id: define-application-models
+        title: Define application and runtime revision models
+        role: developer
+        depends_on: []
+        requirement_ids:
+          - AC-001
+          - AC-002
+          - AC-008
+          - AC-023
+          - AC-024
+          - AC-024
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_064/reports/**
+        expected_outputs:
+          - Versioned application records, application plans, runtime revisions, active pointers, and execution leases.
+        validation:
+          - Schema tests prove the records are versioned, serializable, and checksum-aware.
+      - id: define-application-state-machine
+        title: Define application state machine
+        role: developer
+        depends_on:
+          - define-application-models
+        requirement_ids:
+          - AC-001
+          - AC-002
+          - AC-27
+          - AC-28
+          - AC-29
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_064/reports/**
+        expected_outputs:
+          - Deterministic application lifecycle transitions and invalid-transition rejection.
+        validation:
+          - State-machine tests cover planned, applying, applied, resume, rollback, cancelled, and failed flows.
+      - id: add-immutable-runtime-persistence
+        title: Add immutable runtime-plan persistence
+        role: developer
+        depends_on:
+          - define-application-models
+          - define-application-state-machine
+        requirement_ids:
+          - AC-08
+          - AC-009
+          - AC-23
+          - AC-024
+          - AC-25
+          - AC-26
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_064/reports/**
+        expected_outputs:
+          - Atomic persistence for application plans, runtime revisions, and active revision pointers.
+        validation:
+          - Failure-injection tests prove the prior revision remains intact on write or activation failure.
+      - id: validate-application-eligibility
+        title: Add response eligibility validation
+        role: developer
+        depends_on:
+          - add-immutable-runtime-persistence
+        requirement_ids:
+          - AC-001
+          - AC-002
+          - AC-003
+          - AC-004
+          - AC-005
+          - AC-006
+          - AC-007
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_064/reports/**
+        expected_outputs:
+          - Eligibility checks for validated_safe and approval_required responses with checksum binding.
+        validation:
+          - Tests reject stale, duplicate, invalid, or approval-missing responses.
+      - id: build-application-planner
+        title: Build application planner
+        role: developer
+        depends_on:
+          - validate-application-eligibility
+        requirement_ids:
+          - AC-08
+          - AC-10
+          - AC-11
+          - AC-12
+          - AC-13
+          - AC-14
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_064/reports/**
+        expected_outputs:
+          - Immutable application plans that include graph diffs, rollback metadata, resume points, and validation steps.
+        validation:
+          - Dry-run tests prove the plan is inspectable and deterministic without mutating runtime state.
+      - id: validate-requirement-preservation
+        title: Add requirement-preservation validation
+        role: developer
+        depends_on:
+          - build-application-planner
+        requirement_ids:
+          - AC-15
+          - AC-16
+          - AC-17
+          - AC-18
+          - AC-19
+          - AC-20
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_064/reports/**
+        expected_outputs:
+          - Requirement mapping checks that detect drift, missing coverage, and immutable requirement removal.
+        validation:
+          - Tests prove requirement coverage is revalidated at application time.
+      - id: validate-writable-path-scope
+        title: Add writable-path and scope validation
+        role: security_quality
+        depends_on:
+          - build-application-planner
+        requirement_ids:
+          - AC-20
+          - AC-21
+          - AC-52
+          - AC-53
+        writable_paths:
+          - stories/story_064/reports/**
+        expected_outputs:
+          - Writable-path enforcement that rejects expanded scopes, traversal, absolute paths, and sensitive files.
+        validation:
+          - Tests prove approved writable paths are exact and no broader than the response approval.
+      - id: transform-task-graph
+        title: Add task-graph transformation
+        role: developer
+        depends_on:
+          - build-application-planner
+          - validate-requirement-preservation
+          - validate-writable-path-scope
+        requirement_ids:
+          - AC-13
+          - AC-14
+          - AC-15
+          - AC-16
+          - AC-17
+          - AC-18
+          - AC-19
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_064/reports/**
+        expected_outputs:
+          - Runtime task replacement logic that preserves source history and recalculates downstream readiness.
+        validation:
+          - Tests prove the source task is superseded, not deleted, and that dependency cycles are rejected.
+      - id: validate-runtime-revision
+        title: Add runtime revision validation
+        role: developer
+        depends_on:
+          - transform-task-graph
+          - add-immutable-runtime-persistence
+        requirement_ids:
+          - AC-023
+          - AC-024
+          - AC-25
+          - AC-26
+          - AC-27
+          - AC-28
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_064/reports/**
+        expected_outputs:
+          - Immutable revision validation, checksum verification, and active-pointer guards.
+        validation:
+          - Tests verify every revision has a parent and stale revisions are rejected.
+      - id: apply-transactionally
+        title: Add transactional application
+        role: developer
+        depends_on:
+          - validate-runtime-revision
+        requirement_ids:
+          - AC-26
+          - AC-27
+          - AC-28
+          - AC-29
+          - AC-30
+          - AC-31
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_064/reports/**
+        expected_outputs:
+          - Atomic application flow that publishes a new revision, updates the active pointer, and preserves the prior revision.
+        validation:
+          - Failure-injection tests leave the prior runtime revision active.
+      - id: add-dry-run-support
+        title: Add dry-run support
+        role: developer
+        depends_on:
+          - build-application-planner
+          - apply-transactionally
+        requirement_ids:
+          - AC-10
+          - AC-11
+          - AC-12
+          - AC-13
+          - AC-14
+          - AC-15
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_064/reports/**
+        expected_outputs:
+          - Deterministic dry-run output with no persistent runtime-plan mutation and no execution call.
+        validation:
+          - Tests prove the dry run audits eligibility, diffing, budgets, paths, dependencies, and rollback artifacts.
+      - id: add-execution-leases
+        title: Add revision-bound execution leases
+        role: developer
+        depends_on:
+          - add-immutable-runtime-persistence
+          - apply-transactionally
+        requirement_ids:
+          - AC-37
+          - AC-38
+          - AC-43
+          - AC-44
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_064/reports/**
+        expected_outputs:
+          - Lease records tied to task ID, revision ID, attempt ID, model, and writable scope.
+        validation:
+          - Tests reject stale lease writes after the active revision changes.
+      - id: calculate-resume-eligibility
+        title: Add resume eligibility calculation
+        role: developer
+        depends_on:
+          - transform-task-graph
+          - validate-runtime-revision
+          - add-execution-leases
+        requirement_ids:
+          - AC-31
+          - AC-32
+          - AC-33
+          - AC-34
+          - AC-35
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_064/reports/**
+        expected_outputs:
+          - Resume eligibility data that identifies ready tasks, blocked dependents, and skipped superseded tasks.
+        validation:
+          - Tests prove completed unaffected tasks are preserved and the active revision gates resume.
+      - id: integrate-controlled-resume
+        title: Integrate controlled local execution resume
+        role: developer
+        depends_on:
+          - calculate-resume-eligibility
+          - add-execution-leases
+        requirement_ids:
+          - AC-32
+          - AC-33
+          - AC-34
+          - AC-35
+          - AC-36
+          - AC-37
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_064/reports/**
+        expected_outputs:
+          - Explicit resume flow that uses the existing local execution pipeline without any cloud call.
+        validation:
+          - Tests prove resume starts only from the active revision and rejects old-revision results.
+      - id: add-rollback-support
+        title: Add rollback planning and execution
+        role: developer
+        depends_on:
+          - apply-transactionally
+          - add-execution-leases
+          - integrate-controlled-resume
+        requirement_ids:
+          - AC-43
+          - AC-44
+          - AC-45
+          - AC-46
+          - AC-47
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_064/reports/**
+        expected_outputs:
+          - Rollback restores the previous active runtime revision and preserves all history.
+        validation:
+          - Tests prove rollback does not silently revert Git changes and leaves evidence intact.
+      - id: add-recovery-reconciliation
+        title: Add recovery and reconciliation
+        role: developer
+        depends_on:
+          - add-immutable-runtime-persistence
+          - apply-transactionally
+          - add-rollback-support
+        requirement_ids:
+          - AC-46
+          - AC-47
+          - AC-48
+          - AC-49
+          - AC-50
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_064/reports/**
+        expected_outputs:
+          - Recovery checks that detect incomplete transactions, corrupt pointers, missing parents, and stale plans.
+        validation:
+          - Tests return actionable operator guidance instead of guessing the active revision.
+      - id: add-cli-commands
+        title: Add CLI commands
+        role: developer
+        depends_on:
+          - validate-application-eligibility
+          - build-application-planner
+          - add-dry-run-support
+          - apply-transactionally
+          - integrate-controlled-resume
+          - add-rollback-support
+        requirement_ids:
+          - AC-41
+          - AC-42
+          - AC-43
+          - AC-44
+          - AC-45
+          - AC-46
+          - AC-47
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_064/reports/**
+        expected_outputs:
+          - Repository-consistent `agentic cloud-queue` application, dry-run, resume, rollback, status, and show commands.
+        validation:
+          - CLI tests cover `plan-apply`, `apply`, `apply --dry-run`, `resume`, `rollback`, `application-status`, and `application-show`.
+      - id: add-audit-and-monitoring
+        title: Add audit and monitoring
+        role: security_quality
+        depends_on:
+          - define-application-models
+          - define-application-state-machine
+          - add-cli-commands
+        requirement_ids:
+          - AC-48
+          - AC-49
+          - AC-50
+          - AC-51
+          - AC-52
+          - AC-53
+        writable_paths:
+          - stories/story_064/reports/**
+        expected_outputs:
+          - Audited application, resume, lease, and rollback events with checksum and state-transition coverage.
+        validation:
+          - Audit checks prove no secrets leak and all transitions are recorded.
+      - id: add-end-to-end-scenarios
+        title: Add deterministic end-to-end demonstrations
+        role: test
+        depends_on:
+          - add-dry-run-support
+          - apply-transactionally
+          - integrate-controlled-resume
+          - add-rollback-support
+        requirement_ids:
+          - AC-001
+          - AC-002
+          - AC-003
+          - AC-004
+          - AC-005
+          - AC-006
+          - AC-007
+          - AC-10
+          - AC-11
+          - AC-12
+          - AC-26
+          - AC-27
+          - AC-31
+          - AC-32
+          - AC-33
+          - AC-34
+          - AC-35
+          - AC-37
+          - AC-43
+          - AC-44
+        writable_paths:
+          - tests/**
+          - stories/story_064/reports/**
+        expected_outputs:
+          - Offline scenarios for safe application, approved application, stale plan rejection, transaction failure, stale worker rejection, and rollback.
+        validation:
+          - Tests prove the Story 064 flow is deterministic and revision-bound.
+      - id: document-operator-guide
+        title: Documentation and operator guide
+        role: documentation
+        depends_on:
+          - add-cli-commands
+          - add-rollback-support
+        requirement_ids:
+          - AC-41
+          - AC-42
+          - AC-43
+          - AC-44
+          - AC-45
+          - AC-46
+          - AC-47
+          - AC-48
+        writable_paths:
+          - README.md
+          - docs/**
+          - stories/story_064/reports/**
+        expected_outputs:
+          - Operator guidance for eligibility, dry run, apply, resume, rollback, recovery, and canonical blueprint protection.
+        validation:
+          - Docs tests confirm the command map and workflow guidance remain aligned.
+      - id: final-security-review
+        title: Security review
+        role: security_quality
+        depends_on:
+          - validate-writable-path-scope
+          - add-audit-and-monitoring
+          - add-rollback-support
+        requirement_ids:
+          - AC-20
+          - AC-21
+          - AC-22
+          - AC-23
+          - AC-24
+          - AC-25
+          - AC-48
+          - AC-49
+          - AC-50
+        writable_paths:
+          - stories/story_064/reports/**
+        expected_outputs:
+          - Review evidence covering stale-plan protection, path protection, auditability, and rollback limits.
+        validation:
+          - Review checks confirm no paid provider access or hidden fallback paths.
+      - id: final-local-review
+        title: Final local review
+        role: local_reviewer
+        depends_on:
+          - define-application-models
+          - define-application-state-machine
+          - add-cli-commands
+          - add-audit-and-monitoring
+          - final-security-review
+        requirement_ids:
+          - AC-001
+          - AC-002
+          - AC-008
+          - AC-10
+          - AC-11
+          - AC-12
+          - AC-13
+          - AC-14
+          - AC-027
+          - AC-031
+          - AC-032
+          - AC-033
+          - AC-034
+          - AC-035
+          - AC-036
+          - AC-037
+          - AC-038
+          - AC-43
+          - AC-44
+          - AC-45
+          - AC-46
+          - AC-47
+          - AC-48
+          - AC-49
+          - AC-50
+          - AC-51
+          - AC-52
+          - AC-53
+          - AC-54
+          - AC-55
+          - AC-56
+          - AC-57
+          - AC-58
+          - AC-59
+          - AC-60
+        writable_paths:
+          - stories/story_064/reports/**
+        expected_outputs:
+          - Final review evidence that Story 064 preserves Stories 061 through 063 and remains offline-safe.
+        validation:
+          - Review checks confirm acceptance-criteria coverage and no implementation drift.
+    acceptance_criteria:
+      - Only eligible responses can produce application plans.
+      - validated_safe responses may be planned without approval.
+      - approval_required responses need valid approval.
+      - Approval checksum must match.
+      - Request checksum must match.
+      - Stale responses cannot be applied.
+      - Already-applied responses cannot be applied twice.
+      - Application plans are versioned.
+      - Application plans are immutable.
+      - Dry run performs complete validation.
+      - Dry run makes no runtime-plan changes.
+      - Canonical blueprint is never modified.
+      - Source tasks are superseded, not deleted.
+      - Source-task history is preserved.
+      - Child tasks preserve requirement coverage.
+      - Child tasks fit local context limits.
+      - Child tasks have valid dependencies.
+      - Dependency cycles are rejected.
+      - Missing dependencies are rejected.
+      - Unsafe writable-path changes are rejected.
+      - Approved writable-path changes must match approval.
+      - Architecture overlays are versioned.
+      - Runtime revisions are immutable.
+      - Every revision has a parent.
+      - Revision checksums are verified.
+      - Active revision changes atomically.
+      - Failed application leaves prior revision active.
+      - Partial revisions are not activated.
+      - Application is idempotent.
+      - Concurrent stale applications are rejected.
+      - Resume eligibility is calculated after application.
+      - Resume preserves unaffected completed tasks.
+      - Resume skips superseded tasks.
+      - Resume uses only the active revision.
+      - Resume uses the existing local execution pipeline.
+      - Resume performs no cloud call.
+      - Old-revision task results are rejected.
+      - Execution leases are revision-bound.
+      - Automatic resume is disabled by default.
+      - Automatic apply is disabled by default.
+      - Explicit apply works.
+      - Explicit resume works.
+      - Rollback restores the prior active revision.
+      - Rollback preserves history.
+      - Rollback does not silently revert Git changes.
+      - Incomplete transactions are detected.
+      - Corrupt active pointers are reported safely.
+      - Every application action is audited.
+      - Audit logs contain checksums and state transitions.
+      - Audit logs contain no secrets.
+      - Runtime application artifacts are not committed.
+      - Artifact policy detects tracked runtime artifacts.
+      - Public readiness excludes runtime artifacts.
+      - Windows and Linux behavior are equivalent.
+      - Story 061 behavior remains intact.
+      - Story 062 behavior remains intact.
+      - Story 063 behavior remains intact.
+      - Generation remains idempotent.
+      - CI is deterministic and offline.
+      - No paid provider integration is introduced.
+    implementation_scope:
+      - Eligibility checks for validated_safe and approval_required responses
+      - Immutable application plans with graph diffs and rollback metadata
+      - Runtime-plan revision persistence and active pointer management
+      - Transactional application and stale-plan rejection
+      - Task replacement, dependency recalculation, and resume eligibility
+      - Revision-bound execution leases and stale lease rejection
+      - Explicit rollback, recovery, and audit trails
+      - agentic cloud-queue plan-apply, apply, apply --dry-run, resume, rollback, application-status, and application-show
+      - Canonical blueprint protection and runtime overlay storage
+      - Offline deterministic tests with no paid provider calls
+    definition_of_done:
+      - The blueprint defines the safe application, resume, rollback, recovery, and audit flow.
+      - Acceptance criteria cover eligibility, planning, dry run, transactional application, resume, rollback, and regression safety.
+      - The generated Story 064 workspace is created by agentic generate-stories and generation is idempotent across two runs.
+      - docker compose run --rm dev pytest passes.
+      - docker compose run --rm dev ruff check . passes.
+      - artifact-policy validation passes.
+      - runtime-config validation passes.
+      - hidden-Unicode hygiene validation passes.
+      - Public-readiness validation passes when applicable to the repository state.
+      - No paid cloud API calls are implemented.
+      - No provider network access is added.
+      - Manual application and manual resume remain explicit.
+    not_in_scope:
+      - Paid cloud API integrations.
+      - Automatic provider selection at runtime.
+      - Silent canonical blueprint rewrites.
+      - Automatic merging, deployment, publishing, or live execution.
+      - Automatic application or resume by default.
+      - Automatic Git reverts after local execution changes.
+      - Secret-bearing runtime artifacts or hidden fallback paths.
+    test_plan:
+      test_layers_version: 1
+      unit_tests:
+        required: true
+        action: add_or_update
+        frequency: every_commit
+        evidence_or_reason: Cover application schemas, revision schemas, lease schemas, state-machine transitions, checksum binding, and configuration defaults for explicit apply and resume.
+      integration_tests:
+        required: true
+        action: add_or_update
+        frequency: every_pull_request
+        evidence_or_reason: Cover eligibility, dry run, transactional apply, resume, rollback, stale revision rejection, and Story 061 through Story 063 regressions.
+      mock_e2e_tests:
+        required: true
+        action: add_or_update
+        frequency: before_merge
+        evidence_or_reason: Use deterministic offline fixtures to prove application planning, revision publication, resume eligibility, and rollback without cloud calls.
+      live_read_only_checks:
+        required: false
+        action: not_applicable_with_reason
+        frequency: manual_only
+        evidence_or_reason: Story 064 is local-only, offline-first, and does not require live cloud credentials or provider network access.
+      remote_dev_smoke_tests:
+        required: false
+        action: not_applicable_with_reason
+        frequency: after_remote_dev_deploy
+        evidence_or_reason: Story 064 does not add remote deployment behavior.
+    monitoring_plan:
+      logs_required:
+        - application_plan_id
+        - application_id
+        - request_id
+        - response_checksum
+        - request_checksum
+        - approval_checksum
+        - source_revision_id
+        - proposed_revision_id
+        - active_revision_id
+        - application_state
+        - resume_state
+        - lease_state
+        - rollback_state
+        - audit_event
+      watch_for:
+        - canonical_blueprint_modified
+        - stale_application_plan
+        - duplicate_application
+        - approval_checksum_mismatch
+        - request_checksum_mismatch
+        - response_checksum_mismatch
+        - dependency_cycle
+        - dependency_missing
+        - writable_path_violation
+        - transaction_failed
+        - resume_blocked
+        - rollback_failed
+        - recovery_required
+        - old_revision_write_attempt
+        - paid_provider_call_attempt
+        - network_access_attempt
+        - automatic_apply_attempt
+        - automatic_resume_attempt
+        - Story_061_regression
+        - Story_062_regression
+        - Story_063_regression
