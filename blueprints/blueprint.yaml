@@ -5239,6 +5239,1036 @@ stories:
         - Story_060_regression
         - Story_061_regression
 
+  - id: STORY-063
+    story_id: story_063
+    slug: structured-cloud-escalation-and-manual-packet-queue
+    title: Story 063 - Structured Cloud Escalation and Manual Packet Queue
+    goal: Define a provider-neutral, manual-first cloud escalation queue that packages local blockers into self-contained request packets, accepts untrusted cloud responses, validates them independently, classifies safe decompositions, and records approval decisions without invoking paid cloud APIs.
+    why: Story 061 made context-safe local execution explicit, and Story 062 proved the end-to-end local demo path plus post-merge verification. Story 063 adds the missing cloud escalation boundary so a blocked local task can be packaged, exported, manually reviewed in any compatible cloud model, re-imported safely, and classified for either approval or later automatic application while remaining provider-neutral and offline-friendly.
+    acceptance_criteria:
+      - A local execution blocker can create a queue item.
+      - Queue items have stable unique IDs.
+      - Request schema is versioned.
+      - Queue state transitions are validated.
+      - Unsupported transitions are rejected.
+      - Request packets are self-contained.
+      - Request packets include relevant requirements.
+      - Request packets include blocker evidence.
+      - Request packets include exact response schema.
+      - Secrets are redacted.
+      - ".env contents are excluded."
+      - Export packet size is bounded.
+      - Single-request export works.
+      - Batch export works.
+      - Only ready independent requests are batched.
+      - Dependent requests are not exported prematurely.
+      - Batch ordering is deterministic.
+      - Export checksums are persisted.
+      - YAML response import works.
+      - ZIP response-bundle import works.
+      - ZIP-slip attacks are rejected.
+      - Unknown request IDs are rejected.
+      - Duplicate response IDs are rejected.
+      - Invalid schema versions are rejected.
+      - Malformed YAML is rejected safely.
+      - Raw imported responses are preserved safely.
+      - Normalized responses are persisted.
+      - Requirements are independently compared.
+      - Writable paths are independently compared.
+      - External-service additions are detected.
+      - Safe decompositions are classified as safe candidates.
+      - Scope-changing responses require approval.
+      - Invalid responses do not corrupt valid responses in the same batch.
+      - No imported response executes code.
+      - Audit logs contain state transitions and checksums.
+      - Logs do not expose secrets.
+      - Manual packet mode works without network access.
+      - CI uses deterministic fixtures.
+      - Future provider adapters can use the same canonical schemas.
+      - OpenAI and Gemini can be added later without changing queue records.
+      - Story 061 context-safe task rules remain enforced.
+      - Story 062 demo and post-merge verification remain backward compatible.
+      - No cloud or Codex fallback is introduced.
+      - No automatic API charges can occur in Story 063.
+      - Operator documentation explains export, upload, response download, and import.
+      - Error messages are actionable.
+      - Queue artifacts follow artifact policy.
+      - Generation remains idempotent.
+    implementation_scope:
+      - Structured cloud escalation queue records
+      - Canonical versioned request and response schemas
+      - Request states, deterministic transitions, and audit history
+      - Manual packet export and import workflows
+      - Single-request and ready-batch packet generation
+      - Safe archive extraction and path traversal rejection
+      - Secret redaction, file allowlists, and packet limits
+      - Requirement, writable-path, architecture, and external-service comparison
+      - Safe-candidate versus approval-required versus invalid classification
+      - Manual approval and rejection commands
+      - Provider-neutral adapter interfaces with a manual packet adapter
+      - Future compatibility for OpenAI, Gemini, Anthropic, Bedrock, and OpenAI-compatible providers
+      - Offline deterministic fixtures and no paid API calls
+      - Backward compatibility for Stories 060, 061, and 062
+    agents:
+      developer:
+        writable_paths:
+          - src/**
+          - tests/**
+          - docs/**
+          - stories/story_063/reports/**
+      test:
+        writable_paths:
+          - tests/**
+          - stories/story_063/reports/**
+      documentation:
+        writable_paths:
+          - README.md
+          - docs/**
+          - stories/story_063/reports/**
+      security_quality:
+        writable_paths:
+          - stories/story_063/reports/**
+      local_reviewer:
+        writable_paths:
+          - stories/story_063/reports/**
+    execution_order:
+      - developer
+      - test
+      - documentation
+      - security_quality
+      - local_reviewer
+    local_execution_constraints:
+      decomposition_authority: cloud_planner
+      required_context_must_fit: true
+      allow_required_context_trimming: false
+      oversized_task_policy: reject_for_cloud_redecomposition
+      local_agent_may_redecompose: false
+      require_independent_token_estimate: true
+      require_final_story_validation: true
+      maximum_task_size_contract: The complete required prompt for a Story 063 cloud escalation task, including system instructions, canonical request schema, manual export and import rules, untrusted-response validation, approval boundaries, dependency handoffs, writable-path rules, output contract, and audit requirements, must fit within the assigned model's usable input-token budget. Oversized tasks must be returned to the cloud planner for finer decomposition before any local execution or packet export.
+      forbidden_fallbacks:
+        - cloud_model_implementation
+        - codex_implementation
+        - hidden_implementation_fallback
+      required_failure_states:
+        schema_invalid: The request or response schema does not validate against the canonical versioned contract.
+        transition_invalid: The requested queue state transition is not allowed.
+        export_not_ready: The request is not ready for export or depends on another unresolved cloud response.
+        duplicate_request_id: A duplicate request or response identifier was discovered.
+        unknown_request_id: An imported response does not match a known exported request.
+        zip_slip_detected: An imported archive attempts path traversal or extraction outside the allowed root.
+        secret_redaction_required: The exported packet still contains a secret or credential-like value.
+        packet_limit_exceeded: A request or response exceeds the configured file, size, or bundle limits.
+        approval_required: The response changes requirements, scope, architecture, or safety boundaries.
+        validation_failed: Requirement comparison, path comparison, or response normalization failed.
+        no_paid_api_call_allowed: A design or adapter attempts to rely on paid cloud API execution in Story 063.
+        provider_metadata_mismatch: Provider-specific hints conflict with the canonical provider-neutral record.
+        batch_dependency_blocked: A request depends on another cloud result that has not been validated and applied.
+    subtasks:
+      - id: define-cloud-schema
+        title: Define request and response schemas
+        role: developer
+        depends_on: []
+        requirement_ids:
+          - AC-001
+          - AC-002
+          - AC-003
+          - AC-019
+          - AC-020
+          - AC-024
+          - AC-025
+          - AC-026
+          - AC-027
+          - AC-039
+          - AC-040
+        required_context:
+          files:
+            - blueprints/blueprint.yaml
+            - src/agentic_dev/story_blueprint.py
+            - src/agentic_dev/cloud_review_packet.py
+            - src/agentic_dev/queue_management.py
+            - tests/test_cloud_review_packet.py
+            - tests/test_queue_management.py
+          summaries:
+            - The schema must stay provider-neutral and versioned so future adapters can emit the same canonical request and response records.
+            - Request and response validation must reject unknown or malformed records before any state change.
+          prior_task_outputs: []
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_063/reports/**
+        expected_outputs:
+          - Canonical request and response schemas with stable versioning, enums, and validation helpers.
+          - Tests proving version rejection and schema parsing behavior.
+        validation:
+          - Tests cover valid records, invalid versions, unknown request types, and missing required fields.
+        context_budget:
+          max_input_tokens: 24000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: define-queue-lifecycle
+        title: Define queue states and transitions
+        role: developer
+        depends_on:
+          - define-cloud-schema
+        requirement_ids:
+          - AC-004
+          - AC-005
+          - AC-014
+          - AC-015
+          - AC-033
+        required_context:
+          files:
+            - src/agentic_dev/queue_management.py
+            - src/agentic_dev/cloud_review_result.py
+            - tests/test_queue_management.py
+            - tests/test_cloud_review_result.py
+          summaries:
+            - Queue lifecycle rules must be deterministic and auditable.
+          prior_task_outputs:
+            - define-cloud-schema
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_063/reports/**
+        expected_outputs:
+          - Explicit queued, ready_for_export, exported, awaiting_response, response_imported, validation_failed, validated_safe, approval_required, approved, rejected, applied, failed, and cancelled lifecycle handling.
+        validation:
+          - Tests reject unsupported or out-of-order transitions.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: add-request-persistence
+        title: Add queue persistence and audit records
+        role: developer
+        depends_on:
+          - define-cloud-schema
+          - define-queue-lifecycle
+        requirement_ids:
+          - AC-018
+          - AC-035
+          - AC-047
+          - AC-048
+        required_context:
+          files:
+            - src/agentic_dev/queue_management.py
+            - src/agentic_dev/support_queue.py
+            - src/agentic_dev/artifact_policy.py
+            - tests/test_queue_management.py
+            - tests/test_support_queue.py
+            - tests/test_artifact_policy.py
+          summaries:
+            - Request records, raw responses, normalized responses, checksums, and audit events must survive repeated generation without corruption.
+          prior_task_outputs:
+            - define-cloud-schema
+            - define-queue-lifecycle
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_063/reports/**
+        expected_outputs:
+          - Persistent queue records plus immutable audit trails for creation, export, import, classification, approval, rejection, and final state.
+        validation:
+          - Tests prove audit data is written once, is stable, and does not expose secrets.
+        context_budget:
+          max_input_tokens: 24000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: create-blocker-escalations
+        title: Create queue items from local blockers
+        role: developer
+        depends_on:
+          - define-cloud-schema
+          - define-queue-lifecycle
+          - add-request-persistence
+        requirement_ids:
+          - AC-001
+          - AC-002
+          - AC-007
+          - AC-008
+          - AC-041
+          - AC-042
+        required_context:
+          files:
+            - src/agentic_dev/local_execution.py
+            - src/agentic_dev/subtask_execution.py
+            - src/agentic_dev/story_blueprint.py
+            - tests/test_local_execution.py
+            - tests/test_subtask_execution.py
+          summaries:
+            - Local blockers, oversized tasks, failure analysis, and clarification requests must map to stable queue items with unique identifiers.
+          prior_task_outputs:
+            - define-cloud-schema
+            - define-queue-lifecycle
+            - add-request-persistence
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_063/reports/**
+        expected_outputs:
+          - Queue item creation from local blockers with stable IDs, request types, blocker reasons, and dependency hints.
+        validation:
+          - Tests cover unique IDs, blocker metadata, and local task handoff summaries.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: build-context-manifests
+        title: Build self-contained request context manifests
+        role: developer
+        depends_on:
+          - create-blocker-escalations
+        requirement_ids:
+          - AC-006
+          - AC-007
+          - AC-008
+          - AC-009
+          - AC-010
+          - AC-047
+        required_context:
+          files:
+            - src/agentic_dev/role_context.py
+            - src/agentic_dev/prompt_pack.py
+            - src/agentic_dev/artifact_policy.py
+            - tests/test_role_context.py
+            - tests/test_prompt_pack.py
+            - tests/test_artifact_policy.py
+          summaries:
+            - Context manifests must be bounded, provenance-aware, and sufficient for a cloud model to answer without original chat history.
+          prior_task_outputs:
+            - create-blocker-escalations
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_063/reports/**
+        expected_outputs:
+          - Request context manifests with story goal, requirements, blocker evidence, dependencies, and exact response contract.
+        validation:
+          - Tests prove bounded file selection and required context inclusion.
+        context_budget:
+          max_input_tokens: 26000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: add-secret-redaction-and-limits
+        title: Add secret redaction and packet limits
+        role: security_quality
+        depends_on:
+          - build-context-manifests
+        requirement_ids:
+          - AC-010
+          - AC-011
+          - AC-012
+          - AC-034
+          - AC-036
+          - AC-047
+        required_context:
+          files:
+            - src/agentic_dev/artifact_policy.py
+            - src/agentic_dev/cloud_review_packet.py
+            - tests/test_artifact_policy.py
+            - tests/test_cloud_review_packet.py
+          summaries:
+            - Exported packets must exclude secrets, .env contents, credential files, and unbounded repository context.
+          prior_task_outputs:
+            - build-context-manifests
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_063/reports/**
+        expected_outputs:
+          - Redaction and size-limit enforcement for exported packets and imported bundles.
+        validation:
+          - Tests reject secret leakage, oversized packets, and unsafe file inclusion.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: add-single-export
+        title: Add single-request export
+        role: developer
+        depends_on:
+          - add-request-persistence
+          - build-context-manifests
+          - add-secret-redaction-and-limits
+        requirement_ids:
+          - AC-013
+          - AC-018
+          - AC-047
+          - AC-048
+        required_context:
+          files:
+            - src/agentic_dev/cloud_review_packet.py
+            - src/agentic_dev/cli.py
+            - tests/test_cloud_review_packet.py
+            - tests/test_queue_management.py
+          summaries:
+            - Single export must produce a self-contained packet with manifest, instructions, schema, request payload, and checksum evidence.
+          prior_task_outputs:
+            - add-request-persistence
+            - build-context-manifests
+            - add-secret-redaction-and-limits
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_063/reports/**
+        expected_outputs:
+          - Export path handling for one request at a time with recorded checksum and export metadata.
+        validation:
+          - Tests prove the command exports the correct request and records a checksum.
+        context_budget:
+          max_input_tokens: 24000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: add-batch-export
+        title: Add dependency-aware batch export
+        role: developer
+        depends_on:
+          - define-queue-lifecycle
+          - add-single-export
+        requirement_ids:
+          - AC-014
+          - AC-015
+          - AC-016
+          - AC-017
+          - AC-048
+        required_context:
+          files:
+            - src/agentic_dev/cloud_review_packet.py
+            - src/agentic_dev/cli.py
+            - tests/test_cloud_review_packet.py
+            - tests/test_queue_management.py
+          summaries:
+            - Only ready, dependency-independent requests may be grouped into one deterministic batch packet.
+          prior_task_outputs:
+            - define-queue-lifecycle
+            - add-single-export
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_063/reports/**
+        expected_outputs:
+          - Deterministic ready-batch export with manifest, grouped request files, and recorded batch membership.
+        validation:
+          - Tests prove dependency-blocked requests are excluded and ordering is stable.
+        context_budget:
+          max_input_tokens: 24000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: add-safe-response-import
+        title: Add safe response import
+        role: developer
+        depends_on:
+          - define-cloud-schema
+          - add-secret-redaction-and-limits
+        requirement_ids:
+          - AC-019
+          - AC-020
+          - AC-021
+          - AC-022
+          - AC-023
+          - AC-024
+          - AC-025
+          - AC-026
+          - AC-034
+        required_context:
+          files:
+            - src/agentic_dev/cloud_review_packet.py
+            - src/agentic_dev/queue_management.py
+            - tests/test_cloud_review_packet.py
+            - tests/test_artifact_policy.py
+          summaries:
+            - Import must safely read YAML, JSON, and ZIP bundles, reject path traversal, and preserve raw data separately from normalized records.
+          prior_task_outputs:
+            - define-cloud-schema
+            - add-secret-redaction-and-limits
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_063/reports/**
+        expected_outputs:
+          - Safe import handling for YAML, JSON, and ZIP response bundles plus strict error reporting.
+        validation:
+          - Tests cover ZIP-slip rejection, malformed YAML rejection, duplicate request IDs, unknown request IDs, and safe archive extraction.
+        context_budget:
+          max_input_tokens: 24000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: normalize-cloud-responses
+        title: Add response normalization and persistence
+        role: developer
+        depends_on:
+          - add-safe-response-import
+        requirement_ids:
+          - AC-027
+          - AC-028
+          - AC-029
+          - AC-035
+        required_context:
+          files:
+            - src/agentic_dev/cloud_review_packet.py
+            - src/agentic_dev/cloud_review_result.py
+            - tests/test_cloud_review_packet.py
+            - tests/test_cloud_review_result.py
+          summaries:
+            - Untrusted responses must be normalized into a canonical provider-neutral shape while preserving the raw source bundle.
+          prior_task_outputs:
+            - add-safe-response-import
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_063/reports/**
+        expected_outputs:
+          - Normalized response records with raw-response preservation and explicit validation failures.
+        validation:
+          - Tests prove malformed structures are rejected and valid structures are persisted independently.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: compare-request-and-response
+        title: Add requirement, path, and scope comparison
+        role: developer
+        depends_on:
+          - normalize-cloud-responses
+        requirement_ids:
+          - AC-028
+          - AC-029
+          - AC-030
+          - AC-031
+          - AC-032
+          - AC-033
+        required_context:
+          files:
+            - src/agentic_dev/cloud_review_result.py
+            - src/agentic_dev/artifact_policy.py
+            - tests/test_cloud_review_result.py
+            - tests/test_artifact_policy.py
+          summaries:
+            - Independent comparison logic must decide whether a response is a safe candidate, approval required, or invalid.
+          prior_task_outputs:
+            - normalize-cloud-responses
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_063/reports/**
+        expected_outputs:
+          - Canonical comparison functions for requirements, writable paths, external services, and architecture changes.
+        validation:
+          - Tests cover preserved, modified, removed, and scope-expanding responses.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: classify-response-risk
+        title: Add response risk classification
+        role: developer
+        depends_on:
+          - compare-request-and-response
+        requirement_ids:
+          - AC-031
+          - AC-032
+          - AC-033
+          - AC-044
+        required_context:
+          files:
+            - src/agentic_dev/cloud_review_result.py
+            - tests/test_cloud_review_result.py
+            - tests/test_queue_management.py
+          summaries:
+            - Safe decompositions can be marked for later automatic application only after independent validation proves requirement preservation.
+          prior_task_outputs:
+            - compare-request-and-response
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_063/reports/**
+        expected_outputs:
+          - Deterministic classification into safe_candidate, approval_required, invalid, or rejected states with reasons.
+        validation:
+          - Tests prove safe, risky, and invalid responses are classified consistently.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: add-approval-commands
+        title: Add approval and rejection commands
+        role: developer
+        depends_on:
+          - classify-response-risk
+        requirement_ids:
+          - AC-032
+          - AC-033
+          - AC-038
+          - AC-045
+        required_context:
+          files:
+            - src/agentic_dev/cli.py
+            - src/agentic_dev/cloud_review_result.py
+            - tests/test_cloud_review_result.py
+            - tests/test_queue_management.py
+          summaries:
+            - Manual operator approval must be explicit and must never be implied by import alone.
+          prior_task_outputs:
+            - classify-response-risk
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_063/reports/**
+        expected_outputs:
+          - Approve and reject commands that update audited queue state and emit clear operator output.
+        validation:
+          - Tests cover approval and rejection paths plus invalid transition rejection.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: add-cloud-queue-cli
+        title: Add cloud-queue command group
+        role: developer
+        depends_on:
+          - add-single-export
+          - add-batch-export
+          - add-safe-response-import
+          - add-approval-commands
+        requirement_ids:
+          - AC-001
+          - AC-013
+          - AC-014
+          - AC-019
+          - AC-032
+          - AC-038
+          - AC-045
+          - AC-046
+        required_context:
+          files:
+            - src/agentic_dev/cli.py
+            - src/agentic_dev/cloud_review_packet.py
+            - src/agentic_dev/cloud_review_result.py
+            - tests/test_cloud_review_packet.py
+            - tests/test_cloud_review_result.py
+          summaries:
+            - The CLI should present one cohesive cloud-queue group rather than many unrelated top-level commands.
+          prior_task_outputs:
+            - add-single-export
+            - add-batch-export
+            - add-safe-response-import
+            - add-approval-commands
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_063/reports/**
+        expected_outputs:
+          - List, show, export, import, approve, reject, and status command wiring with actionable messaging.
+        validation:
+          - Tests assert command help text, output, and status transitions.
+        context_budget:
+          max_input_tokens: 24000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: add-manual-round-trip-fixture
+        title: Add manual round-trip fixtures
+        role: test
+        depends_on:
+          - add-cloud-queue-cli
+          - classify-response-risk
+        requirement_ids:
+          - AC-016
+          - AC-017
+          - AC-018
+          - AC-019
+          - AC-020
+          - AC-021
+          - AC-022
+          - AC-023
+          - AC-027
+          - AC-028
+          - AC-031
+          - AC-032
+          - AC-035
+          - AC-036
+          - AC-037
+          - AC-039
+          - AC-040
+        required_context:
+          files:
+            - tests/test_cloud_review_packet.py
+            - tests/test_cloud_review_result.py
+            - tests/test_story_generator.py
+            - tests/test_public_readiness.py
+          summaries:
+            - Deterministic fixtures should prove the full manual packet round trip without network access or paid provider calls.
+          prior_task_outputs:
+            - add-cloud-queue-cli
+            - classify-response-risk
+          architecture_decisions: []
+        writable_paths:
+          - tests/**
+          - stories/story_063/reports/**
+        expected_outputs:
+          - End-to-end fake-response fixtures for export, import, validation, classification, approval, and rejection.
+        validation:
+          - Tests cover a complete offline round trip with stable checksums and no leaked secrets.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: add-provider-adapter-interface
+        title: Add provider-neutral adapter extension interface
+        role: developer
+        depends_on:
+          - define-cloud-schema
+          - normalize-cloud-responses
+        requirement_ids:
+          - AC-039
+          - AC-040
+          - AC-043
+          - AC-044
+        required_context:
+          files:
+            - src/agentic_dev/cloud_review_packet.py
+            - src/agentic_dev/cloud_review_result.py
+            - src/agentic_dev/runtime_config.py
+            - tests/test_runtime_config.py
+          summaries:
+            - Manual packet mode must remain the default while future provider adapters share the same canonical schema.
+          prior_task_outputs:
+            - define-cloud-schema
+            - normalize-cloud-responses
+          architecture_decisions: []
+        writable_paths:
+          - src/**
+          - tests/**
+          - stories/story_063/reports/**
+        expected_outputs:
+          - A narrow adapter interface with a manual packet adapter and placeholders for future providers.
+        validation:
+          - Tests prove manual mode works offline and no paid API wiring is introduced.
+        context_budget:
+          max_input_tokens: 22000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: document-workflow
+        title: Document operator workflow and boundaries
+        role: documentation
+        depends_on:
+          - add-cloud-queue-cli
+          - add-provider-adapter-interface
+          - add-manual-round-trip-fixture
+        requirement_ids:
+          - AC-045
+          - AC-046
+          - AC-047
+          - AC-048
+        required_context:
+          files:
+            - README.md
+            - docs/command_map.md
+            - docs/local_models.md
+            - docs/runtime_config.md
+          summaries:
+            - Documentation must explain export, upload, import, approval, provider neutrality, and the manual-first default.
+          prior_task_outputs:
+            - add-cloud-queue-cli
+            - add-provider-adapter-interface
+            - add-manual-round-trip-fixture
+          architecture_decisions: []
+        writable_paths:
+          - README.md
+          - docs/**
+          - stories/story_063/reports/**
+        expected_outputs:
+          - Operator guide with manual export/import steps, classification boundaries, and future provider notes.
+        validation:
+          - Docs tests confirm command map and workflow guidance stay aligned.
+        context_budget:
+          max_input_tokens: 20000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: review-security-and-artifacts
+        title: Review security and artifact policy
+        role: security_quality
+        depends_on:
+          - add-secret-redaction-and-limits
+          - add-safe-response-import
+          - classify-response-risk
+          - document-workflow
+        requirement_ids:
+          - AC-010
+          - AC-011
+          - AC-012
+          - AC-033
+          - AC-035
+          - AC-036
+          - AC-047
+        required_context:
+          files:
+            - src/agentic_dev/artifact_policy.py
+            - src/agentic_dev/cloud_review_packet.py
+            - src/agentic_dev/cloud_review_result.py
+            - tests/test_artifact_policy.py
+            - tests/test_cloud_review_packet.py
+          summaries:
+            - Untrusted imported responses must stay isolated and logs must not expose secrets or bundle contents.
+          prior_task_outputs:
+            - add-secret-redaction-and-limits
+            - add-safe-response-import
+            - classify-response-risk
+            - document-workflow
+          architecture_decisions: []
+        writable_paths:
+          - stories/story_063/reports/**
+        expected_outputs:
+          - Security review notes covering redaction, ZIP handling, audit data, and artifact-policy compliance.
+        validation:
+          - Review checks confirm no secret values leak into logs or exported artifacts.
+        context_budget:
+          max_input_tokens: 18000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: validate-story-result
+        title: Final Story 063 validation
+        role: local_reviewer
+        depends_on:
+          - define-cloud-schema
+          - define-queue-lifecycle
+          - add-request-persistence
+          - create-blocker-escalations
+          - build-context-manifests
+          - add-secret-redaction-and-limits
+          - add-single-export
+          - add-batch-export
+          - add-safe-response-import
+          - normalize-cloud-responses
+          - compare-request-and-response
+          - classify-response-risk
+          - add-approval-commands
+          - add-cloud-queue-cli
+          - add-manual-round-trip-fixture
+          - add-provider-adapter-interface
+          - document-workflow
+          - review-security-and-artifacts
+        requirement_ids:
+          - AC-001
+          - AC-002
+          - AC-003
+          - AC-004
+          - AC-005
+          - AC-006
+          - AC-007
+          - AC-008
+          - AC-009
+          - AC-010
+          - AC-011
+          - AC-012
+          - AC-013
+          - AC-014
+          - AC-015
+          - AC-016
+          - AC-017
+          - AC-018
+          - AC-019
+          - AC-020
+          - AC-021
+          - AC-022
+          - AC-023
+          - AC-024
+          - AC-025
+          - AC-026
+          - AC-027
+          - AC-028
+          - AC-029
+          - AC-030
+          - AC-031
+          - AC-032
+          - AC-033
+          - AC-034
+          - AC-035
+          - AC-036
+          - AC-037
+          - AC-038
+          - AC-039
+          - AC-040
+          - AC-041
+          - AC-042
+          - AC-043
+          - AC-044
+          - AC-045
+          - AC-046
+          - AC-047
+          - AC-048
+        required_context:
+          files:
+            - tests/test_cloud_review_packet.py
+            - tests/test_cloud_review_result.py
+            - tests/test_queue_management.py
+            - tests/test_story_generator.py
+            - tests/test_public_readiness.py
+          summaries:
+            - Final review must prove the manual-first, provider-neutral, offline-safe design remains coherent end to end.
+          prior_task_outputs:
+            - define-cloud-schema
+            - define-queue-lifecycle
+            - add-request-persistence
+            - create-blocker-escalations
+            - build-context-manifests
+            - add-secret-redaction-and-limits
+            - add-single-export
+            - add-batch-export
+            - add-safe-response-import
+            - normalize-cloud-responses
+            - compare-request-and-response
+            - classify-response-risk
+            - add-approval-commands
+            - add-cloud-queue-cli
+            - add-manual-round-trip-fixture
+            - add-provider-adapter-interface
+            - document-workflow
+            - review-security-and-artifacts
+          architecture_decisions: []
+        writable_paths:
+          - stories/story_063/reports/**
+        expected_outputs:
+          - Final review evidence covering acceptance criteria, security boundaries, and backward compatibility.
+        validation:
+          - Tests or review checks prove the story is ready for implementation without paid API calls or hidden fallback paths.
+        context_budget:
+          max_input_tokens: 18000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+    definition_of_done:
+      - The blueprint defines the manual-first escalation queue, batch export, safe import, approval boundary, and provider-neutral schemas.
+      - Acceptance criteria cover queue lifecycle, packet export/import, redaction, classification, auditability, and future provider compatibility.
+      - The generated Story 063 workspace is created by agentic generate-stories and generation is idempotent across two runs.
+      - docker compose run --rm dev pytest passes.
+      - docker compose run --rm dev ruff check . passes.
+      - artifact-policy validation passes.
+      - runtime-config validation passes.
+      - hidden-Unicode hygiene validation passes.
+      - Public-readiness validation passes when applicable to the repository state.
+      - The manual packet mode remains the default.
+      - No paid cloud API calls are implemented.
+      - Provider-neutral adapter compatibility is preserved for future OpenAI, Gemini, Anthropic, Bedrock, and OpenAI-compatible support.
+      - Backward compatibility is preserved for Stories 060, 061, and 062.
+    not_in_scope:
+      - Paid cloud API integrations.
+      - Automatic provider selection at runtime.
+      - Automatic task-graph mutation or local execution resume from imported cloud results.
+      - Secret-bearing packets, environment dumps, or arbitrary archive extraction.
+      - Deployment, publishing, release tagging, or direct pushes to main.
+      - Automatic commits or merges from cloud responses.
+    test_plan:
+      test_layers_version: 1
+      unit_tests:
+        required: true
+        action: add_or_update
+        frequency: every_commit
+        evidence_or_reason: Cover canonical request and response schemas, version rejection, request ID stability, queue transitions, redaction, packet size limits, checksum recording, and provider-neutral adapter validation.
+      integration_tests:
+        required: true
+        action: add_or_update
+        frequency: every_pull_request
+        evidence_or_reason: Cover single export, batch export, dependency filtering, manual import, normalized persistence, requirement comparison, approval or rejection, and Story 061 through Story 062 regressions.
+      mock_e2e_tests:
+        required: true
+        action: add_or_update
+        frequency: before_merge
+        evidence_or_reason: Use deterministic fake packet fixtures to prove offline round trips, safe classification, and batch independence without paid provider calls.
+      live_read_only_checks:
+        required: false
+        action: not_applicable_with_reason
+        frequency: manual_only
+        evidence_or_reason: Story 063 is manual-first and provider-neutral; no live cloud credentials or network access are required for CI.
+      remote_dev_smoke_tests:
+        required: false
+        action: not_applicable_with_reason
+        frequency: after_remote_dev_deploy
+        evidence_or_reason: Story 063 adds no remote deployment behavior.
+    monitoring_plan:
+      logs_required:
+        - request_creation
+        - request_state
+        - export_batch_id
+        - request_ids
+        - request_checksum
+        - response_checksum
+        - redaction_count
+        - import_result
+        - schema_validation_status
+        - requirement_comparison_status
+        - scope_comparison_status
+        - response_classification
+        - approval_decision
+        - rejection_reason
+        - final_queue_state
+      watch_for:
+        - secret_exposure
+        - path_traversal_attempt
+        - zip_slip_attempt
+        - duplicate_request_id
+        - unknown_request_id
+        - invalid_state_transition
+        - dependency_in_batch_without_validation
+        - payload_exceeds_packet_limit
+        - provider_specific_schema_leakage
+        - paid_api_call_attempt
+        - cloud_or_codex_fallback_attempt
+        - Story_060_regression
+        - Story_061_regression
+        - Story_062_regression
+
   - id: STORY-048
     slug: story_048_micro_local_agent_prompt_mode
     title: Add Micro Local-Agent Prompt Mode For Gemma Reliability

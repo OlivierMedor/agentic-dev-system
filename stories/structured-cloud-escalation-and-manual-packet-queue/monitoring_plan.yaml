@@ -1,0 +1,31 @@
+logs_required:
+- request_creation
+- request_state
+- export_batch_id
+- request_ids
+- request_checksum
+- response_checksum
+- redaction_count
+- import_result
+- schema_validation_status
+- requirement_comparison_status
+- scope_comparison_status
+- response_classification
+- approval_decision
+- rejection_reason
+- final_queue_state
+watch_for:
+- secret_exposure
+- path_traversal_attempt
+- zip_slip_attempt
+- duplicate_request_id
+- unknown_request_id
+- invalid_state_transition
+- dependency_in_batch_without_validation
+- payload_exceeds_packet_limit
+- provider_specific_schema_leakage
+- paid_api_call_attempt
+- cloud_or_codex_fallback_attempt
+- Story_060_regression
+- Story_061_regression
+- Story_062_regression

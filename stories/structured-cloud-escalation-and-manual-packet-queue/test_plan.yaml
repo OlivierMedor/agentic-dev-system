@@ -1,0 +1,32 @@
+test_layers_version: 1
+unit_tests:
+  required: true
+  action: add_or_update
+  frequency: every_commit
+  evidence_or_reason: Cover canonical request and response schemas, version rejection,
+    request ID stability, queue transitions, redaction, packet size limits, checksum
+    recording, and provider-neutral adapter validation.
+integration_tests:
+  required: true
+  action: add_or_update
+  frequency: every_pull_request
+  evidence_or_reason: Cover single export, batch export, dependency filtering, manual
+    import, normalized persistence, requirement comparison, approval or rejection,
+    and Story 061 through Story 062 regressions.
+mock_e2e_tests:
+  required: true
+  action: add_or_update
+  frequency: before_merge
+  evidence_or_reason: Use deterministic fake packet fixtures to prove offline round
+    trips, safe classification, and batch independence without paid provider calls.
+live_read_only_checks:
+  required: false
+  action: not_applicable_with_reason
+  frequency: manual_only
+  evidence_or_reason: Story 063 is manual-first and provider-neutral; no live cloud
+    credentials or network access are required for CI.
+remote_dev_smoke_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: after_remote_dev_deploy
+  evidence_or_reason: Story 063 adds no remote deployment behavior.
