@@ -7,6 +7,19 @@ from agentic_dev.agent_assignment import assign_agents
 from agentic_dev.artifact_policy import check_artifact_policy, format_artifact_policy_report
 from agentic_dev.cloud_review_packet import create_cloud_review_packet
 from agentic_dev.cloud_review_result import record_cloud_review
+from agentic_dev.cloud_queue import (
+    build_cloud_queue_service,
+    REQUEST_TYPES,
+    format_cloud_queue_approval,
+    format_cloud_queue_export,
+    format_cloud_queue_import,
+    format_cloud_queue_list,
+    format_cloud_queue_reject,
+    format_cloud_queue_show,
+    format_cloud_queue_status,
+    story_id_from_reference,
+    story_slug_from_story_name,
+)
 from agentic_dev.codex_runtime import create_codex_tasks
 from agentic_dev.demo_subtasks import add_demo_subtasks_arguments, run_demo_subtasks
 from agentic_dev.finalize_story import finalize_story
@@ -1147,6 +1160,220 @@ def main() -> None:
         help="Target project folder. Defaults to the current directory.",
     )
 
+    cloud_queue_parser = subparsers.add_parser(
+        "cloud-queue",
+        help="Create, export, import, and approve manual cloud escalation requests.",
+    )
+    cloud_queue_subparsers = cloud_queue_parser.add_subparsers(
+        dest="cloud_queue_command",
+        required=True,
+    )
+
+    cloud_queue_create_parser = cloud_queue_subparsers.add_parser(
+        "create",
+        help="Create a structured cloud escalation request.",
+    )
+    cloud_queue_create_parser.add_argument("--story", required=True, help="Story folder or slug.")
+    cloud_queue_create_parser.add_argument(
+        "--story-slug",
+        help="Optional explicit story slug. Defaults to a slug derived from --story.",
+    )
+    cloud_queue_create_parser.add_argument(
+        "--request-type",
+        choices=REQUEST_TYPES,
+        required=True,
+        help="Canonical request type.",
+    )
+    cloud_queue_create_parser.add_argument(
+        "--reason-code",
+        required=True,
+        help="Machine-readable blocker reason code.",
+    )
+    cloud_queue_create_parser.add_argument(
+        "--reason-summary",
+        required=True,
+        help="Human-readable blocker summary.",
+    )
+    cloud_queue_create_parser.add_argument(
+        "--requested-action",
+        required=True,
+        help="Exact action requested from the cloud model.",
+    )
+    cloud_queue_create_parser.add_argument("--task-id", help="Optional blocked task ID.")
+    cloud_queue_create_parser.add_argument("--task-title", default="", help="Optional task title.")
+    cloud_queue_create_parser.add_argument("--role", default="developer", help="Task role.")
+    cloud_queue_create_parser.add_argument(
+        "--dependency",
+        action="append",
+        default=[],
+        help="Dependent cloud request ID. May be provided multiple times.",
+    )
+    cloud_queue_create_parser.add_argument(
+        "--writable-path",
+        action="append",
+        default=[],
+        help="Allowed writable path. May be provided multiple times.",
+    )
+    cloud_queue_create_parser.add_argument(
+        "--expected-output",
+        action="append",
+        default=[],
+        help="Expected output path. May be provided multiple times.",
+    )
+    cloud_queue_create_parser.add_argument(
+        "--validation",
+        action="append",
+        default=[],
+        help="Validation step. May be provided multiple times.",
+    )
+    cloud_queue_create_parser.add_argument(
+        "--requirement-id",
+        action="append",
+        default=[],
+        help="Applicable requirement ID. May be provided multiple times.",
+    )
+    cloud_queue_create_parser.add_argument(
+        "--immutable-requirement-id",
+        action="append",
+        default=[],
+        help="Immutable requirement ID. May be provided multiple times.",
+    )
+    cloud_queue_create_parser.add_argument(
+        "--story-goal",
+        default="",
+        help="Optional story goal, usually derived from the story workspace.",
+    )
+    cloud_queue_create_parser.add_argument(
+        "--acceptance-criterion",
+        action="append",
+        default=[],
+        help="Acceptance criterion to include in packet context.",
+    )
+    cloud_queue_create_parser.add_argument(
+        "--architecture-decision",
+        action="append",
+        default=[],
+        help="Relevant architecture decision. May be provided multiple times.",
+    )
+    cloud_queue_create_parser.add_argument(
+        "--dependency-handoff",
+        action="append",
+        default=[],
+        help="Relevant dependency handoff note. May be provided multiple times.",
+    )
+    cloud_queue_create_parser.add_argument(
+        "--local-failure-summary",
+        default="",
+        help="Short summary of the local failure or blocker evidence.",
+    )
+    cloud_queue_create_parser.add_argument(
+        "--token-estimate",
+        type=int,
+        default=0,
+        help="Estimated token usage for the request context.",
+    )
+    cloud_queue_create_parser.add_argument(
+        "--usable-token-limit",
+        type=int,
+        default=0,
+        help="Usable local-model token limit for comparison.",
+    )
+    cloud_queue_create_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
+    cloud_queue_list_parser = cloud_queue_subparsers.add_parser(
+        "list",
+        help="List cloud queue requests.",
+    )
+    cloud_queue_list_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
+    cloud_queue_show_parser = cloud_queue_subparsers.add_parser(
+        "show",
+        help="Show one cloud queue request clearly.",
+    )
+    cloud_queue_show_parser.add_argument("--request", required=True, help="Cloud request ID.")
+    cloud_queue_show_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
+    cloud_queue_export_parser = cloud_queue_subparsers.add_parser(
+        "export",
+        help="Export one request packet or a batch of ready requests.",
+    )
+    cloud_queue_export_group = cloud_queue_export_parser.add_mutually_exclusive_group(required=True)
+    cloud_queue_export_group.add_argument("--request", help="Export one request by ID.")
+    cloud_queue_export_group.add_argument(
+        "--all-ready",
+        action="store_true",
+        help="Export all ready independent requests in one batch.",
+    )
+    cloud_queue_export_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
+    cloud_queue_import_parser = cloud_queue_subparsers.add_parser(
+        "import",
+        help="Import a YAML, JSON, or ZIP response bundle.",
+    )
+    cloud_queue_import_parser.add_argument("--file", required=True, help="Response file or bundle.")
+    cloud_queue_import_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
+    cloud_queue_approve_parser = cloud_queue_subparsers.add_parser(
+        "approve",
+        help="Approve a response that requires human approval.",
+    )
+    cloud_queue_approve_parser.add_argument("--request", required=True, help="Cloud request ID.")
+    cloud_queue_approve_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
+    cloud_queue_reject_parser = cloud_queue_subparsers.add_parser(
+        "reject",
+        help="Reject a response and preserve the audit trail.",
+    )
+    cloud_queue_reject_parser.add_argument("--request", required=True, help="Cloud request ID.")
+    cloud_queue_reject_parser.add_argument("--reason", required=True, help="Rejection reason.")
+    cloud_queue_reject_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
+    cloud_queue_status_parser = cloud_queue_subparsers.add_parser(
+        "status",
+        help="Show the cloud queue status summary.",
+    )
+    cloud_queue_status_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+
     queue_parser = subparsers.add_parser(
         "queue",
         help="Create and manage improvement, maintenance, and feature queue items.",
@@ -1429,6 +1656,72 @@ def main() -> None:
             print(f"Finalize result: {result.finalize_result_path}")
             print(f"Finalize report: {result.finalize_report_path}")
             print(f"Next action: {result.next_action}")
+
+        if args.command == "cloud-queue":
+            service = build_cloud_queue_service(args.project)
+
+            if args.cloud_queue_command == "create":
+                result = service.create_request(
+                    request_type=args.request_type,
+                    story_id=story_id_from_reference(args.story),
+                    story_slug=args.story_slug or story_slug_from_story_name(args.story),
+                    task_id=args.task_id,
+                    reason_code=args.reason_code,
+                    reason_summary=args.reason_summary,
+                    requested_action_summary=args.requested_action,
+                    task_title=args.task_title,
+                    role=args.role,
+                    dependencies=args.dependency,
+                    writable_paths=args.writable_path,
+                    expected_outputs=args.expected_output,
+                    validation=args.validation,
+                    story_goal=args.story_goal,
+                    acceptance_criteria=args.acceptance_criterion,
+                    architecture_decisions=args.architecture_decision,
+                    dependency_handoffs=args.dependency_handoff,
+                    local_failure_summary=args.local_failure_summary,
+                    relevant_files=[],
+                    file_summaries=[],
+                    token_estimate=args.token_estimate,
+                    usable_token_limit=args.usable_token_limit,
+                    requirement_ids=args.requirement_id,
+                    immutable_requirement_ids=args.immutable_requirement_id,
+                )
+                print(f"Cloud queue request created: {result.request_id}")
+                print(f"Status: {result.status}")
+                print(f"Request path: {service.request_path(result.request_id)}")
+                print(f"Next action: {result.next_action}")
+
+            if args.cloud_queue_command == "list":
+                result = service.list_requests()
+                print(format_cloud_queue_list(result))
+
+            if args.cloud_queue_command == "show":
+                result = service.show_request(args.request)
+                print(format_cloud_queue_show(result))
+
+            if args.cloud_queue_command == "export":
+                if args.request:
+                    result = service.export_request(args.request)
+                else:
+                    result = service.export_ready_requests()
+                print(format_cloud_queue_export(result))
+
+            if args.cloud_queue_command == "import":
+                result = service.import_response_bundle(Path(args.file))
+                print(format_cloud_queue_import(result))
+
+            if args.cloud_queue_command == "approve":
+                result = service.approve_request(args.request)
+                print(format_cloud_queue_approval(result))
+
+            if args.cloud_queue_command == "reject":
+                result = service.reject_request(args.request, args.reason)
+                print(format_cloud_queue_reject(result))
+
+            if args.cloud_queue_command == "status":
+                result = service.status()
+                print(format_cloud_queue_status(result))
 
         if args.command == "cloud-review-packet":
             result = create_cloud_review_packet(args.project, args.story, args.force)

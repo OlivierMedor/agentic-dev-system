@@ -23,6 +23,9 @@ def test_public_readiness_passes_for_safe_tracked_files() -> None:
         "stories/story_033_public_readiness_private_instructions/cloud_review_packet/.gitkeep",
         "stories/story_033_public_readiness_private_instructions/remote_dev_validation/.gitkeep",
         ".agentic/support_queue/pending/.gitkeep",
+        ".agentic/cloud_queue/requests/.gitkeep",
+        ".agentic/cloud_queue/exports/.gitkeep",
+        ".agentic/cloud_queue/audit/.gitkeep",
         ".agentic/feature_scan/.gitkeep",
         ".agentic/local_model_scorecard/prompts/developer_agent_prompt.md",
         ".agentic/local_model_scorecard/scorecard_template.yaml",
@@ -89,6 +92,24 @@ def test_public_readiness_blocks_support_queue_runtime_files() -> None:
     ]
 
     assert violation_paths([*blocked_paths, ".agentic/support_queue/pending/.gitkeep"]) == blocked_paths
+
+
+def test_public_readiness_blocks_cloud_queue_runtime_files() -> None:
+    blocked_paths = [
+        ".agentic/cloud_queue/requests/cloud-req-0001.yaml",
+        ".agentic/cloud_queue/exports/cloud-batch-0001/manifest.yaml",
+        ".agentic/cloud_queue/audit/cloud-event-000001.yaml",
+        ".agentic/cloud_queue/exports/cloud-batch-0001/cloud_queue_packet.zip",
+    ]
+
+    assert violation_paths(
+        [
+            *blocked_paths,
+            ".agentic/cloud_queue/requests/.gitkeep",
+            ".agentic/cloud_queue/exports/.gitkeep",
+            ".agentic/cloud_queue/audit/.gitkeep",
+        ],
+    ) == blocked_paths
 
 
 def test_public_readiness_blocks_other_runtime_artifacts() -> None:

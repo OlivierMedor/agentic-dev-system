@@ -184,6 +184,12 @@ local_execution:
     documentation: qwen3
     security_quality: gemma
     local_reviewer: gemma
+
+cloud_escalation:
+  enabled: true
+  default_mode: manual
+  automated_provider_enabled: false
+  provider: none
 """
 
 
@@ -317,6 +323,7 @@ def validate_runtime_config(project_path: Path) -> RuntimeConfigValidationResult
 
     parse_codex_runtime_config(config.get("codex_runtime"), errors)
     validate_local_execution_config(config.get("local_execution"), errors)
+    validate_cloud_escalation_config(config.get("cloud_escalation"), errors)
 
     if errors:
         raise ValueError("Runtime config validation failed:\n- " + "\n- ".join(errors))
@@ -455,6 +462,35 @@ def validate_local_execution_config(section: Any, errors: list[str]) -> None:
             errors.append(
                 f"local_execution.role_defaults.{role} must be a non-empty string.",
             )
+
+
+def validate_cloud_escalation_config(section: Any, errors: list[str]) -> None:
+    if section is None:
+        errors.append("cloud_escalation must be configured.")
+        return
+
+    if not isinstance(section, dict):
+        errors.append("cloud_escalation must be a mapping.")
+        return
+
+    enabled = section.get("enabled")
+    default_mode = section.get("default_mode")
+    automated_provider_enabled = section.get("automated_provider_enabled")
+    provider = section.get("provider")
+
+    if not isinstance(enabled, bool):
+        errors.append("cloud_escalation.enabled must be a boolean.")
+    elif not enabled:
+        errors.append("cloud_escalation.enabled must be true.")
+
+    if default_mode != "manual":
+        errors.append("cloud_escalation.default_mode must be manual.")
+
+    if automated_provider_enabled is not False:
+        errors.append("cloud_escalation.automated_provider_enabled must be false.")
+
+    if provider != "none":
+        errors.append("cloud_escalation.provider must be none.")
 
 
 def mapping_value(
