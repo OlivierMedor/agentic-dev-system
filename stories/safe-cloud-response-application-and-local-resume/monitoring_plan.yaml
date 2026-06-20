@@ -1,0 +1,37 @@
+logs_required:
+- application_plan_id
+- application_id
+- request_id
+- response_checksum
+- request_checksum
+- approval_checksum
+- source_revision_id
+- proposed_revision_id
+- active_revision_id
+- application_state
+- resume_state
+- lease_state
+- rollback_state
+- audit_event
+watch_for:
+- canonical_blueprint_modified
+- stale_application_plan
+- duplicate_application
+- approval_checksum_mismatch
+- request_checksum_mismatch
+- response_checksum_mismatch
+- dependency_cycle
+- dependency_missing
+- writable_path_violation
+- transaction_failed
+- resume_blocked
+- rollback_failed
+- recovery_required
+- old_revision_write_attempt
+- paid_provider_call_attempt
+- network_access_attempt
+- automatic_apply_attempt
+- automatic_resume_attempt
+- Story_061_regression
+- Story_062_regression
+- Story_063_regression
