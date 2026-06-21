@@ -10,6 +10,7 @@ Security controls:
 - Runtime revisions are immutable after publish.
 - The active revision pointer is updated atomically.
 - Execution leases are revision-bound.
+- Result publication is gated by lease, attempt, and active-revision checks.
 - Stale workers cannot publish results into a newer revision.
 - Recovery never guesses an active revision when pointer integrity is broken.
 - Canonical blueprint files are not rewritten by runtime application flows.
@@ -29,4 +30,3 @@ Audit coverage:
 - Dry runs are audited.
 - Apply, resume, rollback, and recovery events are audited.
 - Rejected transitions are audited.
-

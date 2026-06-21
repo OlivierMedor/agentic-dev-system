@@ -4,21 +4,18 @@ Story 064 is implemented as a layered, offline, provider-neutral runtime applica
 
 Implemented modules:
 
-- `models.py` for application records, plans, revisions, leases, audit events, recovery, and resume models
+- `models.py` for application records, plans, revisions, transactions, leases, audit events, recovery, and resume models
 - `state_machine.py` for deterministic application state transitions
-- `eligibility.py` for checksum-bound Story 063 response eligibility checks
-- `planning.py` for immutable plan construction
+- `planning.py` for immutable plan construction from the active runtime revision
 - `graph.py` for runtime graph transforms and revision building
 - `validation.py` for requirement, dependency, writable-path, and context validation
 - `persistence.py` for atomic runtime writes and reads
-- `transactions.py` for apply-time transactional sequencing
-- `leases.py` for revision-bound execution leases
-- `resume.py` for explicit resume coordination
-- `rollback.py` for prior-revision restoration
-- `recovery.py` for interrupted-operation inspection and reconciliation
+- `transactions.py` for apply-time transactional sequencing and journal persistence
+- `publication.py` for revision-bound result gating and quarantine paths
+- `resume.py` for explicit resume coordination and execution adapter handoff
 - `audit.py` for append-only audit evidence
 - `formatting.py` for CLI output
-- `service.py` for the public application service
+- `service.py` for orchestration across planning, apply, resume, rollback, and recovery
 
 CLI integration:
 
@@ -39,9 +36,10 @@ Boundary enforcement:
 
 Validation summary:
 
-- Full pytest: `740 passed`
+- Full pytest: `749 passed`
 - Ruff: passed
-- Story 064 focused suite: `41 passed`
-- Cloud-queue regression suite: `116 passed, 1 skipped`
-- Demo-subtask and artifact/public-readiness regression checks: passed
-
+- Story 064 focused suite: `25 passed`
+- Story 064 state-machine suite: `25 passed`
+- Cloud-queue and regression suite: `207 passed, 1 skipped`
+- Generate-stories idempotency: passed
+- Artifact-policy, runtime-config, and public-readiness checks: passed

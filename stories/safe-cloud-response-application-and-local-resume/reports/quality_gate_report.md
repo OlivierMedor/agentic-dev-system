@@ -8,8 +8,8 @@ Checks:
 - state machine transitions
 - eligibility validation
 - planning and graph transformation
-- transaction sequencing
-- resume, lease, rollback, and recovery flows
+- transaction sequencing and journals
+- resume, lease, publication, rollback, and recovery flows
 - canonical blueprint protection
 - CLI command coverage
 - artifact policy
@@ -26,4 +26,4 @@ Results:
 - runtime config: passed
 - generate stories: passed
 - Unicode sweep: clean
-
+- full pytest: `749 passed`

@@ -10,7 +10,7 @@
 
 Result:
 
-- `41 passed in 1.89s`
+- `25 passed in 3.15s`
 
 ## Cloud Queue Regression
 
@@ -24,7 +24,7 @@ Result:
 
 Result:
 
-- `116 passed, 1 skipped in 7.21s`
+- `207 passed, 1 skipped in 5.97s`
 
 ## Cross-Feature Regression
 
@@ -45,7 +45,7 @@ Result:
 
 Result:
 
-- `740 passed in 41.26s`
+- `749 passed in 13.94s`
 
 ## Lint
 
@@ -55,3 +55,9 @@ Result:
 
 - passed
 
+## Repo Checks
+
+- `docker compose run --rm dev agentic generate-stories` - passed twice and was idempotent
+- `python -m agentic_dev.cli artifact-policy` - passed
+- `python -m agentic_dev.cli runtime-config validate` - passed
+- `python -m agentic_dev.cli public-readiness` - passed

@@ -8,4 +8,4 @@ validation:
   runtime_config: passed
   generate_stories: passed
   unicode_hygiene: passed
-
+  full_pytest_count: 749

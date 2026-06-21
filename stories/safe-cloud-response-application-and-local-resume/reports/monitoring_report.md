@@ -7,6 +7,7 @@ Primary runtime locations:
 - `.agentic/cloud_applications/`
 - `.agentic/runtime_plans/`
 - `.agentic/execution_leases/`
+- `.agentic/cloud_applications/transactions/`
 - `.agentic/cloud_queue/`
 
 Operational signals:
@@ -15,8 +16,10 @@ Operational signals:
 - plan checksum mismatches
 - stale-plan rejections
 - transaction failures
+- transaction journal transitions
 - pointer update failures
 - stale lease rejections
+- stale result publication rejections
 - rollback activity
 - recovery inspection and reconciliation
 
@@ -27,4 +30,3 @@ Observed validation signals:
 - resume remains explicit
 - rollback does not revert Git automatically
 - runtime artifacts are ignored by Git
-
