@@ -1,0 +1,31 @@
+test_layers_version: 1
+unit_tests:
+  required: true
+  action: add_or_update
+  frequency: every_commit
+  evidence_or_reason: Cover batch schemas, lifecycle transitions, DAG validation,
+    deterministic ordering, checksums, progress derivation, and configuration defaults
+    for explicit batch operations.
+integration_tests:
+  required: true
+  action: add_or_update
+  frequency: every_pull_request
+  evidence_or_reason: Cover export, import, dry run, apply, resume, retry, cancel,
+    rollback, recovery, and Stories 063 through 064 regressions.
+mock_e2e_tests:
+  required: true
+  action: add_or_update
+  frequency: before_merge
+  evidence_or_reason: Use deterministic offline fixtures to prove batch orchestration,
+    dependency waves, partial success, and isolated failures without cloud calls.
+live_read_only_checks:
+  required: false
+  action: not_applicable_with_reason
+  frequency: manual_only
+  evidence_or_reason: Story 065 is manual-first, offline-friendly, and does not require
+    live cloud credentials or provider network access.
+remote_dev_smoke_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: after_remote_dev_deploy
+  evidence_or_reason: Story 065 adds no remote deployment behavior.

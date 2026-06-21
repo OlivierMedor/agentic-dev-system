@@ -7093,3 +7093,654 @@ stories:
         - Story_061_regression
         - Story_062_regression
         - Story_063_regression
+  - id: STORY-065
+    story_id: story_065
+    slug: parallel-cloud-escalation-batching-and-multi-request-orchestration
+    title: Story 065 - Parallel Cloud Escalation Batching and Multi-Request Orchestration
+    goal: Extend Stories 063 and 064 so the system can orchestrate multiple independent cloud escalations and their resulting runtime applications as one dependency-aware batch.
+    why: Story 063 safely imports and classifies cloud responses, and Story 064 safely applies one response at a time. Story 065 adds a batch orchestration layer so multiple request, response, application, resume, rollback, and recovery operations stay independently traceable while still being scheduled in deterministic dependency-aware waves.
+    agents:
+      developer:
+        writable_paths:
+          - src/**
+          - tests/**
+          - docs/**
+          - stories/parallel-cloud-escalation-batching-and-multi-request-orchestration/reports/**
+      test:
+        writable_paths:
+          - tests/**
+          - stories/parallel-cloud-escalation-batching-and-multi-request-orchestration/reports/**
+      documentation:
+        writable_paths:
+          - README.md
+          - docs/**
+          - stories/parallel-cloud-escalation-batching-and-multi-request-orchestration/reports/**
+      security_quality:
+        writable_paths:
+          - stories/parallel-cloud-escalation-batching-and-multi-request-orchestration/reports/**
+      local_reviewer:
+        writable_paths:
+          - stories/parallel-cloud-escalation-batching-and-multi-request-orchestration/reports/**
+    execution_order:
+      - developer
+      - test
+      - documentation
+      - security_quality
+      - local_reviewer
+    local_execution_constraints:
+      decomposition_authority: cloud_planner
+      required_context_must_fit: true
+      allow_required_context_trimming: false
+      oversized_task_policy: reject_for_cloud_redecomposition
+      local_agent_may_redecompose: false
+      require_independent_token_estimate: true
+      require_final_story_validation: true
+      require_dry_run_before_apply: true
+      preserve_canonical_blueprint: true
+      require_atomic_application: true
+      require_revision_bound_leases: true
+      allow_paid_provider_calls: false
+      allow_network_access: false
+      allow_automatic_git_revert: false
+      allow_automatic_merge: false
+      cloud_batch_orchestration:
+        enabled: true
+        max_parallel_requests: 4
+        max_parallel_applications: 2
+        max_parallel_resumes: 2
+        fail_fast: false
+        continue_on_independent_failure: true
+        require_explicit_batch_apply: true
+        require_explicit_batch_resume: true
+        auto_retry_transient_failures: false
+        manual_cloud_mode_only: true
+      maximum_task_size_contract: The complete required prompt for a Story 065 batch task, including per-request schemas, per-response validation, per-application checksums, dependency-graph rules, execution-wave planning, resume gating, rollback limits, writable-path rules, and audit requirements, must fit within the assigned model's usable input-token budget. Oversized tasks must be returned to the cloud planner for finer decomposition before any batch export, import, apply, resume, retry, cancel, or rollback attempt.
+      forbidden_fallbacks:
+        - cloud_model_implementation
+        - paid_provider_call
+        - hidden_implementation_fallback
+      required_failure_states:
+        batch_validation_failed: The proposed batch plan failed validation.
+        batch_transition_invalid: The batch state transition is not allowed.
+        batch_dependency_cycle: The proposed batch graph contains a cycle.
+        batch_dependency_missing: The proposed batch graph references a missing dependency.
+        batch_export_not_ready: The ready export batch is not valid for export.
+        batch_import_invalid: The imported response bundle failed validation.
+        duplicate_batch_request: The same request was claimed by another batch.
+        duplicate_batch_response: The same response was imported more than once.
+        unknown_batch_response: An imported response did not match a known request.
+        stale_batch_plan: The batch plan changed after it was created.
+        application_conflict: Two eligible applications cannot run concurrently.
+        resume_conflict: Two resume groups cannot safely run together.
+        rollback_conflict: Rollback would cross an unsafe dependency or revision boundary.
+        lease_conflict: A revision-bound lease or writable path is already held.
+        recovery_required: The batch record or batch state is incomplete or corrupt and needs operator recovery.
+    acceptance_criteria:
+      - A batch can group multiple independent cloud requests.
+      - Dependent requests are not exported prematurely.
+      - Batch membership is immutable after export.
+      - Each request retains its own checksum.
+      - The batch manifest has its own checksum.
+      - A multi-response bundle can be imported.
+      - Malformed responses are isolated from valid siblings.
+      - Missing responses remain pending.
+      - Later import of missing responses works.
+      - Duplicate responses are rejected.
+      - Unknown responses are rejected.
+      - Batch status is derived from item states.
+      - Partial success is represented accurately.
+      - Complete failure is represented accurately.
+      - The dependency DAG is validated.
+      - Cycles are rejected.
+      - Deterministic scheduling order is used.
+      - Independent validation may run in parallel.
+      - Application conflicts are detected.
+      - Conflicting applications are serialized or blocked.
+      - Application plans remain individual.
+      - Application checksums remain individual.
+      - Approvals remain individual.
+      - Runtime pointer updates remain serialized.
+      - One active runtime revision exists.
+      - Dry run makes no mutation.
+      - Dry run reports execution waves.
+      - Batch apply uses Story 064 transactions.
+      - One application failure blocks only dependents.
+      - Independent applications may continue.
+      - Per-item application results are preserved.
+      - Resume uses Story 064 leases.
+      - Conflicting writable-path groups do not run together.
+      - Blocked resume groups do not run.
+      - Independent resume groups may run concurrently.
+      - Stale workers cannot publish.
+      - Retry creates a new attempt.
+      - Retry preserves prior evidence.
+      - Stale retry is rejected.
+      - Malformed responses are not retried automatically.
+      - Cancellation prevents new work.
+      - Cancellation preserves completed work.
+      - Running leases are handled safely.
+      - Batch rollback uses reverse order.
+      - Unsafe rollback is rejected.
+      - Partial rollback is represented.
+      - Git changes are never automatically reverted.
+      - Batch records are versioned.
+      - Batch records are immutable where required.
+      - Batch audit is append-only.
+      - Item audit remains intact.
+      - Runtime artifacts are not committed.
+      - Artifact policy detects tracked batch artifacts.
+      - Public readiness excludes batch artifacts.
+      - Windows behavior is supported.
+      - Linux behavior is supported.
+      - Story 063 behavior remains intact.
+      - Story 064 behavior remains intact.
+      - Generation remains idempotent.
+      - No paid provider integration is introduced.
+    implementation_scope:
+      - Canonical batch records, items, attempts, and dependency graph semantics
+      - Cloud request export batches for ready independent requests
+      - Cloud response import batches with isolated validation results
+      - Application batches, execution waves, and revision-chain planning
+      - Resume batches, retry handling, cancellation, and rollback coordination
+      - Deterministic state transitions, audit trails, and progress derivation
+      - Repository-consistent `agentic cloud-queue batch ...` commands
+      - Runtime batch artifact layout and artifact-policy guardrails
+      - Offline-only tests and no paid provider calls
+      - Backward compatibility for Stories 063 and 064
+    subtasks:
+      - id: define-batch-models
+        title: Define batch models
+        role: developer
+        depends_on: []
+        responsibilities:
+          - batch records
+          - batch items
+          - dependency graph
+          - progress model
+          - attempt model
+          - schema versions
+          - tests
+        required_context: &story065_context
+          files:
+            - blueprints/blueprint.yaml
+            - src/agentic_dev/cloud_queue/*.py
+            - src/agentic_dev/cloud_application/*.py
+            - src/agentic_dev/artifact_policy.py
+            - src/agentic_dev/public_readiness.py
+            - tests/test_cloud_queue_models.py
+            - tests/test_cloud_queue_state_machine.py
+            - tests/test_cloud_application_models.py
+            - tests/test_cloud_application_state_machine.py
+            - tests/test_artifact_policy.py
+            - tests/test_public_readiness.py
+          summaries:
+            - Establish a versioned batch record that keeps every request, response, application, and resume attempt independently traceable.
+          prior_task_outputs: []
+          architecture_decisions:
+            - Batch orchestration must remain a layer over Story 063 and Story 064 primitives.
+            - Batch records must never collapse multiple unsafe operations into one opaque action.
+        context_budget: &story065_budget
+          max_input_tokens: 24000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: define-batch-state-machine
+        title: Define batch state machine
+        role: developer
+        depends_on:
+          - define-batch-models
+        responsibilities:
+          - valid transitions
+          - invalid transition rejection
+          - partial states
+          - terminal states
+          - tests
+        required_context: *story065_context
+        context_budget: *story065_budget
+      - id: add-batch-persistence-and-audit
+        title: Add batch persistence and audit
+        role: developer
+        depends_on:
+          - define-batch-models
+          - define-batch-state-machine
+        responsibilities:
+          - atomic persistence
+          - append-only audit
+          - immutable exported membership
+          - checksums
+          - tests
+        required_context: *story065_context
+        context_budget: *story065_budget
+      - id: build-dependency-graph-validation
+        title: Build dependency graph validation
+        role: developer
+        depends_on:
+          - define-batch-models
+          - add-batch-persistence-and-audit
+        responsibilities:
+          - dependency validation
+          - cycle detection
+          - deterministic topological ordering
+          - ready-set calculation
+          - tests
+        required_context: *story065_context
+        context_budget: *story065_budget
+      - id: extend-request-batch-export
+        title: Extend request batch export
+        role: developer
+        depends_on:
+          - add-batch-persistence-and-audit
+          - build-dependency-graph-validation
+        responsibilities:
+          - select ready independent requests
+          - create manifest
+          - preserve request checksums
+          - enforce limits
+          - tests
+        required_context: *story065_context
+        context_budget: *story065_budget
+      - id: add-multi-response-import-orchestration
+        title: Add multi-response import orchestration
+        role: developer
+        depends_on:
+          - add-batch-persistence-and-audit
+          - extend-request-batch-export
+        responsibilities:
+          - import response bundles
+          - isolate invalid responses
+          - preserve missing responses
+          - support later completion
+          - tests
+        required_context: *story065_context
+        context_budget: *story065_budget
+      - id: add-derived-batch-progress
+        title: Add derived batch progress
+        role: developer
+        depends_on:
+          - define-batch-state-machine
+          - add-batch-persistence-and-audit
+          - add-multi-response-import-orchestration
+        responsibilities:
+          - derive status from item states
+          - partial success
+          - complete failure
+          - in-progress state
+          - tests
+        required_context: *story065_context
+        context_budget: *story065_budget
+      - id: add-application-batch-planner
+        title: Add application batch planner
+        role: developer
+        depends_on:
+          - build-dependency-graph-validation
+          - add-multi-response-import-orchestration
+          - add-derived-batch-progress
+        responsibilities:
+          - create individual application plans
+          - create orchestration plan
+          - preserve checksums
+          - preserve approvals
+          - tests
+        required_context: *story065_context
+        context_budget: *story065_budget
+      - id: add-application-conflict-detection
+        title: Add application conflict detection
+        role: security_quality
+        depends_on:
+          - add-application-batch-planner
+        responsibilities:
+          - task conflicts
+          - path conflicts
+          - dependency conflicts
+          - revision conflicts
+          - tests
+        required_context: *story065_context
+        context_budget: *story065_budget
+      - id: add-execution-wave-planning
+        title: Add execution wave planning
+        role: developer
+        depends_on:
+          - build-dependency-graph-validation
+          - add-application-batch-planner
+          - add-application-conflict-detection
+        responsibilities:
+          - deterministic waves
+          - safe parallel preparation
+          - serialized revision commits
+          - tests
+        required_context: *story065_context
+        context_budget: *story065_budget
+      - id: add-batch-dry-run
+        title: Add batch dry-run
+        role: developer
+        depends_on:
+          - add-application-batch-planner
+          - add-execution-wave-planning
+        responsibilities:
+          - readiness
+          - conflict graph
+          - waves
+          - expected revision chain
+          - no mutation
+          - tests
+        required_context: *story065_context
+        context_budget: *story065_budget
+      - id: add-batch-apply
+        title: Add batch apply
+        role: developer
+        depends_on:
+          - add-application-batch-planner
+          - add-execution-wave-planning
+          - add-batch-dry-run
+        responsibilities:
+          - invoke Story 064 apply
+          - isolate failures
+          - preserve item results
+          - update progress
+          - tests
+        required_context: *story065_context
+        context_budget: *story065_budget
+      - id: add-batch-resume-planning
+        title: Add batch resume planning
+        role: developer
+        depends_on:
+          - build-dependency-graph-validation
+          - add-derived-batch-progress
+          - add-batch-apply
+        responsibilities:
+          - ready task groups
+          - dependency handling
+          - writable-path conflict detection
+          - tests
+        required_context: *story065_context
+        context_budget: *story065_budget
+      - id: add-batch-resume
+        title: Add batch resume
+        role: developer
+        depends_on:
+          - add-batch-apply
+          - add-batch-resume-planning
+        responsibilities:
+          - invoke Story 064 resume
+          - create leases
+          - isolate failures
+          - preserve progress
+          - tests
+        required_context: *story065_context
+        context_budget: *story065_budget
+      - id: add-retry-support
+        title: Add retry support
+        role: developer
+        depends_on:
+          - add-multi-response-import-orchestration
+          - add-batch-apply
+          - add-batch-resume
+        responsibilities:
+          - attempt records
+          - retry limits
+          - stale retry checks
+          - explicit operator action
+          - tests
+        required_context: *story065_context
+        context_budget: *story065_budget
+      - id: add-cancellation
+        title: Add cancellation
+        role: developer
+        depends_on:
+          - add-batch-persistence-and-audit
+          - add-batch-apply
+          - add-batch-resume
+        responsibilities:
+          - prevent new work
+          - preserve completed work
+          - handle active leases
+          - tests
+        required_context: *story065_context
+        context_budget: *story065_budget
+      - id: add-batch-rollback
+        title: Add batch rollback
+        role: developer
+        depends_on:
+          - add-batch-apply
+          - add-batch-resume
+          - add-cancellation
+        responsibilities:
+          - reverse-order rollback
+          - partial rollback
+          - conflict checks
+          - tests
+        required_context: *story065_context
+        context_budget: *story065_budget
+      - id: add-recovery-and-reconciliation
+        title: Add recovery and reconciliation
+        role: developer
+        depends_on:
+          - add-batch-persistence-and-audit
+          - add-multi-response-import-orchestration
+          - add-batch-apply
+          - add-batch-resume
+          - add-batch-rollback
+        responsibilities:
+          - partial import recovery
+          - interrupted wave recovery
+          - stale lock recovery
+          - partial rollback recovery
+          - tests
+        required_context: *story065_context
+        context_budget: *story065_budget
+      - id: add-concurrency-controls
+        title: Add concurrency controls
+        role: security_quality
+        depends_on:
+          - add-batch-persistence-and-audit
+          - add-batch-apply
+          - add-batch-resume
+          - add-retry-support
+          - add-cancellation
+          - add-batch-rollback
+        responsibilities:
+          - locks
+          - optimistic checks
+          - duplicate claim prevention
+          - race tests
+        required_context: *story065_context
+        context_budget: *story065_budget
+      - id: add-cli-commands
+        title: Add CLI commands
+        role: developer
+        depends_on:
+          - define-batch-models
+          - define-batch-state-machine
+          - add-batch-persistence-and-audit
+          - build-dependency-graph-validation
+          - extend-request-batch-export
+          - add-multi-response-import-orchestration
+          - add-derived-batch-progress
+          - add-application-batch-planner
+          - add-application-conflict-detection
+          - add-execution-wave-planning
+          - add-batch-dry-run
+          - add-batch-apply
+          - add-batch-resume-planning
+          - add-batch-resume
+          - add-retry-support
+          - add-cancellation
+          - add-batch-rollback
+          - add-recovery-and-reconciliation
+          - add-concurrency-controls
+        responsibilities:
+          - batch list/show
+          - export/import
+          - plan/apply
+          - dry-run
+          - resume
+          - retry
+          - cancel
+          - rollback
+          - status
+          - tests
+        required_context: *story065_context
+        context_budget: *story065_budget
+      - id: add-deterministic-end-to-end-scenarios
+        title: Add deterministic end-to-end scenarios
+        role: test
+        depends_on:
+          - add-cli-commands
+          - add-batch-apply
+          - add-batch-resume
+          - add-batch-rollback
+          - add-recovery-and-reconciliation
+        responsibilities:
+          - complete success
+          - partial import
+          - partial application failure
+          - dependency blocking
+          - partial resume
+          - retry
+          - cancel
+          - rollback
+          - recovery
+          - tests
+        required_context: *story065_context
+        context_budget: *story065_budget
+      - id: add-operator-documentation
+        title: Add operator documentation
+        role: documentation
+        depends_on:
+          - add-cli-commands
+          - add-batch-dry-run
+          - add-batch-rollback
+        responsibilities:
+          - batch lifecycle
+          - dependency behavior
+          - partial success
+          - retries
+          - cancellation
+          - rollback
+          - troubleshooting
+        required_context: *story065_context
+        context_budget: *story065_budget
+      - id: security-review
+        title: Security review
+        role: security_quality
+        depends_on:
+          - add-batch-persistence-and-audit
+          - add-application-conflict-detection
+          - add-concurrency-controls
+          - add-batch-rollback
+        responsibilities:
+          - concurrency
+          - conflict detection
+          - archive handling
+          - approvals
+          - rollback
+          - runtime artifacts
+        required_context: *story065_context
+        context_budget: *story065_budget
+      - id: final-local-review
+        title: Final local review
+        role: local_reviewer
+        depends_on:
+          - define-batch-models
+          - define-batch-state-machine
+          - add-cli-commands
+          - add-deterministic-end-to-end-scenarios
+          - add-operator-documentation
+          - security-review
+        responsibilities:
+          - acceptance-criteria traceability
+          - Story 063 and Story 064 regressions
+          - offline behavior
+          - no paid provider access
+          - review evidence
+        required_context: *story065_context
+        context_budget: *story065_budget
+    definition_of_done:
+      - The blueprint defines the batch record schema, lifecycle, dependency graph, and item-level traceability rules.
+      - Acceptance criteria cover batch export, multi-response import, dry run, apply, resume, retry, cancellation, rollback, recovery, and regression safety.
+      - The generated Story 065 workspace is created by agentic generate-stories and generation is idempotent across two runs.
+      - docker compose run --rm dev pytest passes.
+      - docker compose run --rm dev ruff check . passes.
+      - artifact-policy validation passes.
+      - runtime-config validation passes.
+      - hidden-Unicode hygiene validation passes.
+      - Public-readiness validation passes when applicable to the repository state.
+      - No paid cloud API calls are implemented.
+      - No provider network access is added.
+      - Manual cloud mode remains the default.
+      - Automatic batch apply and automatic batch resume remain disabled by default.
+    not_in_scope:
+      - Paid cloud API integrations.
+      - Provider network access or automatic provider selection.
+      - Automatic live cloud-provider execution.
+      - Silent canonical blueprint rewrites from imported cloud data.
+      - Automatic merging, deployment, publishing, or live execution.
+      - Automatic commits or merges from cloud responses.
+      - Runtime batch records, locks, attempts, response bundles, and audits committed to Git.
+    test_plan:
+      test_layers_version: 1
+      unit_tests:
+        required: true
+        action: add_or_update
+        frequency: every_commit
+        evidence_or_reason: Cover batch schemas, lifecycle transitions, DAG validation, deterministic ordering, checksums, progress derivation, and configuration defaults for explicit batch operations.
+      integration_tests:
+        required: true
+        action: add_or_update
+        frequency: every_pull_request
+        evidence_or_reason: Cover export, import, dry run, apply, resume, retry, cancel, rollback, recovery, and Stories 063 through 064 regressions.
+      mock_e2e_tests:
+        required: true
+        action: add_or_update
+        frequency: before_merge
+        evidence_or_reason: Use deterministic offline fixtures to prove batch orchestration, dependency waves, partial success, and isolated failures without cloud calls.
+      live_read_only_checks:
+        required: false
+        action: not_applicable_with_reason
+        frequency: manual_only
+        evidence_or_reason: Story 065 is manual-first, offline-friendly, and does not require live cloud credentials or provider network access.
+      remote_dev_smoke_tests:
+        required: false
+        action: not_applicable_with_reason
+        frequency: after_remote_dev_deploy
+        evidence_or_reason: Story 065 adds no remote deployment behavior.
+    monitoring_plan:
+      logs_required:
+        - batch_id
+        - batch_type
+        - request_ids
+        - response_ids
+        - application_ids
+        - resume_ids
+        - batch_manifest_checksum
+        - request_checksum
+        - response_checksum
+        - application_checksum
+        - dependency_graph_checksum
+        - item_state
+        - batch_progress
+        - execution_wave
+        - lease_state
+        - rollback_state
+        - audit_event
+      watch_for:
+        - batch_transition_invalid
+        - batch_dependency_cycle
+        - batch_dependency_missing
+        - batch_import_invalid
+        - duplicate_batch_request
+        - duplicate_batch_response
+        - unknown_batch_response
+        - stale_batch_plan
+        - application_conflict
+        - resume_conflict
+        - rollback_conflict
+        - lease_conflict
+        - recovery_required
+        - paid_provider_call_attempt
+        - network_access_attempt
+        - automatic_apply_attempt
+        - automatic_resume_attempt
+        - Story_063_regression
+        - Story_064_regression
