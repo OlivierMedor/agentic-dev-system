@@ -8,7 +8,7 @@ import yaml
 
 from agentic_dev.cli import main
 from agentic_dev.cloud_batch import build_default_batch_service
-from agentic_dev.cloud_queue import create_cloud_queue_request, export_cloud_queue_request, show_cloud_queue_request
+from agentic_dev.cloud_queue import create_cloud_queue_request, show_cloud_queue_request
 
 
 STORY = "story_065_parallel_cloud_batch_orchestration"
@@ -109,8 +109,6 @@ def test_batch_import_isolates_malformed_sibling(tmp_path: Path) -> None:
         request_id_factory=lambda: "CQ-BATCH-4",
         batch_id_factory=lambda: "batch-source",
     )
-    export_cloud_queue_request(tmp_path, all_ready=True)
-
     bundle_path = tmp_path / "responses.zip"
     with ZipFile(bundle_path, "w") as archive:
         archive.writestr(
@@ -120,6 +118,7 @@ def test_batch_import_isolates_malformed_sibling(tmp_path: Path) -> None:
         archive.writestr("broken.yaml", ":\n  - not valid yaml\n")
 
     service = build_default_batch_service(tmp_path)
+    service.export(all_ready=True, batch_id="batch-20260621-0002")
     result = service.import_bundle(bundle_path, batch_id="batch-20260621-0002")
 
     assert result.imported_count == 2

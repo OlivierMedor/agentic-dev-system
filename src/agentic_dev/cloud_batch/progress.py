@@ -28,8 +28,12 @@ def derive_batch_status(progress: ProgressSummary, item_results: list[ItemResult
         return "resumed" if any(result.outcome == "resumed" for result in item_results) else "applied"
     if progress.failed == progress.total:
         return "failed"
-    if progress.succeeded and (progress.failed or progress.blocked or progress.pending or progress.running):
+    if progress.succeeded and progress.failed:
+        return "partially_resumed" if any(result.outcome == "resumed" for result in item_results) else "partially_failed"
+    if progress.succeeded and (progress.blocked or progress.pending or progress.running):
         return "partially_resumed" if any(result.outcome == "resumed" for result in item_results) else "partially_applied"
+    if progress.failed and (progress.blocked or progress.pending or progress.running):
+        return "partially_failed"
     if progress.pending or progress.running:
         return "planned"
     return "validation_complete"
@@ -47,4 +51,3 @@ def derive_batch_result(batch_id: str, items: list[BatchItem], item_results: lis
         checksum="",
         details={},
     )
-
