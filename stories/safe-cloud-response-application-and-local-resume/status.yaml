@@ -1,4 +1,4 @@
 story_id: story_064
 slug: safe-cloud-response-application-and-local-resume
-status: pending
-ready_for_review: false
+status: ready_for_review
+ready_for_review: true

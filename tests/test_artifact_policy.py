@@ -20,6 +20,13 @@ def test_allowed_project_paths_do_not_violate_artifact_policy() -> None:
         ".agentic/cloud_queue/requests/.gitkeep",
         ".agentic/cloud_queue/exports/.gitkeep",
         ".agentic/cloud_queue/audit/.gitkeep",
+        ".agentic/cloud_applications/applications/.gitkeep",
+        ".agentic/cloud_applications/plans/.gitkeep",
+        ".agentic/cloud_applications/audits/.gitkeep",
+        ".agentic/cloud_applications/recovery/.gitkeep",
+        ".agentic/runtime_plans/revisions/.gitkeep",
+        ".agentic/runtime_plans/transactions/.gitkeep",
+        ".agentic/execution_leases/.gitkeep",
         ".agentic/feature_scan/.gitkeep",
         ".agentic/local_model_scorecard/prompts/developer_agent_prompt.md",
         ".agentic/local_model_scorecard/scorecard_template.yaml",
@@ -94,6 +101,12 @@ def test_cloud_queue_runtime_files_are_blocked_except_gitkeep() -> None:
         ".agentic/cloud_queue/exports/cloud-batch-0001/manifest.yaml",
         ".agentic/cloud_queue/audit/cloud-event-000001.yaml",
         ".agentic/cloud_queue/exports/cloud-batch-0001/cloud_queue_packet.zip",
+        ".agentic/cloud_applications/applications/cloud-application-0001.yaml",
+        ".agentic/cloud_applications/plans/cloud-application-0001.yaml",
+        ".agentic/cloud_applications/audits/application_audit.jsonl",
+        ".agentic/runtime_plans/revisions/runtime-plan-r1.yaml",
+        ".agentic/runtime_plans/active.yaml",
+        ".agentic/execution_leases/lease-0001.yaml",
     ]
 
     assert violation_paths(

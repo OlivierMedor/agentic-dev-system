@@ -25,6 +25,13 @@ from agentic_dev.cloud_queue import (
     fail_cloud_queue_request,
     show_cloud_queue_request,
 )
+from agentic_dev.cloud_application import (
+    build_default_application_service,
+    format_application_record,
+    format_application_status,
+    format_recovery_result,
+    format_resume_result,
+)
 from agentic_dev.codex_runtime import create_codex_tasks
 from agentic_dev.demo_subtasks import add_demo_subtasks_arguments, run_demo_subtasks
 from agentic_dev.finalize_story import finalize_story
@@ -510,6 +517,62 @@ def main() -> None:
     )
     cloud_queue_status_parser.add_argument("--project", type=Path, default=Path.cwd())
     cloud_queue_status_parser.add_argument("--json", action="store_true")
+
+    cloud_queue_plan_apply_parser = cloud_queue_subparsers.add_parser(
+        "plan-apply",
+        help="Plan a safe cloud response application without mutating runtime state.",
+    )
+    cloud_queue_plan_apply_parser.add_argument("--project", type=Path, default=Path.cwd())
+    cloud_queue_plan_apply_parser.add_argument("--request", required=True)
+    cloud_queue_plan_apply_parser.add_argument("--dry-run", action="store_true")
+    cloud_queue_plan_apply_parser.add_argument("--json", action="store_true")
+
+    cloud_queue_apply_parser = cloud_queue_subparsers.add_parser(
+        "apply",
+        help="Apply an eligible cloud response to the runtime revision.",
+    )
+    cloud_queue_apply_parser.add_argument("--project", type=Path, default=Path.cwd())
+    cloud_queue_apply_parser.add_argument("--request", required=True)
+    cloud_queue_apply_parser.add_argument("--dry-run", action="store_true")
+    cloud_queue_apply_parser.add_argument("--json", action="store_true")
+
+    cloud_queue_resume_parser = cloud_queue_subparsers.add_parser(
+        "resume",
+        help="Resume local execution from an applied runtime revision.",
+    )
+    cloud_queue_resume_parser.add_argument("--project", type=Path, default=Path.cwd())
+    cloud_queue_resume_parser.add_argument("--request", required=True)
+    cloud_queue_resume_parser.add_argument("--json", action="store_true")
+
+    cloud_queue_rollback_apply_parser = cloud_queue_subparsers.add_parser(
+        "rollback",
+        help="Roll back an applied application to its prior runtime revision.",
+    )
+    cloud_queue_rollback_apply_parser.add_argument("--project", type=Path, default=Path.cwd())
+    cloud_queue_rollback_apply_parser.add_argument("--application", required=True)
+    cloud_queue_rollback_apply_parser.add_argument("--json", action="store_true")
+
+    cloud_queue_application_status_parser = cloud_queue_subparsers.add_parser(
+        "application-status",
+        help="Show runtime application status.",
+    )
+    cloud_queue_application_status_parser.add_argument("--project", type=Path, default=Path.cwd())
+    cloud_queue_application_status_parser.add_argument("--json", action="store_true")
+
+    cloud_queue_application_show_parser = cloud_queue_subparsers.add_parser(
+        "application-show",
+        help="Show one runtime application record.",
+    )
+    cloud_queue_application_show_parser.add_argument("--project", type=Path, default=Path.cwd())
+    cloud_queue_application_show_parser.add_argument("--application", required=True)
+    cloud_queue_application_show_parser.add_argument("--json", action="store_true")
+
+    cloud_queue_recover_parser = cloud_queue_subparsers.add_parser(
+        "recover",
+        help="Inspect runtime application state and recommend recovery actions.",
+    )
+    cloud_queue_recover_parser.add_argument("--project", type=Path, default=Path.cwd())
+    cloud_queue_recover_parser.add_argument("--json", action="store_true")
 
     record_cloud_review_parser = subparsers.add_parser(
         "record-cloud-review",
@@ -1551,6 +1614,57 @@ def main() -> None:
             print(f"Next action: {result.next_action}")
 
         if args.command == "cloud-queue":
+            application_service = build_default_application_service(args.project)
+
+            if args.cloud_queue_command == "plan-apply":
+                result = application_service.plan_apply(args.request, dry_run=True)
+                if args.json:
+                    print(json.dumps(asdict(result), default=str, indent=2, sort_keys=True))
+                else:
+                    print(result.terminal_summary)
+
+            if args.cloud_queue_command == "apply":
+                result = application_service.plan_apply(args.request, dry_run=args.dry_run)
+                if args.json:
+                    print(json.dumps(asdict(result), default=str, indent=2, sort_keys=True))
+                else:
+                    print(result.terminal_summary)
+
+            if args.cloud_queue_command == "resume":
+                result = application_service.resume(args.request)
+                if args.json:
+                    print(json.dumps(asdict(result), default=str, indent=2, sort_keys=True))
+                else:
+                    print(format_resume_result(result))
+
+            if args.cloud_queue_command == "rollback":
+                result = application_service.rollback(args.application)
+                if args.json:
+                    print(json.dumps(asdict(result), default=str, indent=2, sort_keys=True))
+                else:
+                    print(format_application_record(result))
+
+            if args.cloud_queue_command == "application-status":
+                result = application_service.application_status()
+                if args.json:
+                    print(json.dumps(asdict(result), default=str, indent=2, sort_keys=True))
+                else:
+                    print(format_application_status(result))
+
+            if args.cloud_queue_command == "application-show":
+                result = application_service.application_show(args.application)
+                if args.json:
+                    print(json.dumps(asdict(result), default=str, indent=2, sort_keys=True))
+                else:
+                    print(format_application_record(result))
+
+            if args.cloud_queue_command == "recover":
+                result = application_service.recover()
+                if args.json:
+                    print(json.dumps(asdict(result), default=str, indent=2, sort_keys=True))
+                else:
+                    print(format_recovery_result(result))
+
             if args.cloud_queue_command == "create":
                 result = create_cloud_queue_request(
                     args.project,

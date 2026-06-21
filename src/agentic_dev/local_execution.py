@@ -311,6 +311,7 @@ def run_subtask_local_execution(
     role: str | None,
     resume: bool,
     dry_run: bool,
+    initial_state: dict[str, Any] | None = None,
     http_client: LocalModelHttpClient | None,
 ) -> LocalExecutionResult:
     execution_path = story_path / LOCAL_EXECUTION_FOLDER
@@ -363,7 +364,7 @@ def run_subtask_local_execution(
             subtasks=resolved_tasks,
         )
 
-    state = load_execution_state(state_path) if resume else {}
+    state = initial_state if initial_state is not None else load_execution_state(state_path) if resume else {}
     state = initialize_subtask_state(state, story, ordered_tasks)
     write_state(state_path, state)
 

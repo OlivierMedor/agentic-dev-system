@@ -12,6 +12,7 @@ from agentic_dev.artifact_policy import (
     is_generated_cloud_review_packet_path,
     is_generated_remote_dev_validation_path,
     is_generated_review_bundle_path,
+    is_cloud_application_runtime_path,
     is_cloud_queue_runtime_path,
     is_local_agent_context_output_path,
     is_local_agent_draft_output_path,
@@ -99,6 +100,9 @@ def public_readiness_violation_reason(
 
     if is_cloud_queue_runtime_path(parts, filename):
         return "cloud queue runtime files must remain untracked"
+
+    if is_cloud_application_runtime_path(parts, filename):
+        return "cloud application runtime files must remain untracked"
 
     if is_feature_scan_runtime_path(parts, filename):
         return "feature scan runtime files must remain untracked"
@@ -214,6 +218,7 @@ def format_public_readiness_report(result: PublicReadinessResult) -> str:
             "- `stories/**/remote_dev_validation/*` except `.gitkeep`",
             "- `.agentic/support_queue/**/*.yaml` and `*.md` runtime files",
             "- `.agentic/cloud_queue/**` runtime files except `.gitkeep`",
+            "- `.agentic/cloud_applications/**`, `.agentic/runtime_plans/**`, and `.agentic/execution_leases/**` runtime files except `.gitkeep`",
             "- `.agentic/feature_scan/*.md` and `*.yaml` runtime files",
             "- `.agentic/local_model_scorecard/results/**`",
             "- `stories/**/reports/local_agent_drafts/*` except `.gitkeep`",
