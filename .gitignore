@@ -54,6 +54,8 @@ stories/**/reports/local_execution/*
 !.agentic/runtime_plans/**/.gitkeep
 .agentic/execution_leases/**
 !.agentic/execution_leases/**/.gitkeep
+.agentic/cloud_batches/**
+!.agentic/cloud_batches/**/.gitkeep
 tmp/
 .agentic/feature_scan/*.md
 .agentic/feature_scan/*.yaml

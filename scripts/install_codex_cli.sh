@@ -1,4 +1,5 @@
 #!/bin/sh
+# Keep this script POSIX-sh compatible so Docker build can fall back cleanly.
 set -eu
 
 install_real_codex() {
