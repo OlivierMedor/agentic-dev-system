@@ -25,6 +25,7 @@ from agentic_dev.cloud_application.models import (
     RollbackMetadata,
     RuntimePlanRevision,
     TaskSnapshot,
+    TransactionRecord,
 )
 
 
@@ -238,3 +239,23 @@ def test_active_pointer_lease_and_resume_models_round_trip() -> None:
     assert resume.status == "resumed"
     assert recovery.reconciled is False
 
+
+def test_transaction_record_round_trip() -> None:
+    transaction = TransactionRecord(
+        schema_version=1,
+        transaction_id="txn-1",
+        application_id="cloud-application-0001",
+        source_revision_id="runtime-plan-r0",
+        source_revision_checksum="sha256:r0",
+        proposed_revision_id="runtime-plan-r1",
+        proposed_revision_checksum="sha256:r1",
+        expected_active_pointer="runtime-plan-r0",
+        phase="prepared",
+        artifact_paths=("foo.yaml",),
+        created_at="2026-06-20T12:00:00Z",
+        updated_at="2026-06-20T12:00:00Z",
+        recovery_action="recover",
+        details={"key": "value"},
+    )
+
+    assert TransactionRecord.from_dict(transaction.to_dict()) == transaction

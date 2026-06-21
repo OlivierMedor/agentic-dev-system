@@ -170,6 +170,8 @@ def import_single_response(
             **request.to_dict(),
             "prior_state": request.state,
             "state": "imported",
+            "source_task_id": str(response.claims.get("source_task_id", request.source_task_id) or request.source_task_id),
+            "source_plan_revision": str(response.claims.get("source_plan_revision", request.source_plan_revision) or request.source_plan_revision),
             "normalized_response_checksum": normalized_checksum,
             "approval_checksum": approval_binding,
             "raw_response_checksum": checksum_text(raw_text),

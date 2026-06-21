@@ -6,6 +6,7 @@ import uuid
 import contextlib
 import io
 from pathlib import Path
+from types import SimpleNamespace
 
 import yaml
 
@@ -16,6 +17,15 @@ from agentic_dev.cloud_queue import (
     import_cloud_queue_response,
     show_cloud_queue_request,
 )
+from agentic_dev.cloud_application.graph import build_runtime_graph_revision
+from agentic_dev.cloud_application.models import (
+    ActiveRevisionPointer,
+    DependencyChange,
+    RequirementMapping,
+    RollbackMetadata,
+    TaskSnapshot,
+)
+from agentic_dev.cloud_application.persistence import save_active_pointer, save_runtime_revision
 
 
 STORY = "safe-cloud-response-application-and-local-resume"
@@ -99,6 +109,70 @@ def create_story(project_path: Path) -> None:
     )
 
 
+def bootstrap_runtime_state(project_path: Path) -> None:
+    source = TaskSnapshot(
+        task_id="source",
+        title="Source task",
+        role="developer",
+        depends_on=(),
+        requirement_ids=("AC-001",),
+        required_context=("story.md",),
+        writable_paths=("runtime/source/**",),
+        expected_outputs=("reports/source.md",),
+        validation_steps=("pytest -q",),
+        token_estimate=1000,
+        usable_input_tokens=2000,
+        status="blocked",
+        history=("bootstrap",),
+    )
+    audit = TaskSnapshot(
+        task_id="audit",
+        title="Audit task",
+        role="test",
+        depends_on=("source",),
+        requirement_ids=("AC-001",),
+        required_context=("story.md",),
+        writable_paths=("runtime/review/**",),
+        expected_outputs=("reports/audit.md",),
+        validation_steps=("pytest -q",),
+        token_estimate=1000,
+        usable_input_tokens=2000,
+        status="ready",
+        source_task_id="source",
+        history=("source",),
+    )
+    revision = build_runtime_graph_revision(
+        revision_id="runtime-plan-r0",
+        parent_revision_id=None,
+        application_id="bootstrap",
+        created_at="2026-06-20T12:00:00Z",
+        tasks=[source, audit],
+        requirement_mappings=[RequirementMapping(requirement_id="AC-001", task_ids=("source", "audit"))],
+        dependency_changes=[DependencyChange(task_id="audit", prior_dependencies=(), new_dependencies=("source",), summary="bootstrap")],
+        change_summary=["bootstrap runtime plan"],
+        rollback_metadata=RollbackMetadata(
+            prior_revision_id="",
+            prior_revision_checksum="",
+            rollback_reason="bootstrap",
+            created_at="2026-06-20T12:00:00Z",
+            application_id="bootstrap",
+        ),
+        audit_event_ids=("audit-1",),
+    )
+    save_runtime_revision(project_path, revision)
+    save_active_pointer(
+        project_path,
+        ActiveRevisionPointer(
+            schema_version=1,
+            active_revision_id=revision.revision_id,
+            active_revision_checksum=revision.revision_checksum,
+            previous_revision_id=None,
+            update_timestamp="2026-06-20T12:00:00Z",
+            application_id="bootstrap",
+        ),
+    )
+
+
 def response_payload(request_id: str, batch_id: str) -> dict[str, object]:
     return {
         "response_id": f"{request_id}-response",
@@ -110,6 +184,9 @@ def response_payload(request_id: str, batch_id: str) -> dict[str, object]:
         "checksum": "checksum",
         "decision": "SAFE",
         "claims": {
+            "operation_type": "replace_task_with_subtasks",
+            "source_task_id": "source",
+            "source_plan_revision": "runtime-plan-r0",
             "applicable_requirements": ["AC-001"],
             "writable_paths": ["runtime/app/parser/**", "runtime/app/validator/**"],
             "scope_changes": ["manual approval required for redecomposition"],
@@ -155,6 +232,7 @@ def response_payload(request_id: str, batch_id: str) -> dict[str, object]:
 
 def prepare_project(project_path: Path) -> str:
     create_story(project_path)
+    bootstrap_runtime_state(project_path)
     request = create_cloud_queue_request(
         project_path,
         story=STORY,
@@ -162,6 +240,8 @@ def prepare_project(project_path: Path) -> str:
         details="details",
         requirements=["AC-001"],
         writable_paths=["runtime/app/parser/**", "runtime/app/validator/**"],
+        source_task_id="source",
+        source_plan_revision="runtime-plan-r0",
         request_id_factory=lambda: "CQ-CLI-1",
         batch_id_factory=lambda: "batch-cli",
     )
@@ -182,8 +262,7 @@ def prepare_project(project_path: Path) -> str:
     return request.request.request_id
 
 
-def test_cloud_queue_application_cli_commands(
-) -> None:
+def test_cloud_queue_application_cli_commands(monkeypatch) -> None:
     temp_root = (
         Path(os.environ["LOCALAPPDATA"]) / "Temp"
         if os.environ.get("LOCALAPPDATA")
@@ -206,6 +285,14 @@ def test_cloud_queue_application_cli_commands(
             sys.argv = previous_argv
         assert stderr.getvalue() == ""
         return stdout.getvalue()
+
+    state_path = project_path / ".agentic" / "cloud_applications" / "execution_state.yaml"
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+    state_path.write_text("status: completed\n", encoding="utf-8")
+    fake_result = SimpleNamespace(
+        result=SimpleNamespace(status="completed", state_path=state_path, story_path=project_path / "stories" / STORY),
+    )
+    monkeypatch.setattr("agentic_dev.cloud_application.service.run_runtime_revision_execution", lambda *args, **kwargs: fake_result)
 
     request_id = prepare_project(project_path)
 

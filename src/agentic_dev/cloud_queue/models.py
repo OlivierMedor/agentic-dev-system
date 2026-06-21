@@ -53,6 +53,8 @@ class CloudQueueRequest:
     context_files: list[str] = field(default_factory=list)
     created_at: str = ""
     updated_at: str = ""
+    source_task_id: str = ""
+    source_plan_revision: str = ""
     packet_checksum: str = ""
     normalized_response_checksum: str = ""
     approval_checksum: str = ""
@@ -82,6 +84,8 @@ class CloudQueueRequest:
             "context_files": list(self.context_files),
             "created_at": self.created_at,
             "updated_at": self.updated_at,
+            "source_task_id": self.source_task_id,
+            "source_plan_revision": self.source_plan_revision,
             "packet_checksum": self.packet_checksum,
             "normalized_response_checksum": self.normalized_response_checksum,
             "approval_checksum": self.approval_checksum,
@@ -115,6 +119,8 @@ class CloudQueueRequest:
             context_files=list(data.get("context_files", []) or []),
             created_at=str(data.get("created_at", "")),
             updated_at=str(data.get("updated_at", "")),
+            source_task_id=str(data.get("source_task_id", "")),
+            source_plan_revision=str(data.get("source_plan_revision", "")),
             packet_checksum=str(data.get("packet_checksum", "")),
             normalized_response_checksum=str(data.get("normalized_response_checksum", "")),
             approval_checksum=str(data.get("approval_checksum", "")),

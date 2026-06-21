@@ -76,6 +76,8 @@ def create_cloud_queue_request(
     dependencies: list[str] | None = None,
     context_files: list[str] | None = None,
     notes: list[str] | None = None,
+    source_task_id: str = "",
+    source_plan_revision: str = "",
     request_id_factory: Callable[[], str] | None = None,
     batch_id_factory: Callable[[], str] | None = None,
     event_id_factory: Callable[[], str] | None = None,
@@ -101,6 +103,8 @@ def create_cloud_queue_request(
         context_files=[normalize_relative_path(item) for item in (context_files or [])],
         created_at=now_iso(),
         updated_at=now_iso(),
+        source_task_id=source_task_id,
+        source_plan_revision=source_plan_revision,
         notes=list(notes or []),
         next_action="Ready to export.",
     )

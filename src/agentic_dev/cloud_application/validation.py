@@ -272,8 +272,8 @@ def validate_requirement_drift(
 
 
 def validate_no_canonical_mutation(plan: ApplicationPlan) -> None:
-    if plan.source_task_snapshot.source_task_id and plan.source_task_snapshot.source_task_id != plan.source_task_snapshot.task_id:
-        raise ValueError("Source task snapshot is inconsistent.")
+    if not plan.source_task_snapshot.task_id:
+        raise ValueError("Source task snapshot is missing a task ID.")
 
 
 def validate_approval_scope(

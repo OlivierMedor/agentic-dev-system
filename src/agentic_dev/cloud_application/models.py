@@ -8,6 +8,7 @@ APPLICATION_SCHEMA_VERSION = 1
 REVISION_SCHEMA_VERSION = 1
 ACTIVE_POINTER_SCHEMA_VERSION = 1
 LEASE_SCHEMA_VERSION = 1
+TRANSACTION_SCHEMA_VERSION = 1
 
 ApplicationState = str
 ApplicationOperationType = str
@@ -43,9 +44,24 @@ TERMINAL_APPLICATION_STATES = (
 SUPPORTED_APPLICATION_OPERATIONS = (
     "replace_task_with_subtasks",
     "update_task_metadata",
+)
+
+SUPPORTED_REJECTED_APPLICATION_OPERATIONS = (
     "add_architecture_overlay",
     "add_remediation_tasks",
     "record_final_cloud_review",
+)
+
+TRANSACTION_PHASES = (
+    "prepared",
+    "revision_written",
+    "revision_validated",
+    "revision_published",
+    "pointer_updated",
+    "application_updated",
+    "audit_completed",
+    "committed",
+    "failed",
 )
 
 
@@ -224,6 +240,49 @@ class ExecutionLease:
             expiry_timestamp=maybe_text(data.get("expiry_timestamp")),
             heartbeat_timestamp=maybe_text(data.get("heartbeat_timestamp")),
             completion_checksum=maybe_text(data.get("completion_checksum")),
+        )
+
+
+@dataclass(frozen=True)
+class TransactionRecord:
+    schema_version: int
+    transaction_id: str
+    application_id: str
+    source_revision_id: str
+    source_revision_checksum: str
+    proposed_revision_id: str
+    proposed_revision_checksum: str
+    expected_active_pointer: str
+    phase: str
+    artifact_paths: tuple[str, ...] = ()
+    created_at: str = ""
+    updated_at: str = ""
+    recovery_action: str = ""
+    details: dict[str, Any] = field(default_factory=dict)
+
+    def to_dict(self) -> dict[str, Any]:
+        data = asdict(self)
+        data["artifact_paths"] = list(self.artifact_paths)
+        data["details"] = dict(self.details)
+        return data
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "TransactionRecord":
+        return cls(
+            schema_version=int(data.get("schema_version", TRANSACTION_SCHEMA_VERSION)),
+            transaction_id=str(data.get("transaction_id", "")),
+            application_id=str(data.get("application_id", "")),
+            source_revision_id=str(data.get("source_revision_id", "")),
+            source_revision_checksum=str(data.get("source_revision_checksum", "")),
+            proposed_revision_id=str(data.get("proposed_revision_id", "")),
+            proposed_revision_checksum=str(data.get("proposed_revision_checksum", "")),
+            expected_active_pointer=str(data.get("expected_active_pointer", "")),
+            phase=str(data.get("phase", "")),
+            artifact_paths=tuple(str(item) for item in data.get("artifact_paths", []) or []),
+            created_at=str(data.get("created_at", "")),
+            updated_at=str(data.get("updated_at", "")),
+            recovery_action=str(data.get("recovery_action", "")),
+            details=dict(data.get("details", {}) or {}),
         )
 
 
@@ -572,6 +631,7 @@ class RecoveryResult:
     reconciled: bool
     active_pointer: ActiveRevisionPointer | None = None
     application_id: str | None = None
+    transaction_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -585,6 +645,8 @@ class ResumeResult:
     status: str
     reasons: tuple[str, ...] = ()
     resume_state_path: Path | None = None
+    execution_status_path: Path | None = None
+    execution_report_path: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -605,4 +667,3 @@ def maybe_int(value: Any) -> int | None:
     if isinstance(value, int) and not isinstance(value, bool):
         return value
     return None
-

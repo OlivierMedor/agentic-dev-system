@@ -15,6 +15,7 @@ from agentic_dev.cloud_application.models import (
     ApplicationRecord,
     ExecutionLease,
     RuntimePlanRevision,
+    TransactionRecord,
 )
 
 
@@ -50,6 +51,14 @@ def active_pointer_path(project_path: Path) -> Path:
     return runtime_plan_path(project_path) / "active.yaml"
 
 
+def transaction_root_path(project_path: Path) -> Path:
+    return runtime_plan_path(project_path) / "transactions"
+
+
+def transaction_path(project_path: Path, transaction_id: str) -> Path:
+    return transaction_root_path(project_path) / f"{transaction_id}.yaml"
+
+
 def runtime_active_pointer_path(project_path: Path) -> Path:
     return active_pointer_path(project_path)
 
@@ -67,7 +76,7 @@ def ensure_cloud_application_dirs(project_path: Path) -> None:
         application_root_path(project_path) / "recovery",
         runtime_plan_path(project_path),
         runtime_plan_path(project_path) / "revisions",
-        runtime_plan_path(project_path) / "transactions",
+        transaction_root_path(project_path),
         project_path.resolve() / ".agentic" / "execution_leases",
     ):
         directory.mkdir(parents=True, exist_ok=True)
@@ -120,6 +129,10 @@ def load_runtime_revision(path: Path) -> RuntimePlanRevision:
     return RuntimePlanRevision.from_dict(load_yaml_mapping(path))
 
 
+def load_transaction_record(path: Path) -> TransactionRecord:
+    return TransactionRecord.from_dict(load_yaml_mapping(path))
+
+
 def load_runtime_revisions(project_path: Path) -> list[RuntimePlanRevision]:
     revisions_root = runtime_plan_path(project_path) / "revisions"
     if not revisions_root.exists():
@@ -147,6 +160,11 @@ def save_application_plan(project_path: Path, plan: ApplicationPlan) -> Path:
 def save_runtime_revision(project_path: Path, revision: RuntimePlanRevision) -> Path:
     ensure_cloud_application_dirs(project_path)
     return write_yaml_atomic(revision_path(project_path, revision.revision_id), revision.to_dict())
+
+
+def save_transaction_record(project_path: Path, record: TransactionRecord) -> Path:
+    ensure_cloud_application_dirs(project_path)
+    return write_yaml_atomic(transaction_path(project_path, record.transaction_id), record.to_dict())
 
 
 def save_active_pointer(project_path: Path, pointer: ActiveRevisionPointer) -> Path:
