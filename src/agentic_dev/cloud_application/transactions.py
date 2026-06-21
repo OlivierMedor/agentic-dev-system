@@ -41,7 +41,7 @@ def create_transaction_record(
         source_revision_id=source_revision_id,
         source_revision_checksum=source_revision_checksum,
         proposed_revision_id=proposed_revision_id,
-        proposed_revision_checksum="",
+        proposed_revision_checksum=proposed_revision_checksum,
         expected_active_pointer=expected_active_pointer,
         phase="prepared",
         artifact_paths=artifact_paths,

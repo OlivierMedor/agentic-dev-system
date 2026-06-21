@@ -14,6 +14,7 @@ from agentic_dev.cloud_application.models import (
     ApplicationPlan,
     ApplicationRecord,
     ExecutionLease,
+    TaskPublicationRecord,
     RuntimePlanRevision,
     TransactionRecord,
 )
@@ -55,6 +56,10 @@ def transaction_root_path(project_path: Path) -> Path:
     return runtime_plan_path(project_path) / "transactions"
 
 
+def publication_root_path(project_path: Path) -> Path:
+    return project_path.resolve() / ".agentic" / "execution_leases" / "publications"
+
+
 def transaction_path(project_path: Path, transaction_id: str) -> Path:
     return transaction_root_path(project_path) / f"{transaction_id}.yaml"
 
@@ -78,6 +83,7 @@ def ensure_cloud_application_dirs(project_path: Path) -> None:
         runtime_plan_path(project_path) / "revisions",
         transaction_root_path(project_path),
         project_path.resolve() / ".agentic" / "execution_leases",
+        publication_root_path(project_path),
     ):
         directory.mkdir(parents=True, exist_ok=True)
 
@@ -175,6 +181,26 @@ def save_active_pointer(project_path: Path, pointer: ActiveRevisionPointer) -> P
 def save_execution_lease(project_path: Path, lease: ExecutionLease) -> Path:
     ensure_cloud_application_dirs(project_path)
     return write_yaml_atomic(execution_lease_path(project_path, lease.lease_id), lease.to_dict())
+
+
+def publication_path(project_path: Path, lease_id: str) -> Path:
+    return publication_root_path(project_path) / f"{lease_id}.yaml"
+
+
+def save_task_publication_record(project_path: Path, record: TaskPublicationRecord) -> Path:
+    ensure_cloud_application_dirs(project_path)
+    return write_yaml_atomic(publication_path(project_path, record.lease_id), record.to_dict())
+
+
+def load_task_publication_record(path: Path) -> TaskPublicationRecord:
+    return TaskPublicationRecord.from_dict(load_yaml_mapping(path))
+
+
+def load_task_publication_records(project_path: Path) -> list[TaskPublicationRecord]:
+    root = publication_root_path(project_path)
+    if not root.exists():
+        return []
+    return [load_task_publication_record(path) for path in sorted(root.glob("*.yaml"))]
 
 
 def load_execution_lease(path: Path) -> ExecutionLease:

@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+import yaml
+
 from agentic_dev.cloud_application.audit import record_application_audit_event
 from agentic_dev.cloud_application.graph import build_runtime_graph_revision
 from agentic_dev.cloud_application.models import (
@@ -23,6 +25,7 @@ from agentic_dev.cloud_application.models import (
     ResumeResult,
     RollbackMetadata,
     RuntimePlanRevision,
+    TaskPublicationRecord,
     TaskSnapshot,
 )
 from agentic_dev.cloud_application.persistence import (
@@ -34,6 +37,7 @@ from agentic_dev.cloud_application.persistence import (
     ensure_cloud_application_dirs,
     load_active_pointer,
     load_application_record,
+    load_application_plan,
     load_execution_leases,
     load_runtime_revision,
     revision_path,
@@ -61,7 +65,7 @@ from agentic_dev.cloud_queue import show_cloud_queue_request
 from agentic_dev.cloud_queue.approvals import load_approval_record
 from agentic_dev.cloud_queue.classification import APPROVAL_REQUIRED
 from agentic_dev.cloud_queue.models import CloudQueueRequest, CloudQueueResponse
-from agentic_dev.cloud_queue.persistence import checksum_text, now_iso
+from agentic_dev.cloud_queue.persistence import now_iso
 from agentic_dev.story_blueprint import load_blueprint_story
 from agentic_dev.cloud_queue.imports import load_imported_response
 from agentic_dev.cloud_application.planning import (
@@ -76,7 +80,12 @@ from agentic_dev.cloud_application.transactions import (
     save_transaction_phase,
     load_transaction,
 )
-from agentic_dev.cloud_application.publication import validate_publication_gate, quarantine_path
+from agentic_dev.cloud_application.publication import (
+    checksum_bytes,
+    quarantine_path,
+    save_publication_record,
+    validate_publication_gate,
+)
 
 
 @dataclass(frozen=True)
@@ -279,14 +288,21 @@ class ApplicationService:
         revision = self._load_revision(application.revision_id or "")
         pointer = load_active_pointer(runtime_active_pointer_path(self.project_path))
         validate_active_pointer(pointer, revision.revision_id, revision.revision_checksum)
-        resume_eligibility = self._build_resume_eligibility(revision, application)
+        resume_eligibility = application.resume
         if not resume_eligibility.eligible:
             raise ValueError("; ".join(resume_eligibility.reasons) or "Resume is not eligible.")
-        application = self._transition_application(application, "resuming", request, details={"revision_id": revision.revision_id})
+        selected_tasks = self._resolve_resume_tasks(revision, resume_eligibility.resume_from_task_ids)
+        initial_state = self._build_resume_initial_state(revision)
+        application = self._transition_application(
+            application,
+            "resuming",
+            request,
+            details={"revision_id": revision.revision_id},
+        )
         save_application_record(self.project_path, application)
         lease_ids: list[str] = []
         for task_id in resume_eligibility.resume_from_task_ids:
-            lease = self._create_lease(task_id, revision)
+            lease = self._create_lease(task_id, revision, story_name=request.story)
             lease_ids.append(lease.lease_id)
         resume_state_path = application_root_path(self.project_path) / "recovery" / f"{application.application_id}_resume.yaml"
         write_yaml_atomic(
@@ -300,14 +316,60 @@ class ApplicationService:
                 "lease_ids": lease_ids,
             },
         )
-        execution = run_runtime_revision_execution(
-            self.project_path,
-            request.story,
-            revision,
-            resume=True,
-            dry_run=False,
-        )
+        current_pointer = load_active_pointer(runtime_active_pointer_path(self.project_path))
+        validate_active_pointer(current_pointer, revision.revision_id, revision.revision_checksum)
+        try:
+            execution = run_runtime_revision_execution(
+                self.project_path,
+                request.story,
+                revision,
+                resume=True,
+                dry_run=False,
+                resume_task_ids=tuple(task.task_id for task in selected_tasks),
+                initial_state=initial_state,
+            )
+        except Exception as error:  # noqa: BLE001
+            failure_reason = f"{type(error).__name__}: {error}"
+            self._invalidate_resume_leases(
+                revision.revision_id,
+                tuple(lease_ids),
+                failure_reason=failure_reason,
+                lease_state="failed",
+            )
+            application = self._transition_application(
+                application,
+                "resume_failed",
+                request,
+                details={"lease_ids": lease_ids, "execution_status": "exception"},
+            )
+            save_application_record(self.project_path, application)
+            self._record_audit(
+                "resume_failed",
+                application,
+                request,
+                "resuming",
+                "resume_failed",
+                {"lease_ids": lease_ids, "execution_status": "exception", "failure_reason": failure_reason},
+            )
+            return ResumeResult(
+                project_path=self.project_path,
+                application_id=application.application_id,
+                revision_id=revision.revision_id,
+                revision_checksum=revision.revision_checksum,
+                task_ids=resume_eligibility.resume_from_task_ids,
+                lease_ids=tuple(lease_ids),
+                status="resume_failed",
+                reasons=(failure_reason,),
+                resume_state_path=resume_state_path,
+                execution_status_path=None,
+            )
         if execution.result.status != "completed":
+            self._invalidate_resume_leases(
+                revision.revision_id,
+                tuple(lease_ids),
+                failure_reason=f"execution status {execution.result.status}",
+                lease_state="cancelled",
+            )
             application = self._transition_application(
                 application,
                 "resume_failed",
@@ -335,24 +397,208 @@ class ApplicationService:
                 resume_state_path=resume_state_path,
                 execution_status_path=execution.result.state_path,
             )
-        result_checksum = checksum_text(execution.result.state_path.read_text(encoding="utf-8"))
-        for lease in load_execution_leases(self.project_path):
-            if lease.runtime_revision_id != revision.revision_id or lease.lease_state != "active":
-                continue
-            current_pointer = load_active_pointer(runtime_active_pointer_path(self.project_path))
-            validate_active_pointer(current_pointer, revision.revision_id, revision.revision_checksum)
-            validate_publication_gate(
-                self.project_path,
-                lease=lease,
-                execution_attempt_id=lease.execution_attempt_id,
-                active_pointer=current_pointer,
-                result_checksum=result_checksum,
-                result_path=execution.result.state_path,
+        state = yaml.safe_load(execution.result.state_path.read_text(encoding="utf-8"))
+        if not isinstance(state, dict):
+            self._invalidate_resume_leases(
+                revision.revision_id,
+                tuple(lease_ids),
+                failure_reason="execution state was not a mapping",
+                lease_state="failed",
             )
+            application = self._transition_application(
+                application,
+                "resume_failed",
+                request,
+                details={"lease_ids": lease_ids, "execution_status": "invalid_state"},
+            )
+            save_application_record(self.project_path, application)
+            self._record_audit(
+                "resume_failed",
+                application,
+                request,
+                "resuming",
+                "resume_failed",
+                {"lease_ids": lease_ids, "execution_status": "invalid_state"},
+            )
+            return ResumeResult(
+                project_path=self.project_path,
+                application_id=application.application_id,
+                revision_id=revision.revision_id,
+                revision_checksum=revision.revision_checksum,
+                task_ids=resume_eligibility.resume_from_task_ids,
+                lease_ids=tuple(lease_ids),
+                status="resume_failed",
+                reasons=("execution state invalid",),
+                resume_state_path=resume_state_path,
+                execution_status_path=execution.result.state_path,
+            )
+
+        task_states = state.get("tasks", {}) if isinstance(state.get("tasks"), dict) else {}
+        for task in selected_tasks:
+            task_state = task_states.get(task.task_id, {})
+            if not isinstance(task_state, dict) or task_state.get("status") != "completed":
+                self._invalidate_resume_leases(
+                    revision.revision_id,
+                    tuple(lease_ids),
+                    failure_reason=f"task {task.task_id} did not complete",
+                    lease_state="cancelled",
+                )
+                application = self._transition_application(
+                    application,
+                    "resume_failed",
+                    request,
+                    details={"lease_ids": lease_ids, "execution_status": "partial_result"},
+                )
+                save_application_record(self.project_path, application)
+                self._record_audit(
+                    "resume_failed",
+                    application,
+                    request,
+                    "resuming",
+                    "resume_failed",
+                    {"lease_ids": lease_ids, "execution_status": "partial_result", "task_id": task.task_id},
+                )
+                return ResumeResult(
+                    project_path=self.project_path,
+                    application_id=application.application_id,
+                    revision_id=revision.revision_id,
+                    revision_checksum=revision.revision_checksum,
+                    task_ids=resume_eligibility.resume_from_task_ids,
+                    lease_ids=tuple(lease_ids),
+                    status="resume_failed",
+                    reasons=(f"task {task.task_id} did not complete",),
+                    resume_state_path=resume_state_path,
+                    execution_status_path=execution.result.state_path,
+                )
+            task_result_path = (
+                execution.result.story_path
+                / "reports"
+                / "local_execution"
+                / "tasks"
+                / task.task_id
+                / "execution.yaml"
+            )
+            if not task_result_path.exists():
+                self._invalidate_resume_leases(
+                    revision.revision_id,
+                    tuple(lease_ids),
+                    failure_reason=f"missing result for {task.task_id}",
+                    lease_state="failed",
+                )
+                application = self._transition_application(
+                    application,
+                    "resume_failed",
+                    request,
+                    details={"lease_ids": lease_ids, "execution_status": "missing_result"},
+                )
+                save_application_record(self.project_path, application)
+                self._record_audit(
+                    "resume_failed",
+                    application,
+                    request,
+                    "resuming",
+                    "resume_failed",
+                    {"lease_ids": lease_ids, "execution_status": "missing_result", "task_id": task.task_id},
+                )
+                return ResumeResult(
+                    project_path=self.project_path,
+                    application_id=application.application_id,
+                    revision_id=revision.revision_id,
+                    revision_checksum=revision.revision_checksum,
+                    task_ids=resume_eligibility.resume_from_task_ids,
+                    lease_ids=tuple(lease_ids),
+                    status="resume_failed",
+                    reasons=(f"missing result for {task.task_id}",),
+                    resume_state_path=resume_state_path,
+                    execution_status_path=execution.result.state_path,
+                )
+
+            task_bytes = task_result_path.read_bytes()
+            lease = self._lease_for_task(revision.revision_id, task.task_id)
+            current_pointer = load_active_pointer(runtime_active_pointer_path(self.project_path))
+            publication = TaskPublicationRecord(
+                schema_version=1,
+                task_id=task.task_id,
+                lease_id=lease.lease_id,
+                execution_attempt_id=lease.execution_attempt_id,
+                revision_id=revision.revision_id,
+                revision_checksum=revision.revision_checksum,
+                result_artifact_path=str(task_result_path.relative_to(self.project_path.resolve())),
+                result_checksum=checksum_bytes(task_bytes),
+                validation_status=str(task_state.get("validation_result", {}).get("status", "")),
+                publication_timestamp=self.now_factory(),
+            )
+            try:
+                validate_publication_gate(
+                    self.project_path,
+                    publication=publication,
+                    lease=lease,
+                    active_pointer=current_pointer,
+                    revision=revision,
+                    task=task,
+                    result_path=task_result_path,
+                    result_bytes=task_bytes,
+                )
+            except Exception as error:  # noqa: BLE001
+                failure_reason = f"{type(error).__name__}: {error}"
+                self._invalidate_resume_leases(
+                    revision.revision_id,
+                    tuple(lease_ids),
+                    failure_reason=failure_reason,
+                    lease_state="stale",
+                )
+                save_yaml = quarantine_path(self.project_path, lease.lease_id)
+                save_yaml.parent.mkdir(parents=True, exist_ok=True)
+                write_yaml_atomic(
+                    save_yaml,
+                    {
+                        **publication.to_dict(),
+                        "validation_status": "quarantined",
+                        "failure_reason": failure_reason,
+                    },
+                )
+                application = self._transition_application(
+                    application,
+                    "resume_failed",
+                    request,
+                    details={"lease_ids": lease_ids, "execution_status": "publication_failed"},
+                )
+                save_application_record(self.project_path, application)
+                self._record_audit(
+                    "resume_failed",
+                    application,
+                    request,
+                    "resuming",
+                    "resume_failed",
+                    {"lease_ids": lease_ids, "execution_status": "publication_failed", "failure_reason": failure_reason},
+                )
+                return ResumeResult(
+                    project_path=self.project_path,
+                    application_id=application.application_id,
+                    revision_id=revision.revision_id,
+                    revision_checksum=revision.revision_checksum,
+                    task_ids=resume_eligibility.resume_from_task_ids,
+                    lease_ids=tuple(lease_ids),
+                    status="resume_failed",
+                    reasons=(failure_reason,),
+                    resume_state_path=resume_state_path,
+                    execution_status_path=execution.result.state_path,
+                )
+            save_publication_record(self.project_path, publication)
             save_execution_lease(
                 self.project_path,
-                ExecutionLease.from_dict({**lease.to_dict(), "completion_checksum": result_checksum}),
+                ExecutionLease.from_dict(
+                    {
+                        **lease.to_dict(),
+                        "lease_state": "completed",
+                        "completion_checksum": publication.result_checksum,
+                    },
+                ),
             )
+            task_state["publication_status"] = "published"
+            state["tasks"][task.task_id] = task_state
+
+        write_yaml_atomic(execution.result.state_path, state)
         application = self._transition_application(
             application,
             "resumed",
@@ -388,7 +634,7 @@ class ApplicationService:
 
     def rollback(self, application_id: str) -> ApplicationRecord:
         application = load_application_record(application_path(self.project_path, application_id))
-        if application.status not in {"applied", "resumed", "rollback_available", "rollback_failed"}:
+        if application.status not in {"applied", "resumed", "resume_pending", "rollback_available", "rollback_failed"}:
             raise ValueError("Application is not eligible for rollback.")
         if not application.revision_id:
             raise ValueError("Application has no revision to roll back from.")
@@ -402,6 +648,8 @@ class ApplicationService:
             raise ValueError("Current active revision does not match the application revision.")
         if pointer.active_revision_checksum != revision.revision_checksum:
             raise ValueError("Current active revision checksum does not match the application revision.")
+        if prior_revision.revision_checksum != revision.rollback_metadata.prior_revision_checksum:
+            raise ValueError("Prior revision checksum does not match rollback metadata.")
         leases = load_execution_leases(self.project_path)
         active_lease_ids = [
             lease.lease_id
@@ -420,15 +668,53 @@ class ApplicationService:
             updated_at=self.now_factory(),
             artifact_paths=(str(revision_path(self.project_path, revision.revision_id)),),
             recovery_action="restore prior pointer atomically",
-            details={"active_lease_ids": active_lease_ids},
+            details={
+                "active_lease_ids": active_lease_ids,
+                "source_revision_checksum": revision.revision_checksum,
+                "proposed_revision_checksum": prior_revision.revision_checksum,
+            },
         )
         save_transaction_record(self.project_path, rollback_transaction)
+        application = self._transition_application(
+            application,
+            "rolling_back",
+            self._load_request(application.request_id),
+            details={"transaction_id": rollback_transaction.transaction_id},
+        )
+        save_application_record(self.project_path, application)
         for lease in leases:
             if lease.runtime_revision_id == revision.revision_id and lease.lease_state == "active":
                 save_execution_lease(
                     self.project_path,
-                    ExecutionLease.from_dict({**lease.to_dict(), "lease_state": "stale"}),
+                    ExecutionLease.from_dict(
+                        {**lease.to_dict(), "lease_state": "stale", "failure_reason": "rollback in progress"},
+                    ),
                 )
+        current_pointer = load_active_pointer(runtime_active_pointer_path(self.project_path))
+        if current_pointer.active_revision_id != revision.revision_id or current_pointer.active_revision_checksum != revision.revision_checksum:
+            save_transaction_phase(
+                self.project_path,
+                rollback_transaction,
+                phase="rollback_failed",
+                updated_at=self.now_factory(),
+                details={"reason": "active pointer changed before rollback commit"},
+            )
+            application = self._transition_application(
+                application,
+                "rollback_failed",
+                self._load_request(application.request_id),
+                details={"reason": "active pointer changed before rollback commit"},
+            )
+            save_application_record(self.project_path, application)
+            self._record_audit(
+                "rollback_failed",
+                application,
+                self._load_request(application.request_id),
+                "rolling_back",
+                "rollback_failed",
+                {"reason": "active pointer changed before rollback commit", "transaction_id": rollback_transaction.transaction_id},
+            )
+            raise ValueError("Active pointer changed before rollback commit.")
         pointer = ActiveRevisionPointer(
             schema_version=1,
             active_revision_id=prior_revision.revision_id,
@@ -441,14 +727,19 @@ class ApplicationService:
         save_transaction_phase(
             self.project_path,
             rollback_transaction,
-            phase="committed",
+            phase="rolled_back",
             updated_at=self.now_factory(),
+            details={"rolled_back_to": prior_revision.revision_id},
+        )
+        rolled_back = self._transition_application(
+            application,
+            "rolled_back",
+            self._load_request(application.request_id),
             details={"rolled_back_to": prior_revision.revision_id},
         )
         rolled_back = ApplicationRecord.from_dict(
             {
-                **application.to_dict(),
-                "status": "rolled_back",
+                **rolled_back.to_dict(),
                 "active_revision_id": prior_revision.revision_id,
                 "revision_id": prior_revision.revision_id,
                 "revision_checksum": prior_revision.revision_checksum,
@@ -476,7 +767,7 @@ class ApplicationService:
         if transaction_root_path(self.project_path).exists():
             for path in sorted(transaction_root_path(self.project_path).glob("*.yaml")):
                 try:
-                    transactions.append(load_transaction(path))
+                    transactions.append(load_transaction(self.project_path, path.stem))
                 except Exception:
                     findings.append(f"corrupt transaction record: {path.name}")
                     actions.append("inspect transaction journal manually")
@@ -522,33 +813,60 @@ class ApplicationService:
             for transaction in transactions:
                 if transaction.phase in {"revision_published", "pointer_updated"}:
                     revision_file = revision_path(self.project_path, transaction.proposed_revision_id)
-                    if revision_file.exists():
-                        revision = load_runtime_revision(revision_file)
-                        if revision.revision_checksum == transaction.proposed_revision_checksum or not transaction.proposed_revision_checksum:
-                            if pointer.active_revision_id != revision.revision_id and transaction.phase == "revision_published":
-                                save_active_pointer(
-                                    self.project_path,
-                                    ActiveRevisionPointer(
-                                        schema_version=1,
-                                        active_revision_id=revision.revision_id,
-                                        active_revision_checksum=revision.revision_checksum,
-                                        previous_revision_id=transaction.source_revision_id or None,
-                                        update_timestamp=self.now_factory(),
-                                        application_id=transaction.application_id,
-                                    ),
-                                )
-                                reconciled = True
-                                findings.append(f"reconciled published revision: {revision.revision_id}")
-                                actions.append(f"complete pointer update for {transaction.application_id}")
-                            app = next((item for item in applications if item.application_id == transaction.application_id), None)
-                            if app and app.status == "applying" and transaction.phase == "pointer_updated":
-                                save_application_record(
-                                    self.project_path,
-                                    ApplicationRecord.from_dict({**app.to_dict(), "status": "applied", "revision_id": revision.revision_id, "revision_checksum": revision.revision_checksum, "active_revision_id": revision.revision_id}),
-                                )
-                                reconciled = True
-                                findings.append(f"reconciled stale application status: {app.application_id}")
-                                actions.append(f"finalize application {app.application_id}")
+                    plan_path = application_plan_path(self.project_path, transaction.application_id)
+                    if not revision_file.exists() or not plan_path.exists():
+                        continue
+                    revision = load_runtime_revision(revision_file)
+                    plan = load_application_plan(plan_path)
+                    source_pointer_matches = (
+                        pointer.active_revision_id == transaction.source_revision_id
+                        and pointer.active_revision_checksum == transaction.source_revision_checksum
+                        and transaction.expected_active_pointer == pointer.active_revision_id
+                    )
+                    proposed_revision_matches = revision.revision_checksum == transaction.proposed_revision_checksum
+                    plan_checksum_matches = plan.plan_checksum == str(transaction.details.get("plan_checksum", ""))
+                    if transaction.phase == "revision_published":
+                        if not (source_pointer_matches and proposed_revision_matches and plan_checksum_matches):
+                            findings.append(f"stale published transaction: {transaction.transaction_id}")
+                            actions.append(f"inspect transaction {transaction.transaction_id}")
+                            continue
+                        if pointer.active_revision_id != revision.revision_id:
+                            save_active_pointer(
+                                self.project_path,
+                                ActiveRevisionPointer(
+                                    schema_version=1,
+                                    active_revision_id=revision.revision_id,
+                                    active_revision_checksum=revision.revision_checksum,
+                                    previous_revision_id=transaction.source_revision_id or None,
+                                    update_timestamp=self.now_factory(),
+                                    application_id=transaction.application_id,
+                                ),
+                            )
+                            reconciled = True
+                            findings.append(f"reconciled published revision: {revision.revision_id}")
+                            actions.append(f"complete pointer update for {transaction.application_id}")
+                    if transaction.phase == "pointer_updated":
+                        if not (pointer.active_revision_id == revision.revision_id and pointer.active_revision_checksum == revision.revision_checksum and proposed_revision_matches and plan_checksum_matches):
+                            findings.append(f"stale pointer update transaction: {transaction.transaction_id}")
+                            actions.append(f"inspect transaction {transaction.transaction_id}")
+                            continue
+                        app = next((item for item in applications if item.application_id == transaction.application_id), None)
+                        if app and app.status == "applying":
+                            save_application_record(
+                                self.project_path,
+                                ApplicationRecord.from_dict(
+                                    {
+                                        **app.to_dict(),
+                                        "status": "applied",
+                                        "revision_id": revision.revision_id,
+                                        "revision_checksum": revision.revision_checksum,
+                                        "active_revision_id": revision.revision_id,
+                                    },
+                                ),
+                            )
+                            reconciled = True
+                            findings.append(f"reconciled stale application status: {app.application_id}")
+                            actions.append(f"finalize application {app.application_id}")
 
         result = RecoveryResult(
             project_path=self.project_path,
@@ -585,7 +903,7 @@ class ApplicationService:
             source_revision_id=runtime_state.revision.revision_id,
             source_revision_checksum=runtime_state.revision.revision_checksum,
             proposed_revision_id=plan.proposed_revision_id,
-            proposed_revision_checksum="",
+            proposed_revision_checksum=plan.plan_checksum,
             expected_active_pointer=runtime_state.pointer.active_revision_id,
             created_at=self.now_factory(),
             updated_at=self.now_factory(),
@@ -613,22 +931,15 @@ class ApplicationService:
         if self.transaction_hooks.fail_on_revision_write:
             save_transaction_phase(self.project_path, transaction, phase="failed", updated_at=self.now_factory(), details={"reason": "revision_write"})
             raise RuntimeError("Injected failure during proposed revision write.")
-        superseded_source_task = TaskSnapshot.from_dict(
-            {
-                **source_task.to_dict(),
-                "status": "superseded",
-                "writable_paths": [],
-            },
-        )
         proposed_revision = build_runtime_graph_revision(
             revision_id=plan.proposed_revision_id,
             parent_revision_id=plan.source_revision_id,
             application_id=application.application_id,
             created_at=self.now_factory(),
-            tasks=[superseded_source_task, *proposed_tasks],
+            tasks=list(diff.revised_tasks),
             requirement_mappings=list(diff.requirement_mappings),
             dependency_changes=list(diff.dependency_changes),
-            change_summary=[f"{source_task.task_id} superseded"],
+            change_summary=[f"{source_task.task_id} updated" if len(proposed_tasks) == 1 and proposed_tasks[0].task_id == source_task.task_id else f"{source_task.task_id} superseded"],
             rollback_metadata=RollbackMetadata(
                 prior_revision_id=plan.source_revision_id,
                 prior_revision_checksum=plan.source_revision_checksum,
@@ -711,9 +1022,15 @@ class ApplicationService:
                 "revision_id": proposed_revision.revision_id,
                 "revision_checksum": proposed_revision.revision_checksum,
                 "active_revision_id": proposed_revision.revision_id,
-                "resume": self._build_resume_eligibility(proposed_revision, application).__dict__,
                 "rollback_available": True,
                 "plan_checksum": plan.plan_checksum,
+            },
+        )
+        applied_projection = ApplicationRecord.from_dict({**application.to_dict(), "status": "applied"})
+        application = ApplicationRecord.from_dict(
+            {
+                **application.to_dict(),
+                "resume": self._build_resume_eligibility(proposed_revision, applied_projection).__dict__,
             },
         )
         save_application_record(self.project_path, application)
@@ -890,11 +1207,12 @@ class ApplicationService:
             reasons=() if eligible else ("active revision must be applied before resume.",),
         )
 
-    def _create_lease(self, task_id: str, revision: RuntimePlanRevision) -> ExecutionLease:
-        lease_paths = next(
-            (tuple(task.writable_paths) for task in revision.task_graph if task.task_id == task_id),
-            tuple(),
+    def _create_lease(self, task_id: str, revision: RuntimePlanRevision, *, story_name: str | None = None) -> ExecutionLease:
+        lease_paths = list(
+            next((tuple(task.writable_paths) for task in revision.task_graph if task.task_id == task_id), tuple()),
         )
+        if story_name:
+            lease_paths.append(f"stories/{story_name}/reports/local_execution/tasks/{task_id}/**")
         lease = ExecutionLease(
             schema_version=1,
             lease_id=self.lease_id_factory(),
@@ -903,13 +1221,100 @@ class ApplicationService:
             runtime_revision_id=revision.revision_id,
             runtime_revision_checksum=revision.revision_checksum,
             local_model="local-model",
-            writable_paths=lease_paths,
+            writable_paths=tuple(dict.fromkeys(lease_paths)),
             start_timestamp=self.now_factory(),
             lease_state="active",
         )
         save_execution_lease(self.project_path, lease)
         self._record_audit("lease_created", None, None, "resume_pending", "resume_pending", {"lease_id": lease.lease_id, "task_id": task_id})
         return lease
+
+    def _lease_for_task(self, revision_id: str, task_id: str) -> ExecutionLease:
+        for lease in load_execution_leases(self.project_path):
+            if lease.runtime_revision_id == revision_id and lease.task_id == task_id:
+                return lease
+        raise FileNotFoundError(f"Lease not found for task: {task_id}")
+
+    def _lease_id_for_task(self, lease_ids: list[str], task_id: str) -> str:
+        for lease in load_execution_leases(self.project_path):
+            if lease.task_id == task_id and lease.lease_id in lease_ids:
+                return lease.lease_id
+        raise FileNotFoundError(f"Lease not found for task: {task_id}")
+
+    def _execution_attempt_id_for_task(self, lease_ids: list[str], task_id: str) -> str:
+        for lease in load_execution_leases(self.project_path):
+            if lease.task_id == task_id and lease.lease_id in lease_ids:
+                return lease.execution_attempt_id
+        raise FileNotFoundError(f"Execution attempt not found for task: {task_id}")
+
+    def _resolve_resume_tasks(
+        self,
+        revision: RuntimePlanRevision,
+        resume_from_task_ids: tuple[str, ...],
+    ) -> list[TaskSnapshot]:
+        tasks_by_id = {task.task_id: task for task in revision.task_graph}
+        selected: list[TaskSnapshot] = []
+        for task_id in resume_from_task_ids:
+            task = tasks_by_id.get(task_id)
+            if task is None:
+                raise ValueError(f"Resume task is missing from the active revision: {task_id}")
+            if task.status != "ready":
+                raise ValueError(f"Resume task is not eligible: {task_id} ({task.status})")
+            selected.append(task)
+        return selected
+
+    def _build_resume_initial_state(self, revision: RuntimePlanRevision) -> dict[str, Any]:
+        tasks: dict[str, Any] = {}
+        for task in revision.task_graph:
+            tasks[task.task_id] = {
+                "task_id": task.task_id,
+                "title": task.title,
+                "role": task.role,
+                "dependencies": list(task.depends_on),
+                "status": task.status,
+                "attempt": 0,
+                "outputs": [],
+                "handoff_summary": {},
+            }
+        return {
+            "story": "",
+            "status": "pending",
+            "current_task": None,
+            "completed_tasks": [task.task_id for task in revision.task_graph if task.status == "completed"],
+            "blocked_tasks": [task.task_id for task in revision.task_graph if task.status == "blocked"],
+            "cloud_redecomposition_required_tasks": [],
+            "execution_order": [task.task_id for task in revision.task_graph],
+            "tasks": tasks,
+            "final_validation": {
+                "status": "pending",
+                "requirements_checked": [],
+                "missing_requirements": [],
+            },
+        }
+
+    def _invalidate_resume_leases(
+        self,
+        revision_id: str,
+        lease_ids: tuple[str, ...],
+        *,
+        failure_reason: str,
+        lease_state: str,
+    ) -> None:
+        lease_lookup = {lease.lease_id: lease for lease in load_execution_leases(self.project_path)}
+        for lease_id in lease_ids:
+            lease = lease_lookup.get(lease_id)
+            if lease is None or lease.runtime_revision_id != revision_id:
+                continue
+            save_execution_lease(
+                self.project_path,
+                ExecutionLease.from_dict(
+                    {
+                        **lease.to_dict(),
+                        "lease_state": lease_state,
+                        "failure_reason": failure_reason,
+                    },
+                ),
+            )
 
     def _load_request(self, request_id: str) -> CloudQueueRequest:
         return show_cloud_queue_request(self.project_path, request_id).request

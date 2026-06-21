@@ -29,6 +29,8 @@ def run_runtime_revision_execution(
     role: str | None = None,
     resume: bool = True,
     dry_run: bool = False,
+    resume_task_ids: tuple[str, ...] | None = None,
+    initial_state: dict[str, Any] | None = None,
     http_client: Any | None = None,
 ) -> RuntimeResumeExecution:
     blueprint_story = {
@@ -37,6 +39,13 @@ def run_runtime_revision_execution(
         "subtasks": [task.to_dict() for task in revision.task_graph],
     }
     subtasks = [to_blueprint_subtask(task) for task in revision.task_graph]
+    if resume_task_ids is not None:
+        selected_task_ids = list(resume_task_ids)
+        by_id = {task.id: task for task in subtasks}
+        missing = [task_id for task_id in selected_task_ids if task_id not in by_id]
+        if missing:
+            raise ValueError(f"Resume tasks are missing from the active revision: {', '.join(missing)}")
+        subtasks = [by_id[task_id] for task_id in selected_task_ids]
     result = run_subtask_local_execution(
         project_path,
         story_name,
@@ -46,6 +55,7 @@ def run_runtime_revision_execution(
         role=role,
         resume=resume,
         dry_run=dry_run,
+        initial_state=initial_state,
         http_client=http_client,
     )
     ready = tuple(task.task_id for task in revision.task_graph if task.status == "ready")

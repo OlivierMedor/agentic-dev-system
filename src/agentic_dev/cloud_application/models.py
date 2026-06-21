@@ -218,6 +218,7 @@ class ExecutionLease:
     expiry_timestamp: str | None = None
     heartbeat_timestamp: str | None = None
     completion_checksum: str | None = None
+    failure_reason: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -240,6 +241,41 @@ class ExecutionLease:
             expiry_timestamp=maybe_text(data.get("expiry_timestamp")),
             heartbeat_timestamp=maybe_text(data.get("heartbeat_timestamp")),
             completion_checksum=maybe_text(data.get("completion_checksum")),
+            failure_reason=maybe_text(data.get("failure_reason")),
+        )
+
+
+@dataclass(frozen=True)
+class TaskPublicationRecord:
+    schema_version: int
+    task_id: str
+    lease_id: str
+    execution_attempt_id: str
+    revision_id: str
+    revision_checksum: str
+    result_artifact_path: str
+    result_checksum: str
+    validation_status: str
+    publication_timestamp: str
+    failure_reason: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "TaskPublicationRecord":
+        return cls(
+            schema_version=int(data.get("schema_version", TRANSACTION_SCHEMA_VERSION)),
+            task_id=str(data.get("task_id", "")),
+            lease_id=str(data.get("lease_id", "")),
+            execution_attempt_id=str(data.get("execution_attempt_id", "")),
+            revision_id=str(data.get("revision_id", "")),
+            revision_checksum=str(data.get("revision_checksum", "")),
+            result_artifact_path=str(data.get("result_artifact_path", "")),
+            result_checksum=str(data.get("result_checksum", "")),
+            validation_status=str(data.get("validation_status", "")),
+            publication_timestamp=str(data.get("publication_timestamp", "")),
+            failure_reason=maybe_text(data.get("failure_reason")),
         )
 
 

@@ -289,10 +289,48 @@ def test_cloud_queue_application_cli_commands(monkeypatch) -> None:
     state_path = project_path / ".agentic" / "cloud_applications" / "execution_state.yaml"
     state_path.parent.mkdir(parents=True, exist_ok=True)
     state_path.write_text("status: completed\n", encoding="utf-8")
-    fake_result = SimpleNamespace(
-        result=SimpleNamespace(status="completed", state_path=state_path, story_path=project_path / "stories" / STORY),
-    )
-    monkeypatch.setattr("agentic_dev.cloud_application.service.run_runtime_revision_execution", lambda *args, **kwargs: fake_result)
+    def fake_runtime_execution(*args: object, **kwargs: object) -> SimpleNamespace:
+        revision = args[2]
+        story_path = project_path / "stories" / STORY
+        selected_task_ids = tuple(kwargs.get("resume_task_ids") or [task.task_id for task in revision.task_graph if task.status == "ready"])
+        tasks: dict[str, dict[str, object]] = {}
+        for task in revision.task_graph:
+            status = "completed" if task.task_id in selected_task_ids else task.status
+            tasks[task.task_id] = {
+                "task_id": task.task_id,
+                "title": task.title,
+                "role": task.role,
+                "dependencies": list(task.depends_on),
+                "status": status,
+                "attempt": 1,
+                "outputs": [],
+                "handoff_summary": {"available_to_dependents": [], "decisions": [], "outputs": []},
+                "validation_result": {"status": "passed" if status == "completed" else "pending"},
+            }
+            if status == "completed":
+                task_dir = story_path / "reports" / "local_execution" / "tasks" / task.task_id
+                task_dir.mkdir(parents=True, exist_ok=True)
+                (task_dir / "execution.yaml").write_text(yaml.safe_dump(tasks[task.task_id], sort_keys=False), encoding="utf-8")
+        state_path.write_text(
+            yaml.safe_dump(
+                {
+                    "status": "completed",
+                    "story": STORY,
+                    "current_task": None,
+                    "completed_tasks": list(selected_task_ids),
+                    "blocked_tasks": [task.task_id for task in revision.task_graph if task.status == "blocked"],
+                    "cloud_redecomposition_required_tasks": [],
+                    "execution_order": [task.task_id for task in revision.task_graph],
+                    "tasks": tasks,
+                    "final_validation": {"status": "passed", "requirements_checked": [], "missing_requirements": []},
+                },
+                sort_keys=False,
+            ),
+            encoding="utf-8",
+        )
+        return SimpleNamespace(result=SimpleNamespace(status="completed", state_path=state_path, story_path=story_path))
+
+    monkeypatch.setattr("agentic_dev.cloud_application.service.run_runtime_revision_execution", fake_runtime_execution)
 
     request_id = prepare_project(project_path)
 
@@ -310,7 +348,10 @@ def test_cloud_queue_application_cli_commands(monkeypatch) -> None:
     application_id = next(
         path.stem
         for path in application_records
-        if yaml.safe_load(path.read_text(encoding="utf-8")).get("revision_id")
+        if (
+            yaml.safe_load(path.read_text(encoding="utf-8")).get("revision_id")
+            and yaml.safe_load(path.read_text(encoding="utf-8")).get("status") in {"applied", "resume_pending", "resumed"}
+        )
     )
     out = run_cli("cloud-queue", "application-show", "--project", str(project_path), "--application", application_id)
     assert application_id in out
