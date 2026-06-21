@@ -1,7 +1,8 @@
 # Codex Docker Runtime
 
-The Docker `dev` image installs the Codex CLI during `docker compose build` so
-the normal container workflow can detect and run Codex:
+The Docker `dev` image installs the Codex CLI during `docker compose build`
+through a checked-in helper script. If the live installer is unavailable, the
+build falls back to a local Codex shim so CI stays deterministic:
 
 ```powershell
 docker compose build

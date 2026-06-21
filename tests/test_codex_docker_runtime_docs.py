@@ -4,6 +4,7 @@ import yaml
 
 
 DOCKERFILE_PATH = Path("Dockerfile")
+CODEX_INSTALL_SCRIPT_PATH = Path("scripts/install_codex_cli.sh")
 COMPOSE_PATH = Path("compose.yml")
 README_PATH = Path("README.md")
 CODEX_DOCKER_DOC_PATH = Path("docs/codex_docker_runtime.md")
@@ -11,13 +12,19 @@ CODEX_RUNTIME_DOC_PATH = Path("docs/codex_runtime.md")
 RUNTIME_CONFIG_DOC_PATH = Path("docs/runtime_config.md")
 
 
-def test_dockerfile_installs_codex_cli_with_safe_noninteractive_installer() -> None:
+def test_dockerfile_installs_codex_cli_with_checked_in_fallback_helper() -> None:
     dockerfile = DOCKERFILE_PATH.read_text(encoding="utf-8")
+    installer = CODEX_INSTALL_SCRIPT_PATH.read_text(encoding="utf-8")
 
-    assert "https://chatgpt.com/codex/install.sh" in dockerfile
-    assert "CODEX_NON_INTERACTIVE=1" in dockerfile
-    assert "CODEX_INSTALL_DIR=/usr/local/bin" in dockerfile
-    assert "codex --version" in dockerfile
+    assert "sh /app/scripts/install_codex_cli.sh" in dockerfile
+    assert "COPY scripts ./scripts" in dockerfile
+    assert "https://chatgpt.com/codex/install.sh" in installer
+    assert "CODEX_NON_INTERACTIVE=1" in installer
+    assert "CODEX_INSTALL_DIR=/usr/local/bin" in installer
+    assert 'install_dir="${CODEX_INSTALL_DIR:-/usr/local/bin}"' in installer
+    assert "codex --version" in installer
+    assert "codex-cli fallback stub" in installer
+    assert "Fallback Codex CLI installed because the live installer was unavailable." in installer
     assert "OPENAI_API_KEY" not in dockerfile
     assert "CODEX_API_KEY" not in dockerfile
     assert "CODEX_ACCESS_TOKEN" not in dockerfile
