@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from hashlib import sha256
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -302,6 +303,25 @@ def bootstrap_runtime_state_with_mixed_tasks(project_path: Path) -> RuntimePlanR
     return revision
 
 
+def snapshot_application_roots(project_path: Path) -> dict[str, str]:
+    roots = [
+        project_path / ".agentic" / "cloud_queue",
+        project_path / ".agentic" / "cloud_applications",
+        project_path / ".agentic" / "runtime_plans",
+    ]
+    snapshot: dict[str, str] = {}
+    for root in roots:
+        if not root.exists():
+            continue
+        for path in sorted(root.rglob("*")):
+            rel_path = str(path.relative_to(project_path))
+            if path.is_dir():
+                snapshot[f"{rel_path}/"] = "DIR"
+            else:
+                snapshot[rel_path] = sha256(path.read_bytes()).hexdigest()
+    return snapshot
+
+
 def response_payload(request_id: str, batch_id: str, decision: str) -> dict[str, object]:
     proposed_tasks = [
         {
@@ -586,7 +606,8 @@ def test_update_task_metadata_operation_builds_revision(tmp_path: Path) -> None:
 def test_dry_run_creates_plan_without_pointer_change(tmp_path: Path) -> None:
     request_id, _ = prepare_validated_safe_request(tmp_path)
     service = build_default_application_service(tmp_path)
-    before = active_pointer_path(tmp_path).read_text(encoding="utf-8")
+    before = snapshot_application_roots(tmp_path)
+    pointer_before = active_pointer_path(tmp_path).read_text(encoding="utf-8")
 
     result = service.plan_apply(request_id, dry_run=True)
 
@@ -594,7 +615,8 @@ def test_dry_run_creates_plan_without_pointer_change(tmp_path: Path) -> None:
     assert result.application.status == "application_planned"
     assert result.plan.plan_checksum
     assert result.revision_path is None
-    assert active_pointer_path(tmp_path).read_text(encoding="utf-8") == before
+    assert active_pointer_path(tmp_path).read_text(encoding="utf-8") == pointer_before
+    assert snapshot_application_roots(tmp_path) == before
 
 
 def test_apply_resume_and_rollback_flow(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

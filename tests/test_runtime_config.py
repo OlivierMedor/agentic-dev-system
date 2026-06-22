@@ -174,6 +174,13 @@ def test_default_runtime_config_uses_codex_first_tiered_defaults(tmp_path: Path)
         "automated_provider_enabled": False,
         "provider": "none",
     }
+    assert result.config["cloud_batch"] == {
+        "enabled": True,
+        "default_mode": "manual",
+        "manual_cloud_only": True,
+        "automatic_apply_enabled": False,
+        "automatic_resume_enabled": False,
+    }
 
 
 def test_checked_in_runtime_config_keeps_codex_runtime_disabled_by_default() -> None:
@@ -188,6 +195,11 @@ def test_checked_in_runtime_config_keeps_codex_runtime_disabled_by_default() -> 
     assert config["cloud_escalation"]["default_mode"] == "manual"
     assert config["cloud_escalation"]["automated_provider_enabled"] is False
     assert config["cloud_escalation"]["provider"] == "none"
+    assert config["cloud_batch"]["enabled"] is True
+    assert config["cloud_batch"]["default_mode"] == "manual"
+    assert config["cloud_batch"]["manual_cloud_only"] is True
+    assert config["cloud_batch"]["automatic_apply_enabled"] is False
+    assert config["cloud_batch"]["automatic_resume_enabled"] is False
 
 
 def test_validate_runtime_config_fails_for_missing_required_agent(tmp_path: Path) -> None:

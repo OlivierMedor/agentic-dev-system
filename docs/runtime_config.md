@@ -51,6 +51,10 @@ final judgment work.
 can prepare cloud review packets, but a human decides whether to send them to a
 cloud model and records the result manually.
 
+`cloud_batch` follows the same manual-first rule for Story 065 orchestration.
+It coordinates multiple requests and their downstream applications, but
+automatic batch apply and automatic batch resume remain disabled.
+
 `local_model_helper` keeps Gemma support available as an optional micro-mode
 draft helper. It is not the default docs runtime, not a final reviewer, and not
 required for normal workflow validation. Its `prompt_mode: micro` setting keeps

@@ -190,6 +190,13 @@ cloud_escalation:
   default_mode: manual
   automated_provider_enabled: false
   provider: none
+
+cloud_batch:
+  enabled: true
+  default_mode: manual
+  manual_cloud_only: true
+  automatic_apply_enabled: false
+  automatic_resume_enabled: false
 """
 
 
@@ -324,6 +331,7 @@ def validate_runtime_config(project_path: Path) -> RuntimeConfigValidationResult
     parse_codex_runtime_config(config.get("codex_runtime"), errors)
     validate_local_execution_config(config.get("local_execution"), errors)
     validate_cloud_escalation_config(config.get("cloud_escalation"), errors)
+    validate_cloud_batch_config(config.get("cloud_batch"), errors)
 
     if errors:
         raise ValueError("Runtime config validation failed:\n- " + "\n- ".join(errors))
@@ -491,6 +499,39 @@ def validate_cloud_escalation_config(section: Any, errors: list[str]) -> None:
 
     if provider != "none":
         errors.append("cloud_escalation.provider must be none.")
+
+
+def validate_cloud_batch_config(section: Any, errors: list[str]) -> None:
+    if section is None:
+        errors.append("cloud_batch must be configured.")
+        return
+
+    if not isinstance(section, dict):
+        errors.append("cloud_batch must be a mapping.")
+        return
+
+    enabled = section.get("enabled")
+    default_mode = section.get("default_mode")
+    manual_cloud_only = section.get("manual_cloud_only")
+    automatic_apply_enabled = section.get("automatic_apply_enabled")
+    automatic_resume_enabled = section.get("automatic_resume_enabled")
+
+    if not isinstance(enabled, bool):
+        errors.append("cloud_batch.enabled must be a boolean.")
+    elif not enabled:
+        errors.append("cloud_batch.enabled must be true.")
+
+    if default_mode != "manual":
+        errors.append("cloud_batch.default_mode must be manual.")
+
+    if manual_cloud_only is not True:
+        errors.append("cloud_batch.manual_cloud_only must be true.")
+
+    if automatic_apply_enabled is not False:
+        errors.append("cloud_batch.automatic_apply_enabled must be false.")
+
+    if automatic_resume_enabled is not False:
+        errors.append("cloud_batch.automatic_resume_enabled must be false.")
 
 
 def mapping_value(

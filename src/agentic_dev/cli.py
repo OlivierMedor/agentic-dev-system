@@ -25,6 +25,12 @@ from agentic_dev.cloud_queue import (
     fail_cloud_queue_request,
     show_cloud_queue_request,
 )
+from agentic_dev.cloud_batch import (
+    build_default_batch_service,
+    format_batch_record,
+    format_batch_status,
+    format_orchestration_plan,
+)
 from agentic_dev.cloud_application import (
     build_default_application_service,
     format_application_record,
@@ -517,6 +523,108 @@ def main() -> None:
     )
     cloud_queue_status_parser.add_argument("--project", type=Path, default=Path.cwd())
     cloud_queue_status_parser.add_argument("--json", action="store_true")
+
+    cloud_queue_batch_parser = cloud_queue_subparsers.add_parser(
+        "batch",
+        help="Orchestrate cloud queue requests as a dependency-aware batch.",
+    )
+    cloud_queue_batch_subparsers = cloud_queue_batch_parser.add_subparsers(
+        dest="cloud_queue_batch_command",
+        required=True,
+    )
+
+    cloud_queue_batch_list_parser = cloud_queue_batch_subparsers.add_parser(
+        "list",
+        help="List batch records.",
+    )
+    cloud_queue_batch_list_parser.add_argument("--project", type=Path, default=Path.cwd())
+    cloud_queue_batch_list_parser.add_argument("--json", action="store_true")
+
+    cloud_queue_batch_show_parser = cloud_queue_batch_subparsers.add_parser(
+        "show",
+        help="Show one batch record.",
+    )
+    cloud_queue_batch_show_parser.add_argument("--project", type=Path, default=Path.cwd())
+    cloud_queue_batch_show_parser.add_argument("--batch", required=True)
+    cloud_queue_batch_show_parser.add_argument("--json", action="store_true")
+
+    cloud_queue_batch_export_parser = cloud_queue_batch_subparsers.add_parser(
+        "export",
+        help="Export a batch of ready requests.",
+    )
+    cloud_queue_batch_export_parser.add_argument("--project", type=Path, default=Path.cwd())
+    cloud_queue_batch_export_parser.add_argument("--batch")
+    cloud_queue_batch_export_parser.add_argument("--all-ready", action="store_true")
+    cloud_queue_batch_export_parser.add_argument("--request", action="append", default=[])
+    cloud_queue_batch_export_parser.add_argument("--json", action="store_true")
+
+    cloud_queue_batch_import_parser = cloud_queue_batch_subparsers.add_parser(
+        "import",
+        help="Import a batch response bundle.",
+    )
+    cloud_queue_batch_import_parser.add_argument("--project", type=Path, default=Path.cwd())
+    cloud_queue_batch_import_parser.add_argument("--file", required=True)
+    cloud_queue_batch_import_parser.add_argument("--batch")
+    cloud_queue_batch_import_parser.add_argument("--json", action="store_true")
+
+    cloud_queue_batch_plan_apply_parser = cloud_queue_batch_subparsers.add_parser(
+        "plan-apply",
+        help="Build the batch orchestration plan.",
+    )
+    cloud_queue_batch_plan_apply_parser.add_argument("--project", type=Path, default=Path.cwd())
+    cloud_queue_batch_plan_apply_parser.add_argument("--batch", required=True)
+    cloud_queue_batch_plan_apply_parser.add_argument("--json", action="store_true")
+
+    cloud_queue_batch_apply_parser = cloud_queue_batch_subparsers.add_parser(
+        "apply",
+        help="Apply a planned batch.",
+    )
+    cloud_queue_batch_apply_parser.add_argument("--project", type=Path, default=Path.cwd())
+    cloud_queue_batch_apply_parser.add_argument("--batch", required=True)
+    cloud_queue_batch_apply_parser.add_argument("--dry-run", action="store_true")
+    cloud_queue_batch_apply_parser.add_argument("--json", action="store_true")
+
+    cloud_queue_batch_resume_parser = cloud_queue_batch_subparsers.add_parser(
+        "resume",
+        help="Resume a planned batch.",
+    )
+    cloud_queue_batch_resume_parser.add_argument("--project", type=Path, default=Path.cwd())
+    cloud_queue_batch_resume_parser.add_argument("--batch", required=True)
+    cloud_queue_batch_resume_parser.add_argument("--json", action="store_true")
+
+    cloud_queue_batch_retry_parser = cloud_queue_batch_subparsers.add_parser(
+        "retry",
+        help="Retry a batch attempt.",
+    )
+    cloud_queue_batch_retry_parser.add_argument("--project", type=Path, default=Path.cwd())
+    cloud_queue_batch_retry_parser.add_argument("--batch", required=True)
+    cloud_queue_batch_retry_parser.add_argument("--reason", default="")
+    cloud_queue_batch_retry_parser.add_argument("--json", action="store_true")
+
+    cloud_queue_batch_cancel_parser = cloud_queue_batch_subparsers.add_parser(
+        "cancel",
+        help="Cancel a batch.",
+    )
+    cloud_queue_batch_cancel_parser.add_argument("--project", type=Path, default=Path.cwd())
+    cloud_queue_batch_cancel_parser.add_argument("--batch", required=True)
+    cloud_queue_batch_cancel_parser.add_argument("--reason", default="")
+    cloud_queue_batch_cancel_parser.add_argument("--json", action="store_true")
+
+    cloud_queue_batch_rollback_parser = cloud_queue_batch_subparsers.add_parser(
+        "rollback",
+        help="Rollback a batch.",
+    )
+    cloud_queue_batch_rollback_parser.add_argument("--project", type=Path, default=Path.cwd())
+    cloud_queue_batch_rollback_parser.add_argument("--batch", required=True)
+    cloud_queue_batch_rollback_parser.add_argument("--reason", default="")
+    cloud_queue_batch_rollback_parser.add_argument("--json", action="store_true")
+
+    cloud_queue_batch_status_parser = cloud_queue_batch_subparsers.add_parser(
+        "status",
+        help="Show batch status.",
+    )
+    cloud_queue_batch_status_parser.add_argument("--project", type=Path, default=Path.cwd())
+    cloud_queue_batch_status_parser.add_argument("--json", action="store_true")
 
     cloud_queue_plan_apply_parser = cloud_queue_subparsers.add_parser(
         "plan-apply",
@@ -1615,6 +1723,107 @@ def main() -> None:
 
         if args.command == "cloud-queue":
             application_service = build_default_application_service(args.project)
+            batch_service = build_default_batch_service(args.project)
+
+            if args.cloud_queue_command == "batch":
+                if args.cloud_queue_batch_command == "list":
+                    result = batch_service.list_batches()
+                    if args.json:
+                        print(json.dumps([asdict(record) for record in result], default=str, indent=2, sort_keys=True))
+                    else:
+                        print(format_batch_status(list(result)))
+
+                if args.cloud_queue_batch_command == "show":
+                    result = batch_service.show(args.batch)
+                    if args.json:
+                        print(json.dumps(asdict(result), default=str, indent=2, sort_keys=True))
+                    else:
+                        print(format_batch_record(result))
+
+                if args.cloud_queue_batch_command == "export":
+                    result = batch_service.export(
+                        request_ids=list(args.request) if args.request else None,
+                        all_ready=args.all_ready,
+                        batch_id=args.batch,
+                    )
+                    if args.json:
+                        print(json.dumps(asdict(result), default=str, indent=2, sort_keys=True))
+                    else:
+                        print(f"Batch export created: {result.export_path}")
+                        print(f"Batch ID: {result.batch_record.batch_id}")
+                        print(f"Request IDs: {', '.join(result.request_ids)}")
+                        print(f"Manifest checksum: {result.batch_manifest_checksum}")
+
+                if args.cloud_queue_batch_command == "import":
+                    result = batch_service.import_bundle(Path(args.file), batch_id=args.batch)
+                    if args.json:
+                        print(json.dumps(asdict(result), default=str, indent=2, sort_keys=True))
+                    else:
+                        print("Batch import complete:")
+                        print(f"Imported: {result.imported_count}")
+                        print(f"Valid: {result.valid_count}")
+                        print(f"Invalid: {result.invalid_count}")
+                        print(f"Skipped: {result.skipped_count}")
+
+                if args.cloud_queue_batch_command == "plan-apply":
+                    result = batch_service.plan_apply(args.batch, dry_run=False)
+                    if args.json:
+                        print(json.dumps(asdict(result), default=str, indent=2, sort_keys=True))
+                    else:
+                        print(format_orchestration_plan(result.plan))
+
+                if args.cloud_queue_batch_command == "apply":
+                    result = batch_service.apply(args.batch, dry_run=args.dry_run)
+                    if args.json:
+                        print(json.dumps(asdict(result), default=str, indent=2, sort_keys=True))
+                    else:
+                        print(f"Batch apply complete: {result.batch_id}")
+                        print(f"Status: {result.status}")
+                        print(f"Dry run: {result.dry_run}")
+                        for item in result.item_results:
+                            print(f"- {item.item_id}: {item.outcome}")
+
+                if args.cloud_queue_batch_command == "resume":
+                    result = batch_service.resume(args.batch)
+                    if args.json:
+                        print(json.dumps(asdict(result), default=str, indent=2, sort_keys=True))
+                    else:
+                        print(f"Batch resume complete: {result.batch_id}")
+                        print(f"Status: {result.status}")
+                        print(f"Resume groups: {len(result.resume_groups)}")
+
+                if args.cloud_queue_batch_command == "retry":
+                    result = batch_service.retry(args.batch, reason=args.reason)
+                    if args.json:
+                        print(json.dumps(asdict(result), default=str, indent=2, sort_keys=True))
+                    else:
+                        print(f"Batch retry created: {result.batch_id}")
+                        print(f"Attempt ID: {result.attempt_id}")
+                        print(f"Status: {result.status}")
+
+                if args.cloud_queue_batch_command == "cancel":
+                    result = batch_service.cancel(args.batch, reason=args.reason)
+                    if args.json:
+                        print(json.dumps(asdict(result), default=str, indent=2, sort_keys=True))
+                    else:
+                        print(f"Batch canceled: {result.batch_id}")
+                        print(f"Cancelled items: {', '.join(result.cancelled_item_ids) or 'none'}")
+
+                if args.cloud_queue_batch_command == "rollback":
+                    result = batch_service.rollback(args.batch, reason=args.reason)
+                    if args.json:
+                        print(json.dumps(asdict(result), default=str, indent=2, sort_keys=True))
+                    else:
+                        print(f"Batch rollback: {result.batch_id}")
+                        print(f"Status: {result.status}")
+                        print(f"Rolled back items: {', '.join(result.rolled_back_item_ids) or 'none'}")
+
+                if args.cloud_queue_batch_command == "status":
+                    result = batch_service.status()
+                    if args.json:
+                        print(json.dumps(asdict(result), default=str, indent=2, sort_keys=True))
+                    else:
+                        print(format_batch_status(list(result.batches)))
 
             if args.cloud_queue_command == "plan-apply":
                 result = application_service.plan_apply(args.request, dry_run=True)

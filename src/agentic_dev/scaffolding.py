@@ -49,6 +49,12 @@ def init_project(project_path: Path) -> list[Path]:
         project_path / ".agentic" / "cloud_queue" / "requests",
         project_path / ".agentic" / "cloud_queue" / "exports",
         project_path / ".agentic" / "cloud_queue" / "audit",
+        project_path / ".agentic" / "cloud_batches" / "records",
+        project_path / ".agentic" / "cloud_batches" / "plans",
+        project_path / ".agentic" / "cloud_batches" / "attempts",
+        project_path / ".agentic" / "cloud_batches" / "audits",
+        project_path / ".agentic" / "cloud_batches" / "locks",
+        project_path / ".agentic" / "cloud_batches" / "recovery",
         project_path / "blueprints",
         project_path / "stories",
         project_path / "stories" / "story_001_project_setup",
@@ -161,6 +167,12 @@ which approval mode is expected, and which commands require human approval.
         project_path / ".agentic" / "cloud_queue" / "requests" / ".gitkeep": "",
         project_path / ".agentic" / "cloud_queue" / "exports" / ".gitkeep": "",
         project_path / ".agentic" / "cloud_queue" / "audit" / ".gitkeep": "",
+        project_path / ".agentic" / "cloud_batches" / "records" / ".gitkeep": "",
+        project_path / ".agentic" / "cloud_batches" / "plans" / ".gitkeep": "",
+        project_path / ".agentic" / "cloud_batches" / "attempts" / ".gitkeep": "",
+        project_path / ".agentic" / "cloud_batches" / "audits" / ".gitkeep": "",
+        project_path / ".agentic" / "cloud_batches" / "locks" / ".gitkeep": "",
+        project_path / ".agentic" / "cloud_batches" / "recovery" / ".gitkeep": "",
     }
 
     for file_path, content in files.items():

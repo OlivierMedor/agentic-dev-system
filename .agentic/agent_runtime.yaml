@@ -139,3 +139,10 @@ cloud_escalation:
   default_mode: manual
   automated_provider_enabled: false
   provider: none
+
+cloud_batch:
+  enabled: true
+  default_mode: manual
+  manual_cloud_only: true
+  automatic_apply_enabled: false
+  automatic_resume_enabled: false

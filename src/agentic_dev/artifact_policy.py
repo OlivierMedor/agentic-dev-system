@@ -89,6 +89,15 @@ def find_artifact_policy_violations(tracked_files: list[str]) -> list[ArtifactPo
             )
             continue
 
+        if is_cloud_batch_runtime_path(parts, filename):
+            violations.append(
+                ArtifactPolicyViolation(
+                    path=normalized_path,
+                    reason="cloud batch runtime file is tracked",
+                ),
+            )
+            continue
+
         if is_cloud_application_runtime_path(parts, filename):
             violations.append(
                 ArtifactPolicyViolation(
@@ -282,6 +291,13 @@ def is_cloud_queue_runtime_path(parts: list[str], filename: str) -> bool:
         return False
 
     return Path(filename).suffix.lower() in {".yaml", ".json", ".md", ".zip"}
+
+
+def is_cloud_batch_runtime_path(parts: list[str], filename: str) -> bool:
+    if filename == ".gitkeep":
+        return False
+
+    return len(parts) >= 3 and parts[0] == ".agentic" and parts[1] == "cloud_batches"
 
 
 def is_cloud_application_runtime_path(parts: list[str], filename: str) -> bool:

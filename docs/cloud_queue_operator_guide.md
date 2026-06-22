@@ -1,15 +1,17 @@
 # Cloud Queue Operator Guide
 
-This guide explains the manual-first cloud escalation queue introduced by Story 063.
-It is intentionally offline-friendly. It does not call paid cloud APIs, it does not
-auto-apply imported responses, and it keeps provider-specific concerns out of the
-canonical queue records.
+This guide explains the manual-first cloud escalation queue introduced by Story 063
+and the batch orchestration layer introduced by Story 065. It is intentionally
+offline-friendly. It does not call paid cloud APIs, it does not auto-apply imported
+responses, and it keeps provider-specific concerns out of the canonical queue
+records.
 
 ## Architecture
 
-The queue lives under `.agentic/cloud_queue/` at runtime. Requests are stored as
-YAML, exports are written as ZIP packets plus a human-readable export index, and
-audit events are appended to `audit.jsonl`.
+The queue lives under `.agentic/cloud_queue/` at runtime. Batch orchestration
+metadata lives under `.agentic/cloud_batches/`. Requests are stored as YAML,
+exports are written as ZIP packets plus a human-readable export index, and audit
+events are appended to `audit.jsonl`.
 
 The canonical request and response shapes are provider-neutral. OpenAI-shaped and
 Gemini-shaped adapters are fixtures only and normalize into the same stored schema.
@@ -34,9 +36,19 @@ Approved changes are recorded, but they are not applied automatically.
 |-- imports/
 |-- approvals/
 `-- audit.jsonl
+
+.agentic/cloud_batches/
+|-- records/
+|-- plans/
+|-- attempts/
+|-- audits/
+|-- locks/
+`-- recovery/
 ```
 
 Runtime files are ignored by Git and blocked by the artifact policy.
+
+See `docs/cloud_batch_operator_guide.md` for the batch orchestration workflow.
 
 ## Request Types
 
