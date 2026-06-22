@@ -158,6 +158,9 @@ class ApplicationService:
         self.transaction_hooks = transaction_hooks or ApplicationTransactionHooks()
 
     def plan_apply(self, request_id: str, *, dry_run: bool = False) -> PlanApplyResult:
+        if dry_run:
+            return self.preview_plan_apply(request_id)
+
         ensure_cloud_application_dirs(self.project_path)
         request, response = self._load_request_and_response(request_id)
         approval_record = self._load_approval_record_if_present(request)
@@ -210,7 +213,7 @@ class ApplicationService:
             response,
             eligibility,
             proposed_revision_id,
-            dry_run=dry_run,
+            dry_run=True,
             source_task=source_task,
             proposed_tasks=list(planned.proposed_tasks),
             diff=diff,
@@ -227,27 +230,13 @@ class ApplicationService:
             diff,
             active_revision_id=runtime_state.revision.revision_id,
             active_revision_checksum=runtime_state.revision.revision_checksum,
-            dry_run=dry_run,
+            dry_run=True,
         )
         validate_application_state_boundaries(plan)
         application = ApplicationRecord.from_dict({**application.to_dict(), "plan_checksum": plan.plan_checksum})
-        application_path = save_application_record(self.project_path, application)
-        plan_path = save_application_plan(self.project_path, plan)
+        save_application_record(self.project_path, application)
+        save_application_plan(self.project_path, plan)
         audit_ids = [self._record_audit("application_planned", application, request, "new", application.status, {"dry_run": dry_run})]
-
-        if dry_run:
-            return PlanApplyResult(
-                application=application,
-                plan=plan,
-                dry_run=True,
-                active_revision_id=runtime_state.revision.revision_id,
-                active_revision_checksum=runtime_state.revision.revision_checksum,
-                application_path=application_path,
-                plan_path=plan_path,
-                revision_path=None,
-                pointer_path=None,
-                audit_event_ids=tuple(audit_ids),
-            )
 
         application = self._transition_application(
             application,
@@ -258,6 +247,94 @@ class ApplicationService:
         save_application_record(self.project_path, application)
         result = self._apply_plan(application, plan, request, response, source_task, list(planned.proposed_tasks), diff, audit_ids, runtime_state)
         return result
+
+    def preview_plan_apply(self, request_id: str) -> PlanApplyResult:
+        request, response = self._load_request_and_response_preview(request_id)
+        approval_record = self._load_approval_record_preview_if_present(request)
+        eligibility = validate_eligibility(request, approval_record=approval_record)
+        if not eligibility.eligible:
+            raise ValueError(eligibility.reason)
+
+        runtime_state = load_active_runtime_state(self.project_path)
+        source_task = resolve_source_task(runtime_state, request)
+        planned = build_planned_application(request, response, source_task, runtime_state)
+        if request.classification == APPROVAL_REQUIRED and approval_record is not None:
+            validate_approval_scope(approval_record, list(request.writable_paths), list(request.requirements))
+        validate_no_canonical_mutation(
+            ApplicationPlan(
+                schema_version=1,
+                application_id="",
+                request_id=request.request_id,
+                request_checksum=eligibility.request_checksum,
+                response_checksum=eligibility.response_checksum,
+                approval_checksum=eligibility.approval_checksum,
+                source_revision_id=runtime_state.revision.revision_id,
+                source_revision_checksum=runtime_state.revision.revision_checksum,
+                proposed_revision_id="",
+                operation_type=planned.operation.operation_type,
+                source_task_snapshot=source_task,
+                proposed_tasks=planned.proposed_tasks,
+                requirement_mapping=planned.diff.requirement_mappings,
+                dependency_changes=planned.diff.dependency_changes,
+                writable_path_diff=planned.diff.writable_path_diff,
+                context_budget_validation={},
+                expected_outputs=planned.operation.expected_outputs,
+                validation_steps=planned.operation.validation_steps,
+                affected_completed_tasks=planned.diff.affected_completed_tasks,
+                affected_pending_tasks=planned.diff.affected_pending_tasks,
+                resume_candidates=planned.diff.resume_candidates,
+                rollback_target=runtime_state.revision.revision_id,
+                preconditions=(planned.operation.operation_type,),
+                predicted_side_effects=("preserve canonical blueprint",),
+                plan_checksum="",
+                created_at=self.now_factory(),
+            )
+        )
+
+        application_id = self.application_id_factory()
+        proposed_revision_id = self.revision_id_factory()
+        diff = planned.diff
+        application = self._build_application_record(
+            application_id,
+            request,
+            response,
+            eligibility,
+            proposed_revision_id,
+            dry_run=True,
+            source_task=source_task,
+            proposed_tasks=list(planned.proposed_tasks),
+            diff=diff,
+            active_revision_id=runtime_state.revision.revision_id,
+        )
+        plan = self._build_application_plan(
+            application,
+            request,
+            response,
+            eligibility,
+            proposed_revision_id,
+            source_task,
+            list(planned.proposed_tasks),
+            diff,
+            active_revision_id=runtime_state.revision.revision_id,
+            active_revision_checksum=runtime_state.revision.revision_checksum,
+            dry_run=True,
+        )
+        validate_application_state_boundaries(plan)
+        application = ApplicationRecord.from_dict({**application.to_dict(), "plan_checksum": plan.plan_checksum})
+        application_file_path = application_path(self.project_path, application.application_id)
+        plan_file_path = application_plan_path(self.project_path, plan.application_id)
+        return PlanApplyResult(
+            application=application,
+            plan=plan,
+            dry_run=True,
+            active_revision_id=runtime_state.revision.revision_id,
+            active_revision_checksum=runtime_state.revision.revision_checksum,
+            application_path=application_file_path,
+            plan_path=plan_file_path,
+            revision_path=None,
+            pointer_path=None,
+            audit_event_ids=(),
+        )
 
     def application_status(self) -> ApplicationStatusResult:
         ensure_cloud_application_dirs(self.project_path)
@@ -1331,6 +1408,44 @@ class ApplicationService:
         if not approval_path.exists():
             return None
         return load_approval_record(approval_path)
+
+    def _load_request_and_response_preview(self, request_id: str) -> tuple[CloudQueueRequest, CloudQueueResponse]:
+        request = self._load_request_preview(request_id)
+        response = self._load_imported_response_preview(request_id)
+        if response.request_id != request_id:
+            raise ValueError("Imported response does not match the requested application.")
+        return request, response
+
+    def _load_request_preview(self, request_id: str) -> CloudQueueRequest:
+        requests_root = self.project_path.resolve() / ".agentic" / "cloud_queue" / "requests"
+        normalized_request_id = request_id.strip()
+        if not normalized_request_id:
+            raise FileNotFoundError("Cloud queue request was not found: ")
+        if not requests_root.exists():
+            raise FileNotFoundError(f"Cloud queue request was not found: {request_id}")
+        for path in sorted(requests_root.rglob(f"{normalized_request_id}.yaml")):
+            loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+            if not isinstance(loaded, dict):
+                raise ValueError(f"Request file must contain a YAML mapping: {path}")
+            request = CloudQueueRequest.from_dict(loaded)
+            if request.request_id == normalized_request_id:
+                return request
+        raise FileNotFoundError(f"Cloud queue request was not found: {request_id}")
+
+    def _load_imported_response_preview(self, request_id: str) -> CloudQueueResponse:
+        response_path = self.project_path.resolve() / ".agentic" / "cloud_queue" / "imports" / f"{request_id}.yaml"
+        if not response_path.exists():
+            raise FileNotFoundError(f"Imported response does not exist: {response_path}")
+        loaded = yaml.safe_load(response_path.read_text(encoding="utf-8"))
+        if not isinstance(loaded, dict):
+            raise ValueError(f"Imported response must be a YAML mapping: {response_path}")
+        return CloudQueueResponse.from_dict(loaded, source_file=response_path)
+
+    def _load_approval_record_preview_if_present(self, request: CloudQueueRequest) -> dict[str, Any] | None:
+        approval_path = self.project_path / ".agentic" / "cloud_queue" / "approvals" / f"{request.request_id}.yaml"
+        if not approval_path.exists():
+            return None
+        return yaml.safe_load(approval_path.read_text(encoding="utf-8"))
 
     def _load_story(self, story_name: str) -> dict[str, Any]:
         story_path = self.project_path / "stories" / story_name

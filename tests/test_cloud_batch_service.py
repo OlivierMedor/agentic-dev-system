@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from hashlib import sha256
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -52,6 +53,26 @@ def response_payload(request_id: str, batch_id: str, decision: str = "SAFE") -> 
         },
         "adapter": "manual_packet",
     }
+
+
+def snapshot_tree(project_path: Path) -> dict[str, str]:
+    roots = [
+        project_path / ".agentic" / "cloud_queue",
+        project_path / ".agentic" / "cloud_applications",
+        project_path / ".agentic" / "cloud_batches",
+        project_path / ".agentic" / "runtime_plans",
+    ]
+    snapshot: dict[str, str] = {}
+    for root in roots:
+        if not root.exists():
+            continue
+        for path in sorted(root.rglob("*")):
+            rel_path = str(path.relative_to(project_path))
+            if path.is_dir():
+                snapshot[f"{rel_path}/"] = "DIR"
+            else:
+                snapshot[rel_path] = sha256(path.read_bytes()).hexdigest()
+    return snapshot
 
 
 def test_batch_export_creates_record_and_artifacts(tmp_path: Path) -> None:
@@ -180,14 +201,9 @@ def test_batch_plan_apply_dry_run_makes_no_mutation(tmp_path: Path) -> None:
 
     import_cloud_queue_response(tmp_path, response_path)
 
-    before_plan_files = sorted((tmp_path / ".agentic" / "cloud_batches" / "plans").glob("*.yaml"))
-    before_application_files = sorted((tmp_path / ".agentic" / "cloud_applications" / "applications").glob("*.yaml"))
+    before = snapshot_tree(tmp_path)
 
     result = service.plan_apply("batch-20260621-0004", dry_run=True)
 
-    after_plan_files = sorted((tmp_path / ".agentic" / "cloud_batches" / "plans").glob("*.yaml"))
-    after_application_files = sorted((tmp_path / ".agentic" / "cloud_applications" / "applications").glob("*.yaml"))
-
     assert result.status == "planned"
-    assert after_plan_files == before_plan_files
-    assert after_application_files == before_application_files
+    assert snapshot_tree(tmp_path) == before

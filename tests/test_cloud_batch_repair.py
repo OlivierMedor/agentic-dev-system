@@ -10,6 +10,7 @@ import yaml
 
 from agentic_dev.cloud_application import ApplicationService
 from agentic_dev.cloud_batch import build_default_batch_service
+from agentic_dev.cloud_batch.audit import load_batch_audit_events
 from agentic_dev.cloud_batch.graph import batch_dependency_ready_set, batch_dependency_topological_order
 from agentic_dev.cloud_batch.models import (
     BATCH_SCHEMA_VERSION,
@@ -22,7 +23,7 @@ from agentic_dev.cloud_batch.models import (
     ProgressSummary,
 )
 from agentic_dev.cloud_batch.persistence import load_batch_record, save_batch_record
-from agentic_dev.cloud_queue import create_cloud_queue_request
+from agentic_dev.cloud_queue import create_cloud_queue_request, export_cloud_queue_request, import_cloud_queue_response, show_cloud_queue_request
 from agentic_dev.cloud_queue.persistence import checksum_text, now_iso
 
 
@@ -68,11 +69,24 @@ def response_payload(request_id: str, batch_id: str, checksum: str, decision: st
     }
 
 
+def prepare_imported_request(tmp_path: Path, request, checksum: str) -> object:
+    export_cloud_queue_request(tmp_path, request_id=request.request.request_id)
+    response_path = tmp_path / f"{request.request.request_id}.response.yaml"
+    response_path.write_text(
+        yaml.safe_dump(response_payload(request.request.request_id, request.request.batch_id, checksum), sort_keys=False),
+        encoding="utf-8",
+    )
+    import_cloud_queue_response(tmp_path, response_path)
+    return SimpleNamespace(request=show_cloud_queue_request(tmp_path, request.request.request_id).request)
+
+
 def fake_runtime(revision_id: str = "runtime-r1") -> SimpleNamespace:
     return SimpleNamespace(revision=SimpleNamespace(revision_id=revision_id, revision_checksum=f"{revision_id}-checksum"))
 
 
 def fake_application_result(request_id: str, revision_id: str, *, outcome: str = "applied") -> SimpleNamespace:
+    application_path = Path(f"/tmp/{request_id}.application.yaml")
+    plan_path = Path(f"/tmp/{request_id}.plan.yaml")
     application = SimpleNamespace(
         application_id=f"app-{request_id}",
         request_id=request_id,
@@ -81,25 +95,36 @@ def fake_application_result(request_id: str, revision_id: str, *, outcome: str =
         approval_checksum="",
         revision_id=revision_id,
         status=outcome,
+        application_path=application_path,
+        plan_path=plan_path,
     )
-    plan = SimpleNamespace(plan_checksum=f"plan-{request_id}")
-    return SimpleNamespace(application=application, plan=plan)
+    plan = SimpleNamespace(plan_checksum=f"plan-{request_id}", proposed_revision_id=revision_id)
+    return SimpleNamespace(application=application, plan=plan, application_path=application_path, plan_path=plan_path)
 
 
 def snapshot_paths(project_path: Path) -> dict[str, str]:
     roots = [
-        project_path / ".agentic" / "cloud_batches",
-        project_path / ".agentic" / "cloud_applications",
         project_path / ".agentic" / "cloud_queue",
+        project_path / ".agentic" / "cloud_applications",
+        project_path / ".agentic" / "cloud_batches",
+        project_path / ".agentic" / "runtime_plans",
     ]
     snapshot: dict[str, str] = {}
     for root in roots:
         if not root.exists():
             continue
         for path in sorted(root.rglob("*")):
-            if path.is_file():
-                snapshot[str(path.relative_to(project_path))] = sha256(path.read_bytes()).hexdigest()
+            rel_path = str(path.relative_to(project_path))
+            if path.is_dir():
+                snapshot[f"{rel_path}/"] = "DIR"
+            else:
+                snapshot[rel_path] = sha256(path.read_bytes()).hexdigest()
     return snapshot
+
+
+def prepare_single_item_batch(tmp_path: Path, batch_id: str, request_id: str) -> None:
+    service = build_default_batch_service(tmp_path)
+    service.export(request_ids=[request_id], batch_id=batch_id)
 
 
 def seed_batch_record(project_path: Path, batch_id: str, requests: list[object]) -> BatchRecord:
@@ -155,13 +180,29 @@ def seed_batch_record(project_path: Path, batch_id: str, requests: list[object])
     return batch
 
 
+def update_batch_item(project_path: Path, batch_id: str, request_id: str, **changes: object) -> None:
+    batch = load_batch_record(project_path, batch_id)
+    updated_items = []
+    for item in batch.items:
+        if item.request_id == request_id:
+            updated_items.append(type(item).from_dict({**item.to_dict(), **changes}))
+        else:
+            updated_items.append(item)
+    save_batch_record(project_path, type(batch).from_dict({**batch.to_dict(), "items": [item.to_dict() for item in updated_items]}))
+
+
 def test_batch_apply_dependency_order_and_independent_continuation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     create_story(tmp_path)
     request_a = create_cloud_queue_request(tmp_path, story=STORY, title="A", details="details", requirements=["AC-001"], writable_paths=["src/agentic_dev/cli.py"], request_id_factory=lambda: "CQ-REPAIR-A", batch_id_factory=lambda: "batch-source")
     request_b = create_cloud_queue_request(tmp_path, story=STORY, title="B", details="details", requirements=["AC-001"], writable_paths=["docs/cloud_batch_operator_guide.md"], dependencies=[request_a.request.request_id], request_id_factory=lambda: "CQ-REPAIR-B", batch_id_factory=lambda: "batch-source")
     request_c = create_cloud_queue_request(tmp_path, story=STORY, title="C", details="details", requirements=["AC-001"], writable_paths=["src/agentic_dev/runtime_config.py"], request_id_factory=lambda: "CQ-REPAIR-C", batch_id_factory=lambda: "batch-source")
+    request_a = prepare_imported_request(tmp_path, request_a, "response-a")
+    request_b = prepare_imported_request(tmp_path, request_b, "response-b")
+    request_c = prepare_imported_request(tmp_path, request_c, "response-c")
     service = build_default_batch_service(tmp_path)
     seed_batch_record(tmp_path, "batch-repair-1", [request_a, request_b, request_c])
+    monkeypatch.setattr("agentic_dev.cloud_application.service.load_active_runtime_state", lambda project_path: fake_runtime())
+    monkeypatch.setattr(ApplicationService, "plan_apply", lambda self, request_id, dry_run=False: fake_application_result(request_id, "runtime-r1"))
     service.plan_apply("batch-repair-1")
 
     calls: list[str] = []
@@ -188,9 +229,12 @@ def test_batch_apply_dependency_order_and_independent_continuation(tmp_path: Pat
 
 def test_batch_apply_dry_run_makes_no_mutation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     create_story(tmp_path)
-    create_cloud_queue_request(tmp_path, story=STORY, title="A", details="details", requirements=["AC-001"], writable_paths=["src/agentic_dev/cli.py"], request_id_factory=lambda: "CQ-REPAIR-DRY", batch_id_factory=lambda: "batch-source")
+    request = create_cloud_queue_request(tmp_path, story=STORY, title="A", details="details", requirements=["AC-001"], writable_paths=["src/agentic_dev/cli.py"], request_id_factory=lambda: "CQ-REPAIR-DRY", batch_id_factory=lambda: "batch-source")
     service = build_default_batch_service(tmp_path)
-    service.export(request_ids=["CQ-REPAIR-DRY"], batch_id="batch-repair-2")
+    request = prepare_imported_request(tmp_path, request, "response-dry")
+    seed_batch_record(tmp_path, "batch-repair-2", [request])
+    monkeypatch.setattr("agentic_dev.cloud_application.service.load_active_runtime_state", lambda project_path: fake_runtime())
+    monkeypatch.setattr(ApplicationService, "plan_apply", lambda self, request_id, dry_run=False: fake_application_result(request_id, "runtime-r1"))
     service.plan_apply("batch-repair-2")
     before = snapshot_paths(tmp_path)
 
@@ -204,12 +248,117 @@ def test_batch_apply_dry_run_makes_no_mutation(tmp_path: Path, monkeypatch: pyte
     assert before == after
 
 
+def test_batch_apply_dry_run_rejects_stale_plan(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    create_story(tmp_path)
+    request = create_cloud_queue_request(tmp_path, story=STORY, title="A", details="details", requirements=["AC-001"], writable_paths=["src/agentic_dev/cli.py"], request_id_factory=lambda: "CQ-REPAIR-STALE-PLAN", batch_id_factory=lambda: "batch-source")
+    request = prepare_imported_request(tmp_path, request, "checksum-1")
+    service = build_default_batch_service(tmp_path)
+    seed_batch_record(tmp_path, "batch-repair-stale-plan", [request])
+    monkeypatch.setattr("agentic_dev.cloud_application.service.load_active_runtime_state", lambda project_path: fake_runtime())
+    monkeypatch.setattr(ApplicationService, "plan_apply", lambda self, request_id, dry_run=False: fake_application_result(request_id, "runtime-r1"))
+    service.plan_apply("batch-repair-stale-plan")
+    batch = load_batch_record(tmp_path, "batch-repair-stale-plan")
+    save_batch_record(tmp_path, type(batch).from_dict({**batch.to_dict(), "latest_plan_id": "stale-plan"}))
+
+    monkeypatch.setattr("agentic_dev.cloud_batch.orchestration_runtime.load_active_runtime_state", lambda project_path: fake_runtime())
+    monkeypatch.setattr(ApplicationService, "plan_apply", lambda self, request_id, dry_run=False: fake_application_result(request_id, "runtime-r1"))
+
+    with pytest.raises(ValueError, match="Stale batch plan"):
+        service.apply("batch-repair-stale-plan", dry_run=True)
+
+
+def test_batch_apply_dry_run_rejects_active_revision_change(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    create_story(tmp_path)
+    request_a = create_cloud_queue_request(tmp_path, story=STORY, title="A", details="details", requirements=["AC-001"], writable_paths=["src/agentic_dev/cli.py"], request_id_factory=lambda: "CQ-REPAIR-ACTIVE-A", batch_id_factory=lambda: "batch-source")
+    request_b = create_cloud_queue_request(tmp_path, story=STORY, title="B", details="details", requirements=["AC-001"], writable_paths=["src/agentic_dev/runtime_config.py"], request_id_factory=lambda: "CQ-REPAIR-ACTIVE-B", batch_id_factory=lambda: "batch-source")
+    request_a = prepare_imported_request(tmp_path, request_a, "response-active-a")
+    request_b = prepare_imported_request(tmp_path, request_b, "response-active-b")
+    service = build_default_batch_service(tmp_path)
+    seed_batch_record(tmp_path, "batch-repair-active", [request_a, request_b])
+    monkeypatch.setattr("agentic_dev.cloud_application.service.load_active_runtime_state", lambda project_path: fake_runtime())
+    monkeypatch.setattr(ApplicationService, "plan_apply", lambda self, request_id, dry_run=False: fake_application_result(request_id, "runtime-r1"))
+    service.plan_apply("batch-repair-active")
+
+    revisions = [fake_runtime("runtime-r1"), fake_runtime("runtime-r1"), fake_runtime("runtime-r2")]
+
+    def fake_active_runtime(project_path: Path) -> SimpleNamespace:
+        return revisions.pop(0) if revisions else fake_runtime("runtime-r2")
+
+    monkeypatch.setattr("agentic_dev.cloud_batch.orchestration_runtime.load_active_runtime_state", fake_active_runtime)
+    monkeypatch.setattr(ApplicationService, "plan_apply", lambda self, request_id, dry_run=False: fake_application_result(request_id, "runtime-r1"))
+
+    with pytest.raises(ValueError, match="Active runtime revision changed"):
+        service.apply("batch-repair-active", dry_run=True)
+
+
+def test_batch_apply_dry_run_rejects_approval_change(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    create_story(tmp_path)
+    request = create_cloud_queue_request(tmp_path, story=STORY, title="A", details="details", requirements=["AC-001"], writable_paths=["src/agentic_dev/cli.py"], request_id_factory=lambda: "CQ-REPAIR-APPROVAL", batch_id_factory=lambda: "batch-source")
+    request = prepare_imported_request(tmp_path, request, "response-approval")
+    service = build_default_batch_service(tmp_path)
+    seed_batch_record(tmp_path, "batch-repair-approval", [request])
+    monkeypatch.setattr("agentic_dev.cloud_application.service.load_active_runtime_state", lambda project_path: fake_runtime())
+    monkeypatch.setattr(ApplicationService, "plan_apply", lambda self, request_id, dry_run=False: fake_application_result(request_id, "runtime-r1"))
+    service.plan_apply("batch-repair-approval")
+    update_batch_item(tmp_path, "batch-repair-approval", request.request.request_id, approval_checksum="approval-old")
+    approval_path = tmp_path / ".agentic" / "cloud_queue" / "approvals" / f"{request.request.request_id}.yaml"
+    approval_path.parent.mkdir(parents=True, exist_ok=True)
+    approval_path.write_text(
+        yaml.safe_dump(
+            {
+                "request_id": request.request.request_id,
+                "normalized_response_checksum": "approval-new",
+                "approved": True,
+                "operator_note": "changed",
+                "recorded_at": now_iso(),
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr("agentic_dev.cloud_batch.orchestration_runtime.load_active_runtime_state", lambda project_path: fake_runtime())
+    monkeypatch.setattr(ApplicationService, "plan_apply", lambda self, request_id, dry_run=False: fake_application_result(request_id, "runtime-r1"))
+
+    result = service.apply("batch-repair-approval", dry_run=True)
+    assert result.status == "failed"
+    assert result.dry_run is True
+    assert result.item_results[0].outcome == "failed"
+
+
+def test_batch_apply_dry_run_rejects_response_checksum_change(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    create_story(tmp_path)
+    request = create_cloud_queue_request(tmp_path, story=STORY, title="A", details="details", requirements=["AC-001"], writable_paths=["src/agentic_dev/cli.py"], request_id_factory=lambda: "CQ-REPAIR-RESPONSE", batch_id_factory=lambda: "batch-source")
+    request = prepare_imported_request(tmp_path, request, "response-old")
+    service = build_default_batch_service(tmp_path)
+    seed_batch_record(tmp_path, "batch-repair-response", [request])
+    monkeypatch.setattr("agentic_dev.cloud_application.service.load_active_runtime_state", lambda project_path: fake_runtime())
+    monkeypatch.setattr(ApplicationService, "plan_apply", lambda self, request_id, dry_run=False: fake_application_result(request_id, "runtime-r1"))
+    service.plan_apply("batch-repair-response")
+    update_batch_item(tmp_path, "batch-repair-response", request.request.request_id, response_checksum="response-expected")
+    response_path = tmp_path / "response.yaml"
+    response_path.write_text(yaml.safe_dump(response_payload(request.request.request_id, request.request.batch_id, "response-new"), sort_keys=False), encoding="utf-8")
+    import_cloud_queue_response(tmp_path, response_path)
+
+    monkeypatch.setattr("agentic_dev.cloud_batch.orchestration_runtime.load_active_runtime_state", lambda project_path: fake_runtime())
+    monkeypatch.setattr(ApplicationService, "plan_apply", lambda self, request_id, dry_run=False: fake_application_result(request_id, "runtime-r1"))
+
+    result = service.apply("batch-repair-response", dry_run=True)
+    assert result.status == "failed"
+    assert result.dry_run is True
+    assert result.item_results[0].outcome == "failed"
+
+
 def test_batch_apply_rejects_stale_runtime_revision(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     create_story(tmp_path)
     request_a = create_cloud_queue_request(tmp_path, story=STORY, title="A", details="details", requirements=["AC-001"], writable_paths=["src/agentic_dev/cli.py"], request_id_factory=lambda: "CQ-REPAIR-STALE-A", batch_id_factory=lambda: "batch-source")
     request_b = create_cloud_queue_request(tmp_path, story=STORY, title="B", details="details", requirements=["AC-001"], writable_paths=["src/agentic_dev/runtime_config.py"], request_id_factory=lambda: "CQ-REPAIR-STALE-B", batch_id_factory=lambda: "batch-source")
+    request_a = prepare_imported_request(tmp_path, request_a, "response-stale-a")
+    request_b = prepare_imported_request(tmp_path, request_b, "response-stale-b")
     service = build_default_batch_service(tmp_path)
     seed_batch_record(tmp_path, "batch-repair-3", [request_a, request_b])
+    monkeypatch.setattr("agentic_dev.cloud_application.service.load_active_runtime_state", lambda project_path: fake_runtime())
+    monkeypatch.setattr(ApplicationService, "plan_apply", lambda self, request_id, dry_run=False: fake_application_result(request_id, "runtime-r1"))
     service.plan_apply("batch-repair-3")
 
     revisions = ["runtime-r1", "runtime-r2", "runtime-r3", "runtime-r4"]
@@ -229,8 +378,12 @@ def test_batch_apply_skips_cancelled_and_terminal_items(tmp_path: Path, monkeypa
     create_story(tmp_path)
     request_a = create_cloud_queue_request(tmp_path, story=STORY, title="A", details="details", requirements=["AC-001"], writable_paths=["src/agentic_dev/cli.py"], request_id_factory=lambda: "CQ-REPAIR-SKIP-A", batch_id_factory=lambda: "batch-source")
     _request_b = create_cloud_queue_request(tmp_path, story=STORY, title="B", details="details", requirements=["AC-001"], writable_paths=["docs/cloud_batch_operator_guide.md"], request_id_factory=lambda: "CQ-REPAIR-SKIP-B", batch_id_factory=lambda: "batch-source")
+    request_a = prepare_imported_request(tmp_path, request_a, "response-skip-a")
+    _request_b = prepare_imported_request(tmp_path, _request_b, "response-skip-b")
     service = build_default_batch_service(tmp_path)
-    service.export(request_ids=[request_a.request.request_id, "CQ-REPAIR-SKIP-B"], batch_id="batch-repair-3b")
+    seed_batch_record(tmp_path, "batch-repair-3b", [request_a, _request_b])
+    monkeypatch.setattr("agentic_dev.cloud_application.service.load_active_runtime_state", lambda project_path: fake_runtime())
+    monkeypatch.setattr(ApplicationService, "plan_apply", lambda self, request_id, dry_run=False: fake_application_result(request_id, "runtime-r1"))
     service.plan_apply("batch-repair-3b")
     batch = load_batch_record(tmp_path, "batch-repair-3b")
     updated_items = []
@@ -302,6 +455,11 @@ def test_batch_resume_partial_failure_isolated(tmp_path: Path, monkeypatch: pyte
     request_a = create_cloud_queue_request(tmp_path, story=STORY, title="A", details="details", requirements=["AC-001"], writable_paths=["src/agentic_dev/cli.py"], request_id_factory=lambda: "CQ-REPAIR-RES-A", batch_id_factory=lambda: "batch-source")
     request_b = create_cloud_queue_request(tmp_path, story=STORY, title="B", details="details", requirements=["AC-001"], writable_paths=["docs/cloud_batch_operator_guide.md"], dependencies=[request_a.request.request_id], request_id_factory=lambda: "CQ-REPAIR-RES-B", batch_id_factory=lambda: "batch-source")
     request_c = create_cloud_queue_request(tmp_path, story=STORY, title="C", details="details", requirements=["AC-001"], writable_paths=["src/agentic_dev/runtime_config.py"], request_id_factory=lambda: "CQ-REPAIR-RES-C", batch_id_factory=lambda: "batch-source")
+    request_d = create_cloud_queue_request(tmp_path, story=STORY, title="D", details="details", requirements=["AC-001"], writable_paths=["docs/runtime_config.md"], request_id_factory=lambda: "CQ-REPAIR-RES-D", batch_id_factory=lambda: "batch-source")
+    request_a = prepare_imported_request(tmp_path, request_a, "response-res-a")
+    request_b = prepare_imported_request(tmp_path, request_b, "response-res-b")
+    request_c = prepare_imported_request(tmp_path, request_c, "response-res-c")
+    request_d = prepare_imported_request(tmp_path, request_d, "response-res-d")
     service = build_default_batch_service(tmp_path)
     seed_batch_record(
         tmp_path,
@@ -310,8 +468,12 @@ def test_batch_resume_partial_failure_isolated(tmp_path: Path, monkeypatch: pyte
             request_a,
             request_b,
             request_c,
+            request_d,
         ],
     )
+    update_batch_item(tmp_path, "batch-repair-6", request_d.request.request_id, dependencies=(request_c.request.request_id,))
+    monkeypatch.setattr("agentic_dev.cloud_application.service.load_active_runtime_state", lambda project_path: fake_runtime())
+    monkeypatch.setattr(ApplicationService, "plan_apply", lambda self, request_id, dry_run=False: fake_application_result(request_id, "runtime-r1"))
     service.plan_apply("batch-repair-6")
     monkeypatch.setattr("agentic_dev.cloud_batch.orchestration_runtime.load_active_runtime_state", lambda project_path: fake_runtime())
     monkeypatch.setattr(ApplicationService, "plan_apply", lambda self, request_id, dry_run=False: fake_application_result(request_id, "runtime-r1"))
@@ -331,3 +493,6 @@ def test_batch_resume_partial_failure_isolated(tmp_path: Path, monkeypatch: pyte
     assert statuses[request_a.request.request_id] == "failed"
     assert statuses["CQ-REPAIR-RES-B"] == "validation_partial"
     assert statuses[request_c.request.request_id] == "resumed"
+    assert statuses[request_d.request.request_id] == "resumed"
+    events = load_batch_audit_events(tmp_path)
+    assert any(event.get("event_type") == "batch_resume_item_failed" and event.get("details", {}).get("failed_item_id") == request_a.request.request_id for event in events)

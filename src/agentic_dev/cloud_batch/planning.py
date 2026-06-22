@@ -23,6 +23,7 @@ from agentic_dev.cloud_batch.models import (
 from agentic_dev.cloud_batch.progress import derive_batch_progress
 from agentic_dev.cloud_queue import dependencies_resolved, load_imported_response, show_cloud_queue_request
 from agentic_dev.cloud_queue.classification import APPROVAL_REQUIRED
+from agentic_dev.cloud_queue.models import CloudQueueRequest, CloudQueueResponse
 from agentic_dev.cloud_queue.imports import imported_response_path
 from agentic_dev.cloud_queue.persistence import checksum_text, now_iso
 
@@ -59,8 +60,8 @@ def build_batch_orchestration_plan(
     service_factory = application_service_factory or _default_application_service_factory(project_path, batch_record)
 
     for item in sorted(batch_record.items, key=lambda value: value.request_id):
-        request = show_cloud_queue_request(project_path, item.request_id).request
-        if not dependencies_resolved(project_path, request):
+        request = _load_request_for_planning(project_path, item.request_id, persist_item_plans=persist_item_plans)
+        if not _dependencies_resolved_for_planning(project_path, request, persist_item_plans=persist_item_plans):
             blocked_item_ids.append(item.item_id)
             item_results.append(
                 ItemResult(
@@ -72,8 +73,8 @@ def build_batch_orchestration_plan(
             )
             continue
 
-        response_path = imported_response_path(project_path, request.request_id)
-        if not response_path.exists():
+        response = _load_response_for_planning(project_path, request.request_id, persist_item_plans=persist_item_plans)
+        if response is None:
             blocked_item_ids.append(item.item_id)
             item_results.append(
                 ItemResult(
@@ -85,7 +86,6 @@ def build_batch_orchestration_plan(
             )
             continue
 
-        response = load_imported_response(project_path, request.request_id)
         if request.classification == APPROVAL_REQUIRED and not request.approval_checksum:
             blocked_item_ids.append(item.item_id)
             item_results.append(
@@ -202,6 +202,58 @@ def build_batch_orchestration_plan(
         conflict_result=conflict_result,
         item_results=tuple(item_results),
     )
+
+
+def _load_request_for_planning(project_path: Path, request_id: str, *, persist_item_plans: bool) -> CloudQueueRequest:
+    if persist_item_plans:
+        return show_cloud_queue_request(project_path, request_id).request
+    requests_root = project_path.resolve() / ".agentic" / "cloud_queue" / "requests"
+    normalized_request_id = request_id.strip()
+    if not normalized_request_id:
+        raise FileNotFoundError("Cloud queue request was not found: ")
+    if not requests_root.exists():
+        raise FileNotFoundError(f"Cloud queue request was not found: {request_id}")
+    for path in sorted(requests_root.rglob(f"{normalized_request_id}.yaml")):
+        loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+        if not isinstance(loaded, dict):
+            raise ValueError(f"Request file must contain a YAML mapping: {path}")
+        request = CloudQueueRequest.from_dict(loaded)
+        if request.request_id == normalized_request_id:
+            return request
+    raise FileNotFoundError(f"Cloud queue request was not found: {request_id}")
+
+
+def _load_response_for_planning(project_path: Path, request_id: str, *, persist_item_plans: bool) -> CloudQueueResponse | None:
+    if persist_item_plans:
+        return load_imported_response(project_path, request_id)
+    response_path = imported_response_path(project_path, request_id)
+    if not response_path.exists():
+        return None
+    loaded = yaml.safe_load(response_path.read_text(encoding="utf-8"))
+    if not isinstance(loaded, dict):
+        raise ValueError(f"Imported response must be a YAML mapping: {response_path}")
+    return CloudQueueResponse.from_dict(loaded, source_file=response_path)
+
+
+def _dependencies_resolved_for_planning(project_path: Path, request: CloudQueueRequest, *, persist_item_plans: bool) -> bool:
+    if persist_item_plans:
+        return dependencies_resolved(project_path, request)
+    requests_root = project_path.resolve() / ".agentic" / "cloud_queue" / "requests"
+    if not request.dependencies:
+        return True
+    if not requests_root.exists():
+        return False
+    for dependency_id in request.dependencies:
+        dependency_path = next(iter(sorted(requests_root.rglob(f"{dependency_id}.yaml"))), None)
+        if dependency_path is None:
+            return False
+        loaded = yaml.safe_load(dependency_path.read_text(encoding="utf-8"))
+        if not isinstance(loaded, dict):
+            return False
+        dependency = CloudQueueRequest.from_dict(loaded)
+        if dependency.state not in {"validated_safe", "approved"}:
+            return False
+    return True
 
 
 def build_execution_waves(batch_id: str, items: list[BatchItem], conflict_result: ConflictResult) -> tuple[ExecutionWave, ...]:
