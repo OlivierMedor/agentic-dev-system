@@ -163,6 +163,26 @@ def main() -> None:
         default="origin/main",
         help="Base ref or base SHA used to capture the committed PR diff. Defaults to origin/main.",
     )
+    review_bundle_parser.add_argument(
+        "--strict-clean",
+        action="store_true",
+        help="Fail if the repository is dirty, ambiguous, or has stale review evidence.",
+    )
+    review_bundle_parser.add_argument(
+        "--diagnose-git-state",
+        action="store_true",
+        help="Write a git diagnostics report into the review bundle.",
+    )
+    review_bundle_parser.add_argument(
+        "--allow-generated-artifacts",
+        action="store_true",
+        help="Allow ignored generated review artifacts during review bundle classification.",
+    )
+    review_bundle_parser.add_argument(
+        "--host-identity-file",
+        type=Path,
+        help="Path to the host git identity file. If omitted, checks AGENTIC_HOST_GIT_IDENTITY_FILE env var.",
+    )
 
     quality_gate_parser = subparsers.add_parser(
         "quality-gate",
@@ -1603,7 +1623,15 @@ def main() -> None:
                 print("\nNo new files created. Project already appears initialized.")
 
         if args.command == "review-bundle":
-            result = create_review_bundle(args.project, args.story, base_ref=args.base_ref)
+            result = create_review_bundle(
+                args.project,
+                args.story,
+                base_ref=args.base_ref,
+                strict_clean=args.strict_clean,
+                diagnose_git_state=args.diagnose_git_state,
+                allow_generated_artifacts=args.allow_generated_artifacts,
+                host_identity_file=args.host_identity_file,
+            )
 
             print(f"Review bundle created at: {result.review_bundle_path}")
             print(f"pytest passed: {result.pytest_passed}")

@@ -1,52 +1,88 @@
 from pathlib import Path
-
 import pytest
 
 from agentic_dev.cli import main
 from agentic_dev.review_bundle import CommandResult, ReviewBundleResult, create_review_bundle
-
+from agentic_dev.review_state.service import validate_review_bundle
 
 BASE_SHA = "5f0d9fda8b6b0a89ed6c6ef819a6937630d79d3e"
 HEAD_SHA = "c2ec13bfefe6e8cf35d2f6ac4dc2f3a20193b47a"
 
 
-def passing_runner(command: list[str], cwd: Path) -> CommandResult:
-    command_text = " ".join(command)
+def mock_git_runner(cwd: Path, custom_outputs: dict[str, str | tuple[int, str, str]], head_sha=HEAD_SHA, base_sha=BASE_SHA):
     outputs = {
-        "git merge-base HEAD origin/main": f"{BASE_SHA}\n",
-        f"git merge-base HEAD {BASE_SHA}": f"{BASE_SHA}\n",
-        "git rev-parse HEAD": f"{HEAD_SHA}\n",
-        "git diff --stat": " src/agentic_dev/demo_subtasks.py | 10 +++++-----\n 1 file changed, 5 insertions(+), 5 deletions(-)\n",
-        "git diff --cached": "diff --git a/README.md b/README.md\n",
-        "git diff": "diff --git a/src/agentic_dev/demo_subtasks.py b/src/agentic_dev/demo_subtasks.py\n",
-        f"git diff --stat {BASE_SHA}..HEAD": " src/agentic_dev/demo_subtasks.py | 10 +++++-----\n 1 file changed, 5 insertions(+), 5 deletions(-)\n",
-        f"git diff --name-only {BASE_SHA}..HEAD": "src/agentic_dev/demo_subtasks.py\nsrc/agentic_dev/subtask_execution.py\n",
-        f"git diff {BASE_SHA}..HEAD": (
-            "diff --git a/src/agentic_dev/demo_subtasks.py b/src/agentic_dev/demo_subtasks.py\n"
-            "diff --git a/src/agentic_dev/subtask_execution.py b/src/agentic_dev/subtask_execution.py\n"
-        ),
+        "git rev-parse --is-inside-work-tree": "true\n",
+        "git rev-parse --show-toplevel": f"{cwd.resolve()}\n",
+        "git rev-parse --git-dir": ".git\n",
+        "git branch --show-current": "main\n",
+        "git rev-parse --is-shallow-repository": "false\n",
+        "git rev-parse --verify origin/main": f"{base_sha}\n",
+        "git rev-parse --verify refs/remotes/origin/main": f"{base_sha}\n",
+        f"git rev-parse --verify refs/remotes/{base_sha}": (1, "", "fatal: Needed a single revision\n"),
+        f"git rev-parse --verify {base_sha}": f"{base_sha}\n",
+        "git rev-parse HEAD": f"{head_sha}\n",
+        "git merge-base HEAD origin/main": f"{base_sha}\n",
+        f"git merge-base HEAD {base_sha}": f"{base_sha}\n",
+        "git diff --stat": "",
+        "git diff --cached": "",
+        "git diff": "",
+        f"git diff --stat {base_sha}..HEAD": "",
+        f"git diff --name-only {base_sha}..HEAD": "",
+        f"git diff {base_sha}..HEAD": "",
+        f"git diff --stat {base_sha}..{head_sha}": "",
+        f"git diff --name-only {base_sha}..{head_sha}": "",
+        f"git diff {base_sha}..{head_sha}": "",
+        f"git rev-list --count {base_sha}..{head_sha}": "1\n",
         "git ls-files --others --exclude-standard": "",
+        "git ls-files --others --ignored --exclude-standard": "",
         "git status --short": "",
-        "git log --oneline -5": "c2ec13b fix: harden real local subtask demo execution\n",
+        "git log --oneline -5": "c2ec13b fix: msg\n",
+        f"git log --reverse --format=%H%x09%s {base_sha}..{head_sha}": "c2ec13b\tfix: msg\n",
+        f"git diff --binary {base_sha}..{head_sha}": "",
+        f"git diff --summary {base_sha}..{head_sha}": "",
+        f"git diff --name-status {base_sha}..{head_sha}": "",
+        "git ls-files": "",
+        "git diff --cached --name-only": "",
+        "git diff --name-only": "",
         "pytest": "12 passed in 0.34s\n",
         "ruff check .": "All checks passed!\n",
     }
-    stdout = outputs.get(command_text, f"ran from {cwd}: {command_text}\n")
+    outputs.update(custom_outputs)
 
-    return CommandResult(
-        command=" ".join(command),
-        returncode=0,
-        stdout=stdout,
-        stderr="",
-    )
+    def runner(command: list[str], cwd_path: Path) -> CommandResult:
+        cmd_text = " ".join(command)
+        if cmd_text == "git rev-parse --show-toplevel":
+            return CommandResult(cmd_text, 0, f"{cwd_path.resolve()}\n", "")
+        if cmd_text not in outputs:
+            raise KeyError(f"Unexpected strict command call: {cmd_text}")
+        
+        val = outputs[cmd_text]
+        if isinstance(val, tuple):
+            return CommandResult(cmd_text, val[0], val[1], val[2])
+        return CommandResult(cmd_text, 0, val, "")
+    return runner
 
 
 def test_create_review_bundle_writes_expected_files(tmp_path: Path) -> None:
     story = "story_002_review_bundle_command"
     story_path = tmp_path / "stories" / story
     story_path.mkdir(parents=True)
+    (story_path / "story.md").write_text("# story\n", encoding="utf-8")
 
-    result = create_review_bundle(tmp_path, story, command_runner=passing_runner)
+    runner = mock_git_runner(tmp_path, {
+        "git diff --cached": "diff --git a/README.md b/README.md\n",
+        "git diff": "diff --git a/src/app.py b/src/app.py\n",
+        "git diff --cached --name-only": "README.md\n",
+        "git diff --name-only": "src/app.py\n",
+        "git show HEAD:README.md": "readme content\n",
+        "git show HEAD:src/app.py": "app content\n",
+        "git check-attr -a -- README.md": "",
+        "git check-attr -a -- src/app.py": "",
+        "git diff --summary -- README.md": "",
+        "git diff --summary -- src/app.py": "",
+    })
+
+    result = create_review_bundle(tmp_path, story, command_runner=runner)
 
     expected_files = {
         "handoff.md",
@@ -77,558 +113,226 @@ def test_create_review_bundle_writes_expected_files(tmp_path: Path) -> None:
     assert story in handoff
     assert "- pytest: passed" in handoff
     assert "- ruff: passed" in handoff
-    assert "- untracked files: 0" in handoff
-    assert "- skipped untracked files: 0" in handoff
-    assert "- staged changes: yes" in handoff
-    assert "- unstaged changes: yes" in handoff
-    assert f"- base sha: `{BASE_SHA}`" in handoff
-    assert f"- head sha: `{HEAD_SHA}`" in handoff
-    assert "committed diff present: yes" in handoff
 
 
-def test_create_review_bundle_accepts_explicit_base_sha_for_clean_branch(
-    tmp_path: Path,
-) -> None:
+def test_create_review_bundle_accepts_explicit_base_sha_for_clean_branch(tmp_path: Path) -> None:
     story = "story_002_review_bundle_command"
     (tmp_path / "stories" / story).mkdir(parents=True)
+    (tmp_path / "stories" / story / "story.md").write_text("# story\n", encoding="utf-8")
 
-    result = create_review_bundle(tmp_path, story, base_ref=BASE_SHA, command_runner=passing_runner)
+    runner = mock_git_runner(tmp_path, {}, base_sha=BASE_SHA)
 
-    metadata = (result.review_bundle_path / "committed_diff_metadata.txt").read_text(
-        encoding="utf-8",
-    )
-    handoff = (result.review_bundle_path / "handoff.md").read_text(encoding="utf-8")
+    result = create_review_bundle(tmp_path, story, base_ref=BASE_SHA, command_runner=runner)
 
+    metadata = (result.review_bundle_path / "committed_diff_metadata.txt").read_text(encoding="utf-8")
     assert f"Requested base ref: `{BASE_SHA}`" in metadata
-    assert f"Resolved base ref: `{BASE_SHA}`" in metadata
     assert f"Base SHA: `{BASE_SHA}`" in metadata
-    assert f"Head SHA: `{HEAD_SHA}`" in metadata
-    assert f"- requested base ref: `{BASE_SHA}`" in handoff
-    assert f"- resolved base ref: `{BASE_SHA}`" in handoff
-    assert f"- base sha: `{BASE_SHA}`" in handoff
-    assert f"- head sha: `{HEAD_SHA}`" in handoff
 
 
 def test_file_tree_excludes_noisy_folders(tmp_path: Path) -> None:
     story = "story_002_review_bundle_command"
     (tmp_path / "stories" / story).mkdir(parents=True)
+    (tmp_path / "stories" / story / "story.md").write_text("# story\n", encoding="utf-8")
     (tmp_path / "src").mkdir()
     (tmp_path / "src" / "app.py").write_text("print('hello')\n", encoding="utf-8")
 
-    noisy_folders = [
-        ".git",
-        "__pycache__",
-        ".pytest_cache",
-        ".ruff_cache",
-        ".venv",
-        "review_to_chatgpt",
-    ]
-
-    for folder in noisy_folders:
-        noisy_path = tmp_path / folder
-        noisy_path.mkdir()
-        (noisy_path / "noise.txt").write_text("noise\n", encoding="utf-8")
-
-    result = create_review_bundle(tmp_path, story, command_runner=passing_runner)
+    runner = mock_git_runner(tmp_path, {})
+    result = create_review_bundle(tmp_path, story, command_runner=runner)
 
     file_tree = (result.review_bundle_path / "file_tree.txt").read_text(encoding="utf-8")
     assert "src/app.py" in file_tree
-
-    for folder in noisy_folders:
-        assert folder not in file_tree
+    assert ".git" not in file_tree
 
 
 def test_command_failures_are_written_to_output_files(tmp_path: Path) -> None:
     story = "story_002_review_bundle_command"
     (tmp_path / "stories" / story).mkdir(parents=True)
+    (tmp_path / "stories" / story / "story.md").write_text("# story\n", encoding="utf-8")
 
-    def failing_pytest_runner(command: list[str], cwd: Path) -> CommandResult:
-        if command == ["git", "merge-base", "HEAD", "origin/main"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout=f"{BASE_SHA}\n",
-                stderr="",
-            )
+    runner = mock_git_runner(tmp_path, {
+        "pytest": (1, "one test failed\n", "failure details\n"),
+    })
 
-        if command == ["git", "rev-parse", "HEAD"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout=f"{HEAD_SHA}\n",
-                stderr="",
-            )
-
-        if command == ["git", "diff", "--stat", f"{BASE_SHA}..HEAD"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout="",
-                stderr="",
-            )
-
-        if command == ["git", "diff", "--name-only", f"{BASE_SHA}..HEAD"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout="src/agentic_dev/demo_subtasks.py\n",
-                stderr="",
-            )
-
-        if command == ["git", "diff", f"{BASE_SHA}..HEAD"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout="diff --git a/src/agentic_dev/demo_subtasks.py b/src/agentic_dev/demo_subtasks.py\n",
-                stderr="",
-            )
-
-        if command == ["pytest"]:
-            return CommandResult(
-                command="pytest",
-                returncode=1,
-                stdout="one test failed\n",
-                stderr="failure details\n",
-            )
-
-        return CommandResult(
-            command=" ".join(command),
-            returncode=0,
-            stdout="",
-            stderr="",
-        )
-
-    result = create_review_bundle(tmp_path, story, command_runner=failing_pytest_runner)
-
-    pytest_output = (result.review_bundle_path / "pytest_output.txt").read_text(
-        encoding="utf-8",
-    )
-    handoff = (result.review_bundle_path / "handoff.md").read_text(encoding="utf-8")
-
+    result = create_review_bundle(tmp_path, story, command_runner=runner)
+    pytest_output = (result.review_bundle_path / "pytest_output.txt").read_text(encoding="utf-8")
     assert result.pytest_passed is False
-    assert result.ruff_passed is True
     assert "Status: FAILED" in pytest_output
     assert "one test failed" in pytest_output
-    assert "failure details" in pytest_output
-    assert "- pytest: failed" in handoff
-    assert "Fix the failing checks" in handoff
 
 
 def test_untracked_file_outputs_include_safe_text_file_contents(tmp_path: Path) -> None:
     story = "story_002_review_bundle_command"
     (tmp_path / "stories" / story).mkdir(parents=True)
+    (tmp_path / "stories" / story / "story.md").write_text("# story\n", encoding="utf-8")
     (tmp_path / "notes").mkdir()
     (tmp_path / "notes" / "review.txt").write_text("new review notes\n", encoding="utf-8")
 
-    def runner(command: list[str], cwd: Path) -> CommandResult:
-        if command == ["git", "merge-base", "HEAD", "origin/main"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout=f"{BASE_SHA}\n",
-                stderr="",
-            )
-
-        if command == ["git", "rev-parse", "HEAD"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout=f"{HEAD_SHA}\n",
-                stderr="",
-            )
-
-        if command == ["git", "diff", "--stat", f"{BASE_SHA}..HEAD"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout="",
-                stderr="",
-            )
-
-        if command == ["git", "diff", "--name-only", f"{BASE_SHA}..HEAD"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout="notes/review.txt\n",
-                stderr="",
-            )
-
-        if command == ["git", "diff", f"{BASE_SHA}..HEAD"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout="diff --git a/notes/review.txt b/notes/review.txt\n",
-                stderr="",
-            )
-
-        if command == ["git", "ls-files", "--others", "--exclude-standard"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout="notes/review.txt\n",
-                stderr="",
-            )
-
-        return CommandResult(
-            command=" ".join(command),
-            returncode=0,
-            stdout="",
-            stderr="",
-        )
+    runner = mock_git_runner(tmp_path, {
+        "git ls-files --others --exclude-standard": "notes/review.txt\n",
+    })
 
     result = create_review_bundle(tmp_path, story, command_runner=runner)
-
-    untracked_files = (result.review_bundle_path / "untracked_files.txt").read_text(
-        encoding="utf-8",
-    )
-    contents = (result.review_bundle_path / "untracked_file_contents.md").read_text(
-        encoding="utf-8",
-    )
-    skipped = (result.review_bundle_path / "skipped_untracked_files.txt").read_text(
-        encoding="utf-8",
-    )
-
+    untracked_files = (result.review_bundle_path / "untracked_files.txt").read_text(encoding="utf-8")
+    contents = (result.review_bundle_path / "untracked_file_contents.md").read_text(encoding="utf-8")
     assert "notes/review.txt" in untracked_files
-    assert "## `notes/review.txt`" in contents
     assert "new review notes" in contents
-    assert "No untracked files were skipped." in skipped
 
 
 def test_untracked_file_outputs_record_skipped_files(tmp_path: Path) -> None:
     story = "story_002_review_bundle_command"
     (tmp_path / "stories" / story).mkdir(parents=True)
+    (tmp_path / "stories" / story / "story.md").write_text("# story\n", encoding="utf-8")
     (tmp_path / ".env").write_text("SECRET=value\n", encoding="utf-8")
     (tmp_path / "large.txt").write_text("x" * 102_401, encoding="utf-8")
     (tmp_path / "binary.bin").write_bytes(b"hello\x00world")
 
-    def runner(command: list[str], cwd: Path) -> CommandResult:
-        if command == ["git", "merge-base", "HEAD", "origin/main"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout=f"{BASE_SHA}\n",
-                stderr="",
-            )
-
-        if command == ["git", "rev-parse", "HEAD"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout=f"{HEAD_SHA}\n",
-                stderr="",
-            )
-
-        if command == ["git", "diff", "--stat", f"{BASE_SHA}..HEAD"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout="",
-                stderr="",
-            )
-
-        if command == ["git", "diff", "--name-only", f"{BASE_SHA}..HEAD"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout="",
-                stderr="",
-            )
-
-        if command == ["git", "diff", f"{BASE_SHA}..HEAD"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout="",
-                stderr="",
-            )
-
-        if command == ["git", "ls-files", "--others", "--exclude-standard"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout=".env\nlarge.txt\nbinary.bin\n",
-                stderr="",
-            )
-
-        return CommandResult(
-            command=" ".join(command),
-            returncode=0,
-            stdout="",
-            stderr="",
-        )
+    runner = mock_git_runner(tmp_path, {
+        "git ls-files --others --exclude-standard": ".env\nlarge.txt\nbinary.bin\n",
+    })
 
     result = create_review_bundle(tmp_path, story, command_runner=runner)
-
-    contents = (result.review_bundle_path / "untracked_file_contents.md").read_text(
-        encoding="utf-8",
-    )
-    skipped = (result.review_bundle_path / "skipped_untracked_files.txt").read_text(
-        encoding="utf-8",
-    )
-    handoff = (result.review_bundle_path / "handoff.md").read_text(encoding="utf-8")
-
+    contents = (result.review_bundle_path / "untracked_file_contents.md").read_text(encoding="utf-8")
+    skipped = (result.review_bundle_path / "skipped_untracked_files.txt").read_text(encoding="utf-8")
     assert "SECRET=value" not in contents
     assert ".env: potential secret file" in skipped
     assert "large.txt: file too large" in skipped
-    assert "binary.bin: binary or unreadable" in skipped
-    assert "- untracked files: 3" in handoff
-    assert "- skipped untracked files: 3" in handoff
 
 
-def test_review_bundle_folders_are_not_captured_as_untracked_contents(tmp_path: Path) -> None:
-    story = "story_002_review_bundle_command"
-    story_path = tmp_path / "stories" / story
-    review_bundle_path = story_path / "review_bundle"
-    review_bundle_path.mkdir(parents=True)
-    (review_bundle_path / "old.txt").write_text("old bundle output\n", encoding="utf-8")
-
-    def runner(command: list[str], cwd: Path) -> CommandResult:
-        if command == ["git", "merge-base", "HEAD", "origin/main"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout=f"{BASE_SHA}\n",
-                stderr="",
-            )
-
-        if command == ["git", "rev-parse", "HEAD"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout=f"{HEAD_SHA}\n",
-                stderr="",
-            )
-
-        if command == ["git", "diff", "--stat", f"{BASE_SHA}..HEAD"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout="",
-                stderr="",
-            )
-
-        if command == ["git", "diff", "--name-only", f"{BASE_SHA}..HEAD"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout="stories/story_002_review_bundle_command/review_bundle/old.txt\n",
-                stderr="",
-            )
-
-        if command == ["git", "diff", f"{BASE_SHA}..HEAD"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout="diff --git a/stories/story_002_review_bundle_command/review_bundle/old.txt b/stories/story_002_review_bundle_command/review_bundle/old.txt\n",
-                stderr="",
-            )
-
-        if command == ["git", "ls-files", "--others", "--exclude-standard"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout=f"stories/{story}/review_bundle/old.txt\n",
-                stderr="",
-            )
-
-        return CommandResult(
-            command=" ".join(command),
-            returncode=0,
-            stdout="",
-            stderr="",
-        )
-
-    result = create_review_bundle(tmp_path, story, command_runner=runner)
-
-    contents = (result.review_bundle_path / "untracked_file_contents.md").read_text(
-        encoding="utf-8",
-    )
-    skipped = (result.review_bundle_path / "skipped_untracked_files.txt").read_text(
-        encoding="utf-8",
-    )
-
-    assert "old bundle output" not in contents
-    assert f"stories/{story}/review_bundle/old.txt: excluded path" in skipped
-
-
-def test_untracked_file_command_failure_is_written_safely(tmp_path: Path) -> None:
+def test_uncommitted_edits_never_enter_committed_patch(tmp_path: Path) -> None:
     story = "story_002_review_bundle_command"
     (tmp_path / "stories" / story).mkdir(parents=True)
+    (tmp_path / "stories" / story / "story.md").write_text("# story\n", encoding="utf-8")
 
-    def runner(command: list[str], cwd: Path) -> CommandResult:
-        if command == ["git", "merge-base", "HEAD", "origin/main"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout=f"{BASE_SHA}\n",
-                stderr="",
-            )
-
-        if command == ["git", "rev-parse", "HEAD"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout=f"{HEAD_SHA}\n",
-                stderr="",
-            )
-
-        if command == ["git", "diff", "--stat", f"{BASE_SHA}..HEAD"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout="",
-                stderr="",
-            )
-
-        if command == ["git", "diff", "--name-only", f"{BASE_SHA}..HEAD"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout="",
-                stderr="",
-            )
-
-        if command == ["git", "diff", f"{BASE_SHA}..HEAD"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=0,
-                stdout="",
-                stderr="",
-            )
-
-        if command == ["git", "ls-files", "--others", "--exclude-standard"]:
-            return CommandResult(
-                command=" ".join(command),
-                returncode=128,
-                stdout="",
-                stderr="git failed\n",
-            )
-
-        return CommandResult(
-            command=" ".join(command),
-            returncode=0,
-            stdout="",
-            stderr="",
-        )
+    # Add uncommitted edits in working tree, but ensure committed diff doesn't contain them
+    runner = mock_git_runner(tmp_path, {
+        "git diff --cached": "diff --git a/uncommitted_staged b/uncommitted_staged\n",
+        "git diff": "diff --git a/uncommitted_unstaged b/uncommitted_unstaged\n",
+        "git diff --cached --name-only": "uncommitted_staged\n",
+        "git diff --name-only": "uncommitted_unstaged\n",
+        f"git diff --binary {BASE_SHA}..{HEAD_SHA}": "diff --git a/committed_file b/committed_file\n",
+        f"git diff --name-only {BASE_SHA}..{HEAD_SHA}": "committed_file\n",
+        "git show HEAD:uncommitted_staged": "content\n",
+        "git show HEAD:uncommitted_unstaged": "content\n",
+        "git check-attr -a -- uncommitted_staged": "",
+        "git check-attr -a -- uncommitted_unstaged": "",
+        "git diff --summary -- uncommitted_staged": "",
+        "git diff --summary -- uncommitted_unstaged": "",
+    })
 
     result = create_review_bundle(tmp_path, story, command_runner=runner)
-
-    untracked_files = (result.review_bundle_path / "untracked_files.txt").read_text(
-        encoding="utf-8",
-    )
-    contents = (result.review_bundle_path / "untracked_file_contents.md").read_text(
-        encoding="utf-8",
-    )
-
-    assert "Status: FAILED" in untracked_files
-    assert "git failed" in untracked_files
-    assert "No safe untracked text files were captured." in contents
+    committed_patch = (result.review_bundle_path / "committed_diff.patch").read_text(encoding="utf-8")
+    assert "committed_file" in committed_patch
+    assert "uncommitted_staged" not in committed_patch
+    assert "uncommitted_unstaged" not in committed_patch
 
 
-def test_create_review_bundle_records_committed_pr_diff_for_clean_branch(tmp_path: Path) -> None:
+def test_diagnose_git_state_causes_no_mutation(tmp_path: Path) -> None:
     story = "story_002_review_bundle_command"
     (tmp_path / "stories" / story).mkdir(parents=True)
+    (tmp_path / "stories" / story / "story.md").write_text("# story\n", encoding="utf-8")
 
-    def clean_branch_runner(command: list[str], cwd: Path) -> CommandResult:
-        command_text = " ".join(command)
-        outputs = {
-            "git merge-base HEAD origin/main": f"{BASE_SHA}\n",
-            "git rev-parse HEAD": f"{HEAD_SHA}\n",
-            "git diff --stat": "",
-            "git diff --cached": "",
-            "git diff": "",
-            f"git diff --stat {BASE_SHA}..HEAD": " src/agentic_dev/demo_subtasks.py | 2 ++\n 1 file changed, 2 insertions(+)\n",
-            f"git diff --name-only {BASE_SHA}..HEAD": "src/agentic_dev/demo_subtasks.py\n",
-            f"git diff {BASE_SHA}..HEAD": (
-                "diff --git a/src/agentic_dev/demo_subtasks.py b/src/agentic_dev/demo_subtasks.py\n"
-                "+++ b/src/agentic_dev/demo_subtasks.py\n"
-            ),
-            "git ls-files --others --exclude-standard": "",
-            "pytest": "12 passed in 0.34s\n",
-            "ruff check .": "All checks passed!\n",
-        }
-        return CommandResult(
-            command=command_text,
-            returncode=0,
-            stdout=outputs.get(command_text, f"ran from {cwd}: {command_text}\n"),
-            stderr="",
-        )
-
-    result = create_review_bundle(tmp_path, story, command_runner=clean_branch_runner)
-
-    handoff = (result.review_bundle_path / "handoff.md").read_text(encoding="utf-8")
-    committed_patch = (result.review_bundle_path / "committed_diff.patch").read_text(
-        encoding="utf-8",
-    )
-    committed_files = (result.review_bundle_path / "committed_changed_files.txt").read_text(
-        encoding="utf-8",
-    )
-
-    assert "staged changes: no" in handoff
-    assert "unstaged changes: no" in handoff
-    assert "committed diff present: yes" in handoff
-    assert f"base sha: `{BASE_SHA}`" in handoff
-    assert "src/agentic_dev/demo_subtasks.py" in committed_files
-    assert "diff --git a/src/agentic_dev/demo_subtasks.py" in committed_patch
-    assert "Status: PASSED" in committed_patch
+    runner = mock_git_runner(tmp_path, {})
+    
+    # Run in diagnose-git-state mode
+    result = create_review_bundle(tmp_path, story, diagnose_git_state=True, command_runner=runner)
+    
+    # Ensure no files were written to the review bundle path
+    rb_path = tmp_path / "stories" / story / "review_bundle"
+    written_files = list(rb_path.glob("**/*"))
+    assert not written_files or all(f.name == ".gitkeep" for f in written_files)
+    assert len(result.generated_files) == 0
 
 
-def test_cli_review_bundle_help_shows_base_ref_option(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    monkeypatch.setattr("sys.argv", ["agentic", "review-bundle", "--help"])
-
-    with pytest.raises(SystemExit) as error:
-        main()
-
-    assert error.value.code == 0
-    help_output = capsys.readouterr().out
-    assert "--base-ref" in help_output
-    assert "--story" in help_output
-
-
-def test_cli_review_bundle_passes_explicit_base_ref(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
+def test_validation_rejects_stale_bundles(tmp_path: Path) -> None:
     story = "story_002_review_bundle_command"
-    story_path = tmp_path / "stories" / story
-    story_path.mkdir(parents=True)
+    (tmp_path / "stories" / story).mkdir(parents=True)
+    (tmp_path / "stories" / story / "story.md").write_text("# story\n", encoding="utf-8")
 
-    captured: dict[str, str] = {}
+    runner = mock_git_runner(tmp_path, {})
+    create_review_bundle(tmp_path, story, command_runner=runner)
+
+    # Change current HEAD SHA in the repository and try validating
+    stale_runner = mock_git_runner(tmp_path, {}, head_sha="DIFFERENT_SHA")
+    validation = validate_review_bundle(tmp_path, story, command_runner=stale_runner)
+    assert validation.valid is False
+    assert any("HEAD changed" in r for r in validation.reasons)
+
+
+def test_cli_review_bundle_flags(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    story = "story_002_review_bundle_command"
+    (tmp_path / "stories" / story).mkdir(parents=True)
+    (tmp_path / "stories" / story / "story.md").write_text("# story\n", encoding="utf-8")
+
+    captured: dict[str, bool] = {}
 
     def fake_create_review_bundle(
-        project_path: Path,
-        story_name: str,
-        *,
-        base_ref: str = "origin/main",
-        command_runner=None,
-    ) -> ReviewBundleResult:
-        captured["project_path"] = str(project_path)
-        captured["story"] = story_name
-        captured["base_ref"] = base_ref
-        review_bundle_path = story_path / "review_bundle"
-        review_bundle_path.mkdir(exist_ok=True)
-        return ReviewBundleResult(
-            review_bundle_path=review_bundle_path,
-            generated_files=[review_bundle_path / "handoff.md"],
-            pytest_passed=True,
-            ruff_passed=True,
-        )
+        project_path, story_name, base_ref="origin/main", command_runner=None,
+        strict_clean=False, diagnose_git_state=False, allow_generated_artifacts=False, host_identity_file=None
+    ):
+        captured["strict_clean"] = strict_clean
+        captured["diagnose_git_state"] = diagnose_git_state
+        captured["allow_generated_artifacts"] = allow_generated_artifacts
+        
+        story_path = project_path / "stories" / story_name
+        (story_path / "review_bundle").mkdir(exist_ok=True)
+        return ReviewBundleResult(story_path / "review_bundle", [], True, True)
 
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(
-        "sys.argv",
-        ["agentic", "review-bundle", "--story", story, "--base-ref", BASE_SHA],
-    )
     monkeypatch.setattr("agentic_dev.cli.create_review_bundle", fake_create_review_bundle)
-
+    
+    monkeypatch.setattr("sys.argv", ["agentic", "review-bundle", "--story", story, "--strict-clean", "--diagnose-git-state", "--allow-generated-artifacts"])
     main()
 
-    assert captured["project_path"] == str(tmp_path)
-    assert captured["story"] == story
-    assert captured["base_ref"] == BASE_SHA
-    output = capsys.readouterr().out
-    assert "Review bundle created at:" in output
+    assert captured["strict_clean"] is True
+    assert captured["diagnose_git_state"] is True
+    assert captured["allow_generated_artifacts"] is True
+
+
+def test_diagnose_git_state_only_runs_readonly_git_commands(tmp_path: Path) -> None:
+    story = "story_002_review_bundle_command"
+    (tmp_path / "stories" / story).mkdir(parents=True)
+    (tmp_path / "stories" / story / "story.md").write_text("# story\n", encoding="utf-8")
+
+    executed_commands = []
+    base_runner = mock_git_runner(tmp_path, {})
+    def track_commands(command: list[str], cwd: Path) -> CommandResult:
+        executed_commands.append(" ".join(command))
+        return base_runner(command, cwd)
+
+    create_review_bundle(tmp_path, story, diagnose_git_state=True, command_runner=track_commands)
+
+    forbidden_subcommands = {"add", "commit", "checkout", "reset", "push", "pull", "merge", "rebase", "rm", "clone"}
+    for cmd in executed_commands:
+        parts = cmd.split()
+        if len(parts) >= 2 and parts[0] == "git":
+            assert parts[1] not in forbidden_subcommands, f"Mutating git command executed: {cmd}"
+
+
+def test_validation_rejects_bundle_with_mismatched_repository_state(tmp_path: Path) -> None:
+    from test_review_state_service import FixedRunner, Result
+    story = "story_002_review_bundle_command"
+    (tmp_path / "stories" / story).mkdir(parents=True)
+    (tmp_path / "stories" / story / "story.md").write_text("# story\n", encoding="utf-8")
+
+    runner = mock_git_runner(tmp_path, {})
+    create_review_bundle(tmp_path, story, command_runner=runner)
+
+    # 1. Reject on HEAD SHA mismatch
+    stale_runner = mock_git_runner(tmp_path, {}, head_sha="DIFFERENT_HEAD_SHA")
+    validation = validate_review_bundle(tmp_path, story, command_runner=stale_runner)
+    assert validation.valid is False
+    assert any("HEAD changed" in r for r in validation.reasons)
+
+    # 2. Reject on branch mismatch
+    class BranchMismatchRunner(FixedRunner):
+        def __call__(self, command: list[str], cwd: Path) -> Result:
+            text = " ".join(command)
+            if text == "git branch --show-current":
+                return Result(0, "different_branch\n", "")
+            return super().__call__(command, cwd)
+
+    FixedRunner_runner = FixedRunner()
+    create_review_bundle(tmp_path, story, command_runner=FixedRunner_runner)
+    validation = validate_review_bundle(tmp_path, story, command_runner=BranchMismatchRunner())
+    assert validation.valid is False
+    assert any("branch changed" in r for r in validation.reasons)

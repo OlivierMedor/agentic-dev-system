@@ -488,117 +488,50 @@ def create_review_bundle(
     story: str,
     base_ref: str = "origin/main",
     command_runner: CommandRunner = run_command,
+    strict_clean: bool = False,
+    diagnose_git_state: bool = False,
+    allow_generated_artifacts: bool = False,
+    host_identity_file: Path | None = None,
 ) -> ReviewBundleResult:
-    project_path = project_path.resolve()
-    story_path = project_path / "stories" / story
+    from agentic_dev.review_state.service import create_review_bundle as create_review_state_bundle
 
-    if not story_path.exists():
-        raise FileNotFoundError(f"Story folder does not exist: {story_path}")
-
-    review_bundle_path = story_path / "review_bundle"
-    review_bundle_path.mkdir(parents=True, exist_ok=True)
-
-    snapshot = load_review_bundle_snapshot(story_path)
-    committed_diff_metadata = resolve_committed_diff_metadata(
+    result = create_review_state_bundle(
         project_path,
-        base_ref,
-        command_runner,
-        snapshot=snapshot,
+        story,
+        base_ref=base_ref,
+        command_runner=command_runner,
+        strict_clean=strict_clean,
+        diagnose_git_state=diagnose_git_state,
+        allow_generated_artifacts=allow_generated_artifacts,
+        host_identity_file=host_identity_file,
     )
 
-    commands = {
-        "git_status.txt": ["git", "status", "--short"],
-        "git_log.txt": ["git", "log", "--oneline", "-5"],
-        "git_diff_stat.txt": ["git", "diff", "--stat"],
-        "git_diff_staged.patch": ["git", "diff", "--cached"],
-        "git_diff.patch": ["git", "diff"],
-        "committed_diff_stat.txt": ["git", "diff", "--stat", f"{committed_diff_metadata.base_sha}..HEAD"],
-        "committed_changed_files.txt": [
-            "git",
-            "diff",
-            "--name-only",
-            f"{committed_diff_metadata.base_sha}..HEAD",
-        ],
-        "committed_diff.patch": ["git", "diff", f"{committed_diff_metadata.base_sha}..HEAD"],
-        "untracked_files.txt": ["git", "ls-files", "--others", "--exclude-standard"],
-        "pytest_output.txt": ["pytest"],
-        "ruff_output.txt": ["ruff", "check", "."],
+    compatibility_paths = {
+        "handoff.md",
+        "git_status.txt",
+        "git_log.txt",
+        "git_diff_stat.txt",
+        "git_diff_staged.patch",
+        "git_diff.patch",
+        "committed_diff_metadata.txt",
+        "committed_diff_stat.txt",
+        "committed_changed_files.txt",
+        "committed_diff.patch",
+        "untracked_files.txt",
+        "untracked_file_contents.md",
+        "skipped_untracked_files.txt",
+        "pytest_output.txt",
+        "ruff_output.txt",
+        "file_tree.txt",
     }
-
-    results: dict[str, CommandResult] = {}
-    generated_files: list[Path] = []
-
-    for filename, command in commands.items():
-        if snapshot is not None:
-            snapshot_outputs = snapshot.get("outputs", {})
-            if not isinstance(snapshot_outputs, dict):
-                snapshot_outputs = {}
-            if filename in snapshot_outputs:
-                result = command_result_from_snapshot(command, snapshot_outputs, filename)
-            else:
-                result = command_runner(command, project_path)
-        else:
-            result = command_runner(command, project_path)
-        results[filename] = result
-
-        output_path = review_bundle_path / filename
-        write_text(output_path, format_command_output(result))
-        generated_files.append(output_path)
-
-    untracked_files = parse_untracked_files(results["untracked_files.txt"])
-    untracked_snapshot = build_untracked_snapshots(project_path, untracked_files)
-
-    untracked_files_path = review_bundle_path / "untracked_files.txt"
-    write_text(
-        untracked_files_path,
-        format_untracked_file_list(results["untracked_files.txt"], untracked_files),
-    )
-
-    untracked_contents_path = review_bundle_path / "untracked_file_contents.md"
-    write_text(
-        untracked_contents_path,
-        format_untracked_contents(project_path, untracked_snapshot),
-    )
-    generated_files.append(untracked_contents_path)
-
-    skipped_untracked_path = review_bundle_path / "skipped_untracked_files.txt"
-    write_text(
-        skipped_untracked_path,
-        format_skipped_untracked_files(untracked_snapshot.skipped_files),
-    )
-    generated_files.append(skipped_untracked_path)
-
-    committed_diff_metadata_path = review_bundle_path / "committed_diff_metadata.txt"
-    write_text(committed_diff_metadata_path, format_committed_diff_metadata(committed_diff_metadata))
-    generated_files.append(committed_diff_metadata_path)
-
-    file_tree_path = review_bundle_path / "file_tree.txt"
-    write_text(file_tree_path, build_file_tree(project_path))
-    generated_files.append(file_tree_path)
-
-    handoff_path = review_bundle_path / "handoff.md"
-    write_text(
-        handoff_path,
-        generate_handoff(
-            story=story,
-            project_path=project_path,
-            generated_files=[handoff_path, *generated_files],
-            git_status=results["git_status.txt"],
-            git_diff=results["git_diff.patch"],
-            git_diff_staged=results["git_diff_staged.patch"],
-            committed_diff_metadata=committed_diff_metadata,
-            committed_diff_stat=results["committed_diff_stat.txt"],
-            committed_diff_files=results["committed_changed_files.txt"],
-            committed_diff_patch=results["committed_diff.patch"],
-            pytest_result=results["pytest_output.txt"],
-            ruff_result=results["ruff_output.txt"],
-            untracked_snapshot=untracked_snapshot,
-        ),
-    )
-
+    generated_files = [
+        path
+        for path in result.generated_files
+        if path.relative_to(result.review_bundle_path).as_posix() in compatibility_paths
+    ]
     return ReviewBundleResult(
-        review_bundle_path=review_bundle_path,
-        generated_files=[handoff_path, *generated_files],
-        pytest_passed=results["pytest_output.txt"].passed,
-        ruff_passed=results["ruff_output.txt"].passed,
+        review_bundle_path=result.review_bundle_path,
+        generated_files=generated_files,
+        pytest_passed=result.pytest_passed,
+        ruff_passed=result.ruff_passed,
     )

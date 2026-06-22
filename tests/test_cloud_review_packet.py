@@ -265,3 +265,31 @@ def test_cli_cloud_review_packet_defaults_project_to_current_directory(
     main()
 
     assert (story_path / "cloud_review_packet" / "cloud_review_prompt.md").exists()
+
+
+def test_cloud_review_packet_validation_failure_raises_value_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    story_path = create_story(tmp_path)
+    review_bundle_path = story_path / "review_bundle"
+    review_bundle_path.mkdir()
+    (review_bundle_path / "manifest.yaml").write_text("schema_version: 1\n", encoding="utf-8")
+
+    # Mock validate_review_bundle to return invalid
+    from agentic_dev.review_state.service import ReviewBundleValidation
+    
+    def mock_validate(project_path, story, **kwargs):
+        return ReviewBundleValidation(
+            valid=False,
+            reasons=["HEAD changed after review bundle generation", "corrupt manifest checksum"],
+            manifest=None,
+            manifest_path=review_bundle_path / "manifest.yaml",
+            checksum_path=review_bundle_path / "validation" / "checksums.yaml"
+        )
+        
+    monkeypatch.setattr("agentic_dev.cloud_review_packet.validate_review_bundle", mock_validate)
+
+    with pytest.raises(ValueError, match="Review bundle validation failed: HEAD changed after review bundle generation; corrupt manifest checksum"):
+        create_cloud_review_packet(tmp_path, STORY)
+

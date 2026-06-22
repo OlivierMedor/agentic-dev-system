@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from agentic_dev.review_state.service import validate_review_bundle
+
 
 PACKET_FILENAMES = [
     "cloud_review_prompt.md",
@@ -17,6 +19,8 @@ OPTIONAL_EVIDENCE_FILES = [
     ("agent_plan.yaml", "Agent plan"),
     ("test_plan.yaml", "Test plan"),
     ("monitoring_plan.yaml", "Monitoring plan"),
+    ("review_bundle/manifest.yaml", "Review bundle manifest"),
+    ("review_bundle/validation/checksums.yaml", "Review bundle checksums"),
     ("reports/quality_gate_result.yaml", "Quality gate result"),
     ("reports/post_merge_quality_gate_result.yaml", "Post-merge quality gate result"),
     ("reports/finalize_story_result.yaml", "Finalize story result"),
@@ -59,6 +63,13 @@ def create_cloud_review_packet(project_path: Path, story: str, force: bool = Fal
     story_file = story_path / "story.md"
     if not story_file.exists():
         raise FileNotFoundError(f"Required story file does not exist: {story_file}")
+
+    review_bundle_path = story_path / "review_bundle"
+    manifest_path = review_bundle_path / "manifest.yaml"
+    if manifest_path.exists():
+        validation = validate_review_bundle(project_path, story)
+        if not validation.valid:
+            raise ValueError("Review bundle validation failed: " + "; ".join(validation.reasons))
 
     packet_path = story_path / "cloud_review_packet"
     packet_path.mkdir(parents=True, exist_ok=True)

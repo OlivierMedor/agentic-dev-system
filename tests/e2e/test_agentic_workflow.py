@@ -113,13 +113,21 @@ def fake_review_bundle_command_runner(command: list[str], cwd: Path) -> CommandR
         "git diff --name-only 5f0d9fda8b6b0a89ed6c6ef819a6937630d79d3e..HEAD": "",
         "git diff 5f0d9fda8b6b0a89ed6c6ef819a6937630d79d3e..HEAD": "",
         "git ls-files --others --exclude-standard": "",
+        "git rev-parse --show-toplevel": f"{cwd}\n",
+        "git rev-parse --git-dir": ".git\n",
+        "git branch --show-current": "main\n",
+        "git rev-parse --is-shallow-repository": "false\n",
+        "git rev-parse --verify origin/main": "5f0d9fda8b6b0a89ed6c6ef819a6937630d79d3e\n",
+        "git rev-parse --verify refs/remotes/origin/main": "5f0d9fda8b6b0a89ed6c6ef819a6937630d79d3e\n",
+        "git rev-parse --is-inside-work-tree": "true\n",
+        "git ls-files": "",
         "pytest": "1 passed in 0.01s\n",
         "ruff check .": "All checks passed!\n",
     }
     return CommandResult(
         command=command_text,
         returncode=0,
-        stdout=outputs[command_text],
+        stdout=outputs.get(command_text, ""),
         stderr="",
     )
 
