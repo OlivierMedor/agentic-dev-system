@@ -1,0 +1,35 @@
+logs_required:
+- repository_root
+- current_branch
+- head_sha
+- remote_head_sha
+- requested_base_ref
+- resolved_base_sha
+- merge_base_sha
+- committed_diff_checksum
+- changed_file_checksum
+- working_tree_checksum
+- normalization_checksum
+- review_manifest_checksum
+- review_bundle_path
+- cloud_review_packet_path
+- artifact_state
+- git_status_summary
+watch_for:
+- review_bundle_validation_failed
+- cloud_review_packet_invalid
+- host_container_git_mismatch
+- stale_base_ref
+- missing_base_ref
+- merge_base_unavailable
+- wrong_clone_mount
+- ambiguous_git_state
+- dirty_worktree
+- tracked_runtime_artifact
+- normalization_mismatch
+- shallow_clone_merge_base_unavailable
+- paid_provider_call_attempt
+- network_access_attempt
+- Story_063_regression
+- Story_064_regression
+- Story_065_regression
