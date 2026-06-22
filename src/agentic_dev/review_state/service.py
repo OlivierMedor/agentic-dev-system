@@ -306,6 +306,8 @@ def classify_file_modes(project_path: Path, paths: list[str], command_runner: Co
 
 def classify_generated_artifact_path(path: str) -> str | None:
     normalized = path.replace("\\", "/").strip("/")
+    if normalized.endswith("/.gitkeep") or normalized == ".gitkeep":
+        return None
     if normalized.startswith("stories/") and "/review_bundle/" in normalized:
         return "review_bundle"
     if normalized.startswith("stories/") and "/cloud_review_packet/" in normalized:
