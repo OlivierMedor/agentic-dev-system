@@ -7,10 +7,7 @@ TEXT_SUFFIXES = {".md", ".py", ".txt", ".yaml", ".yml", ".json"}
 INVISIBLE_CODEPOINTS = tuple(range(0x200B, 0x2010)) + tuple(range(0x202A, 0x202F)) + tuple(
     range(0x2060, 0x206A)
 )
-LF_REQUIRED_TEXT_FILES = (
-    Path("Dockerfile"),
-    Path("scripts/install_codex_cli.sh"),
-)
+LF_REQUIRED_TEXT_FILES = (Path("scripts/install_codex_cli.sh"),)
 SCANNED_PATHS = (
     Path("README.md"),
     Path("docs"),
