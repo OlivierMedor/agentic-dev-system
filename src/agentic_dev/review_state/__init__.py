@@ -15,7 +15,7 @@ from .git_identity import (
 from .integrity import CHECKSUM_ALGORITHM, checksum_bytes, checksum_mapping, checksum_text, dump_yaml, load_yaml_mapping
 from .manifest import build_review_manifest, validate_review_manifest
 from .normalization import classify_normalization
-from .service import create_review_bundle, validate_review_bundle
+from .service import create_review_bundle, validate_review_bundle, ReviewBundleDiagnosticsServiceResult
 from .working_tree import collect_working_tree_evidence
 
 __all__ = [
@@ -43,6 +43,7 @@ __all__ = [
     "classify_normalization",
     "create_review_bundle",
     "validate_review_bundle",
+    "ReviewBundleDiagnosticsServiceResult",
     "collect_working_tree_evidence",
 ]
 

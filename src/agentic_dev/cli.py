@@ -171,7 +171,7 @@ def main() -> None:
     review_bundle_parser.add_argument(
         "--diagnose-git-state",
         action="store_true",
-        help="Write a git diagnostics report into the review bundle.",
+        help="Run git diagnostics without modifying the filesystem and print the report to stdout.",
     )
     review_bundle_parser.add_argument(
         "--allow-generated-artifacts",
@@ -1633,12 +1633,16 @@ def main() -> None:
                 host_identity_file=args.host_identity_file,
             )
 
-            print(f"Review bundle created at: {result.review_bundle_path}")
-            print(f"pytest passed: {result.pytest_passed}")
-            print(f"ruff passed: {result.ruff_passed}")
-            print("\nGenerated:")
-            for path in result.generated_files:
-                print(f"  - {path}")
+            from agentic_dev.review_bundle import ReviewBundleDiagnosticsResult
+            if isinstance(result, ReviewBundleDiagnosticsResult):
+                print(result.diagnostics_report, end="")
+            else:
+                print(f"Review bundle created at: {result.review_bundle_path}")
+                print(f"pytest passed: {result.pytest_passed}")
+                print(f"ruff passed: {result.ruff_passed}")
+                print("\nGenerated:")
+                for path in result.generated_files:
+                    print(f"  - {path}")
 
         if args.command == "quality-gate":
             result = run_quality_gate_mode(args.project, args.story, mode=args.mode)

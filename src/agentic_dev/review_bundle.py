@@ -490,6 +490,15 @@ def generate_handoff(
 """
 
 
+@dataclass(frozen=True)
+class ReviewBundleDiagnosticsResult:
+    diagnostics_report: str
+    identity: Any
+    host_identity: Any
+    parity_mismatches: list[str]
+    cleanliness: Any
+
+
 def create_review_bundle(
     project_path: Path,
     story: str,
@@ -499,8 +508,11 @@ def create_review_bundle(
     diagnose_git_state: bool = False,
     allow_generated_artifacts: bool = False,
     host_identity_file: Path | None = None,
-) -> ReviewBundleResult:
-    from agentic_dev.review_state.service import create_review_bundle as create_review_state_bundle
+) -> ReviewBundleResult | ReviewBundleDiagnosticsResult:
+    from agentic_dev.review_state.service import (
+        create_review_bundle as create_review_state_bundle,
+        ReviewBundleDiagnosticsServiceResult,
+    )
 
     result = create_review_state_bundle(
         project_path,
@@ -512,6 +524,15 @@ def create_review_bundle(
         allow_generated_artifacts=allow_generated_artifacts,
         host_identity_file=host_identity_file,
     )
+
+    if isinstance(result, ReviewBundleDiagnosticsServiceResult):
+        return ReviewBundleDiagnosticsResult(
+            diagnostics_report=result.diagnostics_report,
+            identity=result.identity,
+            host_identity=result.host_identity,
+            parity_mismatches=result.parity_mismatches,
+            cleanliness=result.cleanliness,
+        )
 
     compatibility_paths = {
         "handoff.md",

@@ -55,7 +55,7 @@ def mock_git_runner(cwd: Path, custom_outputs: dict[str, str | tuple[int, str, s
             return CommandResult(cmd_text, 0, f"{cwd_path.resolve()}\n", "")
         if cmd_text not in outputs:
             raise KeyError(f"Unexpected strict command call: {cmd_text}")
-        
+
         val = outputs[cmd_text]
         if isinstance(val, tuple):
             return CommandResult(cmd_text, val[0], val[1], val[2])
@@ -232,15 +232,155 @@ def test_diagnose_git_state_causes_no_mutation(tmp_path: Path) -> None:
     (tmp_path / "stories" / story / "story.md").write_text("# story\n", encoding="utf-8")
 
     runner = mock_git_runner(tmp_path, {})
-    
+
     # Run in diagnose-git-state mode
+    from agentic_dev.review_bundle import ReviewBundleDiagnosticsResult
     result = create_review_bundle(tmp_path, story, diagnose_git_state=True, command_runner=runner)
-    
+
+    # Ensure it returns the diagnostics result
+    assert isinstance(result, ReviewBundleDiagnosticsResult)
+
     # Ensure no files were written to the review bundle path
     rb_path = tmp_path / "stories" / story / "review_bundle"
     written_files = list(rb_path.glob("**/*"))
     assert not written_files or all(f.name == ".gitkeep" for f in written_files)
-    assert len(result.generated_files) == 0
+
+
+def test_cli_diagnose_git_state_does_not_run_pytest_or_ruff(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    story = "story_002_review_bundle_command"
+    (tmp_path / "stories" / story).mkdir(parents=True)
+    (tmp_path / "stories" / story / "story.md").write_text("# story\n", encoding="utf-8")
+
+    import subprocess
+    executed_commands = []
+
+    outputs = {
+        "git rev-parse --is-inside-work-tree": "true\n",
+        "git rev-parse --show-toplevel": f"{tmp_path.resolve()}\n",
+        "git rev-parse --git-dir": ".git\n",
+        "git branch --show-current": "main\n",
+        "git rev-parse --is-shallow-repository": "false\n",
+        "git rev-parse --verify origin/main": f"{BASE_SHA}\n",
+        "git rev-parse --verify refs/remotes/origin/main": f"{BASE_SHA}\n",
+        f"git rev-parse --verify refs/remotes/{BASE_SHA}": (1, "", "fatal: Needed a single revision\n"),
+        f"git rev-parse --verify {BASE_SHA}": f"{BASE_SHA}\n",
+        "git rev-parse HEAD": f"{HEAD_SHA}\n",
+        "git merge-base HEAD origin/main": f"{BASE_SHA}\n",
+        f"git merge-base HEAD {BASE_SHA}": f"{BASE_SHA}\n",
+        "git diff --stat": "",
+        "git diff --cached": "",
+        "git diff": "",
+        f"git diff --stat {BASE_SHA}..HEAD": "",
+        f"git diff --name-only {BASE_SHA}..HEAD": "",
+        f"git diff {BASE_SHA}..HEAD": "",
+        f"git diff --stat {BASE_SHA}..{HEAD_SHA}": "",
+        f"git diff --name-only {BASE_SHA}..{HEAD_SHA}": "",
+        f"git diff {BASE_SHA}..{HEAD_SHA}": "",
+        f"git rev-list --count {BASE_SHA}..{HEAD_SHA}": "1\n",
+        "git ls-files --others --exclude-standard": "",
+        "git ls-files --others --ignored --exclude-standard": "",
+        "git status --short": "",
+        "git log --oneline -5": "c2ec13b fix: msg\n",
+        f"git log --reverse --format=%H%x09%s {BASE_SHA}..{HEAD_SHA}": "c2ec13b\tfix: msg\n",
+        f"git diff --binary {BASE_SHA}..{HEAD_SHA}": "",
+        f"git diff --summary {BASE_SHA}..{HEAD_SHA}": "",
+        f"git diff --name-status {BASE_SHA}..{HEAD_SHA}": "",
+        "git ls-files": "",
+        "git diff --cached --name-only": "",
+        "git diff --name-only": "",
+    }
+
+    def fake_subprocess_run(command, *args, **kwargs):
+        cmd_str = " ".join(command) if isinstance(command, list) else command
+        executed_commands.append(cmd_str)
+
+        val = outputs.get(cmd_str, "")
+        returncode = 0
+        stdout = val
+        stderr = ""
+        if isinstance(val, tuple):
+            returncode, stdout, stderr = val
+
+        return subprocess.CompletedProcess(
+            args=command,
+            returncode=returncode,
+            stdout=stdout,
+            stderr=stderr
+        )
+
+    monkeypatch.setattr(subprocess, "run", fake_subprocess_run)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("sys.argv", ["agentic", "review-bundle", "--story", story, "--diagnose-git-state"])
+
+    main()
+
+    captured = capsys.readouterr().out
+    assert "Review Bundle Diagnostics" in captured
+
+    # Prove that neither pytest nor ruff was passed to the command runner
+    for cmd in executed_commands:
+        assert "pytest" not in cmd
+        assert "ruff" not in cmd
+
+
+def test_diagnose_git_state_existing_bundle_unmodified(tmp_path: Path) -> None:
+    story = "story_002_review_bundle_command"
+    story_dir = tmp_path / "stories" / story
+    story_dir.mkdir(parents=True)
+    (story_dir / "story.md").write_text("# story\n", encoding="utf-8")
+
+    runner = mock_git_runner(tmp_path, {})
+    rb_path = story_dir / "review_bundle"
+    assert not rb_path.exists()
+
+    # 1. No existing review bundle
+    create_review_bundle(tmp_path, story, diagnose_git_state=True, command_runner=runner)
+    assert not rb_path.exists()
+
+    # 2. Existing review bundle containing multiple files and nested directories
+    rb_path.mkdir()
+    file1 = rb_path / "file1.txt"
+    file1.write_text("file1 content", encoding="utf-8")
+
+    nested_dir = rb_path / "nested"
+    nested_dir.mkdir()
+    file2 = nested_dir / "file2.bin"
+    file2.write_bytes(b"binary content")
+
+    import os
+    import time
+
+    def get_bundle_state():
+        state = {}
+        for root, dirs, files in os.walk(rb_path):
+            for f in files:
+                p = Path(root) / f
+                rel = p.relative_to(rb_path)
+                stat = p.stat()
+                state[rel] = {
+                    "bytes": p.read_bytes(),
+                    "size": stat.st_size,
+                    "mtime": stat.st_mtime,
+                }
+        return state
+
+    state_before = get_bundle_state()
+    assert len(state_before) == 2
+
+    # Sleep slightly to ensure if a timestamp did update we would detect it
+    time.sleep(0.01)
+
+    create_review_bundle(tmp_path, story, diagnose_git_state=True, command_runner=runner)
+
+    state_after = get_bundle_state()
+
+    assert len(state_before) == len(state_after)
+    for rel_path, before in state_before.items():
+        assert rel_path in state_after
+        after = state_after[rel_path]
+        assert before["bytes"] == after["bytes"]
+        assert before["size"] == after["size"]
+        assert before["mtime"] == after["mtime"]
 
 
 def test_validation_rejects_stale_bundles(tmp_path: Path) -> None:
@@ -272,14 +412,14 @@ def test_cli_review_bundle_flags(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
         captured["strict_clean"] = strict_clean
         captured["diagnose_git_state"] = diagnose_git_state
         captured["allow_generated_artifacts"] = allow_generated_artifacts
-        
+
         story_path = project_path / "stories" / story_name
         (story_path / "review_bundle").mkdir(exist_ok=True)
         return ReviewBundleResult(story_path / "review_bundle", [], True, True)
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("agentic_dev.cli.create_review_bundle", fake_create_review_bundle)
-    
+
     monkeypatch.setattr("sys.argv", ["agentic", "review-bundle", "--story", story, "--strict-clean", "--diagnose-git-state", "--allow-generated-artifacts"])
     main()
 

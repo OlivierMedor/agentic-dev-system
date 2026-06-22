@@ -57,6 +57,15 @@ class ReviewBundleServiceResult:
 
 
 @dataclass(frozen=True)
+class ReviewBundleDiagnosticsServiceResult:
+    diagnostics_report: str
+    identity: RepositoryIdentity
+    host_identity: HostIdentity | None
+    parity_mismatches: list[str]
+    cleanliness: CleanlinessReport
+
+
+@dataclass(frozen=True)
 class ReviewBundleValidation:
     valid: bool
     reasons: list[str]
@@ -596,15 +605,57 @@ def create_review_bundle(
     diagnose_git_state: bool = False,
     allow_generated_artifacts: bool = False,
     host_identity_file: Path | None = None,
-) -> ReviewBundleServiceResult:
+) -> ReviewBundleServiceResult | ReviewBundleDiagnosticsServiceResult:
     project_path = project_path.resolve()
-    story_path = _ensure_story_path(project_path, story)
-    review_bundle_path = story_path / REVIEW_BUNDLE_DIRNAME
-    review_bundle_path.mkdir(parents=True, exist_ok=True)
 
     identity = resolve_repository_identity(project_path, requested_base_ref=base_ref, command_runner=command_runner)
     host_identity = load_host_identity(host_identity_file)
     parity = compare_host_and_container_identity(identity, host_identity)
+
+    if diagnose_git_state:
+        working_tree = collect_working_tree_evidence(project_path, command_runner)
+        tracked_files = _split_lines(_run_text(command_runner, ["git", "ls-files"], project_path))
+        untracked_files = _split_lines(_run_text(command_runner, ["git", "ls-files", "--others", "--exclude-standard"], project_path))
+        ignored_files = _split_lines(_run_text(command_runner, ["git", "ls-files", "--others", "--ignored", "--exclude-standard"], project_path))
+
+        normalization_paths = sorted(set(working_tree.staged + working_tree.unstaged))
+        normalization = classify_normalization(project_path, normalization_paths, command_runner)
+        file_modes = classify_file_modes(project_path, normalization_paths, command_runner)
+        artifacts = classify_artifacts(
+            tracked_files,
+            untracked_files + ignored_files,
+            generated_paths=None
+        )
+
+        tracked_review_artifacts = [item.path for item in artifacts if item.tracked and item.category in {"review_bundle", "cloud_review_packet", "remote_dev_validation"}]
+        tracked_runtime_artifacts = [item.path for item in artifacts if item.tracked and item.category.endswith("runtime")]
+        generated_artifacts = [item.path for item in artifacts if item.generated_during_invocation]
+
+        cleanliness = derive_cleanliness(
+            staged=working_tree.staged,
+            unstaged=working_tree.unstaged,
+            untracked=working_tree.untracked,
+            ignored=working_tree.ignored,
+            normalization_only=[finding.path for finding in normalization if finding.classification in {"line-ending-only", "bom-only", "final-newline-only"}],
+            file_mode_only=[finding.path for finding in file_modes],
+            ambiguous=[finding.path for finding in normalization if finding.classification == "mixed-normalization-and-content-change"],
+            generated_artifacts=generated_artifacts,
+            tracked_review_artifacts=tracked_review_artifacts,
+            tracked_runtime_artifacts=tracked_runtime_artifacts,
+        )
+
+        report = format_diagnostics_report(identity, parity, working_tree, normalization, file_modes, artifacts, cleanliness)
+        return ReviewBundleDiagnosticsServiceResult(
+            diagnostics_report=report,
+            identity=identity,
+            host_identity=host_identity,
+            parity_mismatches=parity.mismatches,
+            cleanliness=cleanliness,
+        )
+
+    story_path = _ensure_story_path(project_path, story)
+    review_bundle_path = story_path / REVIEW_BUNDLE_DIRNAME
+    review_bundle_path.mkdir(parents=True, exist_ok=True)
 
     # 1. Capture working tree BEFORE generating any files (Pre-generation)
     working_tree = collect_working_tree_evidence(project_path, command_runner)
@@ -710,22 +761,7 @@ def create_review_bundle(
         if rejections:
             raise ValueError("Strict review bundle generation failed: " + "; ".join(rejections))
 
-    # 4. Handle diagnose git state (Read-only mode)
-    if diagnose_git_state:
-        report = format_diagnostics_report(identity, parity, working_tree, normalization, file_modes, artifacts, cleanliness)
-        print(report, end="")
-        return ReviewBundleServiceResult(
-            review_bundle_path=review_bundle_path,
-            generated_files=[],
-            pytest_passed=True,
-            ruff_passed=True,
-            identity=identity,
-            host_identity=host_identity,
-            parity_mismatches=parity.mismatches,
-            cleanliness=cleanliness,
-            manifest_path=review_bundle_path / REVIEW_BUNDLE_MANIFEST,
-            validation_report_path=review_bundle_path / "validation" / "diagnostics.md",
-        )
+
 
     # Post-generation: Generate artifacts and checksums
     strict_clean_passed = cleanliness.classification not in {"dirty", "ambiguous"} and not cleanliness.strict_blockers
