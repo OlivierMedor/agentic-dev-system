@@ -7,6 +7,10 @@ TEXT_SUFFIXES = {".md", ".py", ".txt", ".yaml", ".yml", ".json"}
 INVISIBLE_CODEPOINTS = tuple(range(0x200B, 0x2010)) + tuple(range(0x202A, 0x202F)) + tuple(
     range(0x2060, 0x206A)
 )
+LF_REQUIRED_TEXT_FILES = (
+    Path("Dockerfile"),
+    Path("scripts/install_codex_cli.sh"),
+)
 SCANNED_PATHS = (
     Path("README.md"),
     Path("docs"),
@@ -40,5 +44,22 @@ def test_tracked_text_files_do_not_contain_hidden_unicode_controls() -> None:
                     violations.append(f"{relative}: unexpected U+FEFF at character {index}")
                 elif codepoint in INVISIBLE_CODEPOINTS:
                     violations.append(f"{relative}: hidden U+{codepoint:04X} at character {index}")
+
+    assert violations == []
+
+
+def test_docker_text_files_are_lf_only_and_shell_shebang_is_posix() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    violations: list[str] = []
+    for candidate in LF_REQUIRED_TEXT_FILES:
+        path = repo_root / candidate
+        data = path.read_bytes()
+        relative = path.relative_to(repo_root).as_posix()
+        if data.startswith(b"\xef\xbb\xbf"):
+            violations.append(f"{relative}: UTF-8 BOM at file start")
+        if b"\r" in data:
+            violations.append(f"{relative}: carriage return found")
+        if candidate.name == "install_codex_cli.sh" and not data.startswith(b"#!/bin/sh\n"):
+            violations.append(f"{relative}: expected exact '#!/bin/sh' shebang with LF")
 
     assert violations == []
