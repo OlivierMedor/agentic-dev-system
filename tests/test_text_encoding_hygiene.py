@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 
@@ -7,6 +8,7 @@ TEXT_SUFFIXES = {".md", ".py", ".txt", ".yaml", ".yml", ".json"}
 INVISIBLE_CODEPOINTS = tuple(range(0x200B, 0x2010)) + tuple(range(0x202A, 0x202F)) + tuple(
     range(0x2060, 0x206A)
 )
+GITATTRIBUTES_PATH = Path(".gitattributes")
 LF_REQUIRED_TEXT_FILES = (Path("scripts/install_codex_cli.sh"),)
 SCANNED_PATHS = (
     Path("README.md"),
@@ -45,6 +47,12 @@ def test_tracked_text_files_do_not_contain_hidden_unicode_controls() -> None:
     assert violations == []
 
 
+def test_gitattributes_contains_distinct_shell_and_dockerfile_rules() -> None:
+    lines = GITATTRIBUTES_PATH.read_text(encoding="utf-8").splitlines()
+
+    assert lines == ["*.sh text eol=lf", "Dockerfile text eol=lf"]
+
+
 def test_docker_text_files_are_lf_only_and_shell_shebang_is_posix() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     violations: list[str] = []
@@ -58,5 +66,7 @@ def test_docker_text_files_are_lf_only_and_shell_shebang_is_posix() -> None:
             violations.append(f"{relative}: carriage return found")
         if candidate.name == "install_codex_cli.sh" and not data.startswith(b"#!/bin/sh\n"):
             violations.append(f"{relative}: expected exact '#!/bin/sh' shebang with LF")
+        if Path("/bin/sh").exists():
+            subprocess.run(["/bin/sh", "-n", str(path)], check=True)
 
     assert violations == []
