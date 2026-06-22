@@ -1,0 +1,31 @@
+test_layers_version: 1
+unit_tests:
+  required: true
+  action: add_or_update
+  frequency: every_commit
+  evidence_or_reason: Cover review-state models, Git identity resolution, merge-base
+    handling, normalization classification, file-mode handling, manifest checksums,
+    and cleanliness classification.
+integration_tests:
+  required: true
+  action: add_or_update
+  frequency: every_pull_request
+  evidence_or_reason: Cover committed diff generation, working-tree separation, host/container
+    parity, stale-base rejection, bundle validation, and Story 063 through 065 regressions.
+mock_e2e_tests:
+  required: true
+  action: add_or_update
+  frequency: before_merge
+  evidence_or_reason: Use deterministic offline fixtures to prove clean, dirty, normalization-only,
+    stale-base, and wrong-mount scenarios without provider network access.
+live_read_only_checks:
+  required: false
+  action: not_applicable_with_reason
+  frequency: manual_only
+  evidence_or_reason: Story 066 is offline-first, host/container focused, and does
+    not require live cloud credentials or provider network access.
+remote_dev_smoke_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: after_remote_dev_deploy
+  evidence_or_reason: Story 066 adds no remote deployment behavior.

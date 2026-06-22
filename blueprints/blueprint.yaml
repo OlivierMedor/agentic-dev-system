@@ -7744,3 +7744,490 @@ stories:
         - automatic_resume_attempt
         - Story_063_regression
         - Story_064_regression
+  - id: STORY-066
+    story_id: story_066
+    slug: review-bundle-cleanliness-and-host-container-diff-normalization
+    title: Story 066 - Review Bundle Cleanliness and Host/Container Diff Normalization
+    goal: Make review bundles and cloud-review packets accurately distinguish committed PR changes, genuine uncommitted working-tree changes, normalization-only differences, generated review artifacts, ignored runtime artifacts, stale Git metadata, and incorrect base references.
+    why: Review evidence must remain trustworthy when Windows and Linux represent the same tracked content differently, when Docker bind mounts normalize line endings or file modes, and when generated review artifacts exist alongside the source tree.
+    agents:
+      developer:
+        writable_paths:
+          - src/**
+          - tests/**
+          - docs/**
+          - stories/review-bundle-cleanliness-and-host-container-diff-normalization/reports/**
+      test:
+        writable_paths:
+          - tests/**
+          - stories/review-bundle-cleanliness-and-host-container-diff-normalization/reports/**
+      documentation:
+        writable_paths:
+          - README.md
+          - docs/**
+          - stories/review-bundle-cleanliness-and-host-container-diff-normalization/reports/**
+      security_quality:
+        writable_paths:
+          - stories/review-bundle-cleanliness-and-host-container-diff-normalization/reports/**
+      local_reviewer:
+        writable_paths:
+          - stories/review-bundle-cleanliness-and-host-container-diff-normalization/reports/**
+    execution_order:
+      - developer
+      - test
+      - documentation
+      - security_quality
+      - local_reviewer
+    local_execution_constraints:
+      decomposition_authority: cloud_planner
+      required_context_must_fit: true
+      allow_required_context_trimming: false
+      oversized_task_policy: reject_for_cloud_redecomposition
+      local_agent_may_redecompose: false
+      require_independent_token_estimate: true
+      require_final_story_validation: true
+      require_dry_run_before_apply: true
+      preserve_canonical_blueprint: true
+      require_atomic_application: true
+      require_revision_bound_leases: true
+      allow_paid_provider_calls: false
+      allow_network_access: false
+      allow_automatic_git_revert: false
+      allow_automatic_merge: false
+      required_failure_states:
+        review_bundle_validation_failed: The review bundle could not be validated safely.
+        cloud_review_packet_invalid: The cloud-review packet failed integrity or freshness checks.
+        host_container_git_mismatch: Host and container Git identity did not match.
+        stale_base_ref: The requested base ref resolved to stale evidence.
+        missing_base_ref: The requested base ref could not be resolved safely.
+        merge_base_unavailable: The merge-base could not be resolved safely.
+        wrong_clone_mount: The container is not mounted over the expected repository.
+        ambiguous_git_state: Git status could not be classified safely.
+        dirty_worktree: The working tree contains genuine source changes.
+        tracked_runtime_artifact: A runtime or review artifact is accidentally tracked.
+        normalization_mismatch: A tracked file differs only by normalization or checkout policy.
+        shallow_clone_merge_base_unavailable: The clone is too shallow to resolve the merge base safely.
+    acceptance_criteria:
+      - Committed PR evidence is separate from working-tree evidence.
+      - The committed diff is generated only from merge-base(base, HEAD)..HEAD.
+      - The review bundle records repository root, branch, HEAD SHA, remote head SHA when available, requested base ref, resolved base SHA, merge-base SHA, and base freshness.
+      - A stale or missing base ref is detected and reported.
+      - Host and container Git identity are compared before evidence generation.
+      - Host and container HEAD mismatches fail generation.
+      - Host and container base SHA mismatches fail generation.
+      - Host and container merge-base mismatches fail generation.
+      - Wrong clone mounts are detected.
+      - Detached or ambiguous Git state is reported.
+      - Genuine staged changes are reported separately.
+      - Genuine unstaged tracked changes are reported separately.
+      - Genuine untracked non-ignored files are reported separately.
+      - Ignored files are summarized separately.
+      - Generated review artifacts are summarized separately.
+      - Normalization-only differences are classified separately.
+      - CRLF versus LF-only differences are classified separately.
+      - Final-newline-only differences are classified separately.
+      - UTF-8 BOM-only differences are classified separately.
+      - Git attribute normalization effects are classified separately.
+      - Docker bind-mount normalization artifacts are classified separately.
+      - File-mode-only differences are classified separately.
+      - Executable-bit-only differences are classified separately.
+      - Ambiguous mode differences fail strict mode.
+      - A true content change is never hidden by normalization classification.
+      - Binary file differences are summarized correctly.
+      - Rename detection is preserved in the committed diff.
+      - The review bundle reports the correct changed-file count.
+      - The review bundle reports the correct commit count in scope.
+      - The review bundle manifest is versioned.
+      - The review bundle manifest and patch are checksummed.
+      - The changed-file list and Git log are checksummed.
+      - The working-tree report and normalization report are checksummed.
+      - The cloud-review packet references bundle checksums.
+      - Review artifact directories are classified before and after generation.
+      - Generated review directories do not make the repository appear dirty.
+      - Tracked review artifacts fail policy checks.
+      - Tracked runtime artifacts fail policy checks.
+      - Strict clean mode fails on dirty or ambiguous evidence.
+      - Strict clean mode fails on stale base refs.
+      - Strict clean mode fails on host/container mismatches.
+      - Repeated review generation is idempotent.
+      - The system rejects a stale review bundle.
+      - The system rejects a packet built from an older bundle.
+      - The system reports when `.git` metadata is unavailable in the container.
+      - Windows behavior is covered.
+      - Linux behavior is covered.
+      - Docker bind-mount behavior is covered.
+      - Shell scripts remain LF-only.
+      - Story 063 behavior remains intact.
+      - Story 064 behavior remains intact.
+      - Story 065 behavior remains intact.
+      - No paid provider integration is introduced.
+    implementation_scope:
+      - Review-state models for repository identity, committed diff, working tree, normalization, and artifacts
+      - Git base resolution, merge-base validation, shallow-clone handling, and stale-ref detection
+      - Host/container parity checks and actionable mismatch errors
+      - Line-ending, BOM, final-newline, and git-attribute normalization classification
+      - File-mode and executable-bit classification with platform-specific behavior
+      - Cleanliness classification for clean, generated-artifact-only, normalization-only, dirty, and ambiguous states
+      - Review bundle manifest versioning and checksums
+      - Cloud-review packet validation against bundle identity and freshness
+      - Repository-consistent review-bundle and cloud-review-packet commands with diagnostics
+      - Offline-only tests and documentation for Windows, Linux, and Docker bind mounts
+      - Backward compatibility for Stories 063, 064, and 065
+    subtasks:
+      - id: define-review-state-models
+        title: Define review-state models
+        role: developer
+        depends_on: []
+        responsibilities:
+          - manifest schema
+          - committed diff model
+          - working tree model
+          - normalization model
+          - artifact model
+          - checksums
+          - tests
+        required_context: &story066_context
+          files:
+            - blueprints/blueprint.yaml
+            - src/agentic_dev/*.py
+            - tests/test_artifact_policy.py
+            - tests/test_public_readiness.py
+            - tests/test_runtime_config.py
+            - tests/test_story_generator.py
+            - tests/test_story_runner.py
+            - tests/test_text_encoding_hygiene.py
+            - tests/test_cloud_application_service.py
+          summaries:
+            - Establish a versioned review manifest and separate committed evidence from working-tree evidence and generated artifacts.
+          prior_task_outputs: []
+          architecture_decisions:
+            - Committed PR evidence and working-tree evidence must remain separate concepts.
+            - Generated review artifacts may exist without mutating the semantic source state.
+        context_budget: &story066_budget
+          max_input_tokens: 24000
+          reserved_output_tokens: 4000
+          required_context_must_fit: true
+          allow_required_context_trimming: false
+          oversized_task_policy: reject_for_cloud_redecomposition
+      - id: add-git-identity-resolution
+        title: Add Git identity resolution
+        role: developer
+        depends_on:
+          - define-review-state-models
+        responsibilities:
+          - head resolution
+          - branch resolution
+          - remote head resolution
+          - base sha resolution
+          - merge-base resolution
+          - shallow clone handling
+          - tests
+        required_context: *story066_context
+        context_budget: *story066_budget
+      - id: add-host-container-parity-checks
+        title: Add host/container parity checks
+        role: developer
+        depends_on:
+          - define-review-state-models
+          - add-git-identity-resolution
+        responsibilities:
+          - parity report
+          - stale ref detection
+          - wrong mount detection
+          - actionable errors
+          - tests
+        required_context: *story066_context
+        context_budget: *story066_budget
+      - id: separate-committed-and-uncommitted-evidence
+        title: Separate committed and uncommitted evidence
+        role: developer
+        depends_on:
+          - define-review-state-models
+          - add-git-identity-resolution
+          - add-host-container-parity-checks
+        responsibilities:
+          - committed diff
+          - staged changes
+          - unstaged changes
+          - untracked files
+          - ignored summary
+          - tests
+        required_context: *story066_context
+        context_budget: *story066_budget
+      - id: add-line-ending-normalization-detection
+        title: Add line-ending normalization detection
+        role: developer
+        depends_on:
+          - define-review-state-models
+          - separate-committed-and-uncommitted-evidence
+        responsibilities:
+          - crlf and lf
+          - bom
+          - final newline
+          - normalized checksums
+          - mixed-change detection
+          - tests
+        required_context: *story066_context
+        context_budget: *story066_budget
+      - id: add-file-mode-classification
+        title: Add file-mode classification
+        role: developer
+        depends_on:
+          - define-review-state-models
+          - separate-committed-and-uncommitted-evidence
+        responsibilities:
+          - executable bit
+          - file mode changes
+          - windows limitations
+          - strict-mode behavior
+          - tests
+        required_context: *story066_context
+        context_budget: *story066_budget
+      - id: add-cleanliness-classifier
+        title: Add cleanliness classifier
+        role: developer
+        depends_on:
+          - separate-committed-and-uncommitted-evidence
+          - add-line-ending-normalization-detection
+          - add-file-mode-classification
+        responsibilities:
+          - clean
+          - clean with generated artifacts
+          - normalization noise only
+          - dirty
+          - ambiguous
+          - tests
+        required_context: *story066_context
+        context_budget: *story066_budget
+      - id: add-review-manifest-and-checksums
+        title: Add review manifest and checksums
+        role: developer
+        depends_on:
+          - define-review-state-models
+          - add-cleanliness-classifier
+        responsibilities:
+          - manifest schema
+          - patch checksum
+          - changed-file checksum
+          - git log checksum
+          - working-tree report checksum
+          - normalization report checksum
+          - tests
+        required_context: *story066_context
+        context_budget: *story066_budget
+      - id: harden-review-bundle-command
+        title: Harden review-bundle command
+        role: developer
+        depends_on:
+          - add-git-identity-resolution
+          - add-host-container-parity-checks
+          - add-review-manifest-and-checksums
+        responsibilities:
+          - correct base resolution
+          - strict-clean mode
+          - diagnostics
+          - idempotency
+          - tests
+        required_context: *story066_context
+        context_budget: *story066_budget
+      - id: harden-cloud-review-packet-command
+        title: Harden cloud-review-packet command
+        role: developer
+        depends_on:
+          - add-review-manifest-and-checksums
+          - harden-review-bundle-command
+        responsibilities:
+          - bundle checksum validation
+          - stale bundle rejection
+          - HEAD and base validation
+          - ambiguity rejection
+          - tests
+        required_context: *story066_context
+        context_budget: *story066_budget
+      - id: add-artifact-classification
+        title: Add artifact classification
+        role: security_quality
+        depends_on:
+          - separate-committed-and-uncommitted-evidence
+          - add-cleanliness-classifier
+          - harden-review-bundle-command
+        responsibilities:
+          - review bundle artifacts
+          - cloud packet artifacts
+          - reports
+          - caches
+          - runtime files
+          - tests
+        required_context: *story066_context
+        context_budget: *story066_budget
+      - id: add-windows-linux-fixtures
+        title: Add Windows/Linux fixtures
+        role: test
+        depends_on:
+          - add-host-container-parity-checks
+          - add-line-ending-normalization-detection
+          - add-file-mode-classification
+        responsibilities:
+          - windows crlf cases
+          - linux lf cases
+          - docker bind mount cases
+          - executable bit cases
+          - tests
+        required_context: *story066_context
+        context_budget: *story066_budget
+      - id: add-end-to-end-review-scenarios
+        title: Add end-to-end review scenarios
+        role: test
+        depends_on:
+          - harden-review-bundle-command
+          - harden-cloud-review-packet-command
+          - add-artifact-classification
+          - add-windows-linux-fixtures
+        responsibilities:
+          - clean pr
+          - dirty pr
+          - normalization only
+          - wrong base
+          - stale refs
+          - stale packet
+          - thousands of false dirty files
+          - tests
+        required_context: *story066_context
+        context_budget: *story066_budget
+      - id: add-operator-documentation
+        title: Add operator documentation
+        role: documentation
+        depends_on:
+          - harden-review-bundle-command
+          - harden-cloud-review-packet-command
+          - add-end-to-end-review-scenarios
+        responsibilities:
+          - review bundle semantics
+          - cleanliness classifications
+          - strict mode
+          - troubleshooting
+          - windows examples
+          - docker examples
+        required_context: *story066_context
+        context_budget: *story066_budget
+      - id: security-review
+        title: Security review
+        role: security_quality
+        depends_on:
+          - add-review-manifest-and-checksums
+          - add-artifact-classification
+          - add-end-to-end-review-scenarios
+        responsibilities:
+          - checksum integrity
+          - path safety
+          - stale evidence
+          - runtime artifact leakage
+          - ambiguous-state handling
+        required_context: *story066_context
+        context_budget: *story066_budget
+      - id: final-local-review
+        title: Final local review
+        role: local_reviewer
+        depends_on:
+          - add-git-identity-resolution
+          - add-host-container-parity-checks
+          - harden-review-bundle-command
+          - harden-cloud-review-packet-command
+          - add-end-to-end-review-scenarios
+          - add-operator-documentation
+          - security-review
+        responsibilities:
+          - acceptance-criteria traceability
+          - Story 063 regressions
+          - Story 064 regressions
+          - Story 065 regressions
+          - offline behavior
+          - no paid provider access
+          - review evidence
+        required_context: *story066_context
+        context_budget: *story066_budget
+    definition_of_done:
+      - The blueprint defines review-state models, Git identity parity, committed and working-tree separation, normalization classification, strict cleanliness, stale-bundle protection, packet integrity checks, and artifact classification.
+      - Acceptance criteria cover committed diff evidence, host/container parity, normalization-only differences, file modes, generated artifacts, stale base handling, and regression safety.
+      - The generated Story 066 workspace is created by agentic generate-stories and generation is idempotent across two runs.
+      - docker compose run --rm dev pytest passes.
+      - docker compose run --rm dev ruff check . passes.
+      - artifact-policy validation passes.
+      - runtime-config validation passes.
+      - hidden-Unicode hygiene validation passes.
+      - Public-readiness validation passes when applicable to the repository state.
+      - No paid cloud API calls are implemented.
+      - No provider network access is added.
+      - No Story 066 runtime implementation code is added in the blueprint branch.
+    not_in_scope:
+      - Paid provider integrations.
+      - Provider network access or automatic provider selection.
+      - Automatic cloud execution or deployment.
+      - Automatic merges or local merge operations.
+      - Silent fallback to older merge bases.
+      - Hiding real content changes behind normalization classification.
+      - Story 064 application semantics changes.
+      - Story 065 batch orchestration semantics changes.
+    test_plan:
+      test_layers_version: 1
+      unit_tests:
+        required: true
+        action: add_or_update
+        frequency: every_commit
+        evidence_or_reason: Cover review-state models, Git identity resolution, merge-base handling, normalization classification, file-mode handling, manifest checksums, and cleanliness classification.
+      integration_tests:
+        required: true
+        action: add_or_update
+        frequency: every_pull_request
+        evidence_or_reason: Cover committed diff generation, working-tree separation, host/container parity, stale-base rejection, bundle validation, and Story 063 through 065 regressions.
+      mock_e2e_tests:
+        required: true
+        action: add_or_update
+        frequency: before_merge
+        evidence_or_reason: Use deterministic offline fixtures to prove clean, dirty, normalization-only, stale-base, and wrong-mount scenarios without provider network access.
+      live_read_only_checks:
+        required: false
+        action: not_applicable_with_reason
+        frequency: manual_only
+        evidence_or_reason: Story 066 is offline-first, host/container focused, and does not require live cloud credentials or provider network access.
+      remote_dev_smoke_tests:
+        required: false
+        action: not_applicable_with_reason
+        frequency: after_remote_dev_deploy
+        evidence_or_reason: Story 066 adds no remote deployment behavior.
+    monitoring_plan:
+      logs_required:
+        - repository_root
+        - current_branch
+        - head_sha
+        - remote_head_sha
+        - requested_base_ref
+        - resolved_base_sha
+        - merge_base_sha
+        - committed_diff_checksum
+        - changed_file_checksum
+        - working_tree_checksum
+        - normalization_checksum
+        - review_manifest_checksum
+        - review_bundle_path
+        - cloud_review_packet_path
+        - artifact_state
+        - git_status_summary
+      watch_for:
+        - review_bundle_validation_failed
+        - cloud_review_packet_invalid
+        - host_container_git_mismatch
+        - stale_base_ref
+        - missing_base_ref
+        - merge_base_unavailable
+        - wrong_clone_mount
+        - ambiguous_git_state
+        - dirty_worktree
+        - tracked_runtime_artifact
+        - normalization_mismatch
+        - shallow_clone_merge_base_unavailable
+        - paid_provider_call_attempt
+        - network_access_attempt
+        - Story_063_regression
+        - Story_064_regression
+        - Story_065_regression
