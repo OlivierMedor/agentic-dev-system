@@ -76,22 +76,29 @@ CommandRunner = Callable[[list[str], Path], CommandResult]
 
 def run_command(command: list[str], cwd: Path) -> CommandResult:
     """Run a command and capture output without raising on failure."""
-    completed = subprocess.run(
-        command,
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        check=False,
-    )
-
-    return CommandResult(
-        command=" ".join(command),
-        returncode=completed.returncode,
-        stdout=completed.stdout,
-        stderr=completed.stderr,
-    )
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+        return CommandResult(
+            command=" ".join(command),
+            returncode=completed.returncode,
+            stdout=completed.stdout,
+            stderr=completed.stderr,
+        )
+    except FileNotFoundError as e:
+        return CommandResult(
+            command=" ".join(command),
+            returncode=127,
+            stdout="",
+            stderr=str(e),
+        )
 
 
 def build_file_tree(project_path: Path) -> str:
