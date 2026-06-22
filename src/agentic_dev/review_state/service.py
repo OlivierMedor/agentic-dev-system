@@ -801,6 +801,10 @@ def create_review_bundle(
     for directory in [committed_dir, working_tree_dir, normalization_dir, artifacts_dir, validation_dir]:
         directory.mkdir(parents=True, exist_ok=True)
 
+    working_tree_content = dump_yaml({"classification": working_tree.classification, "staged": working_tree.staged, "unstaged": working_tree.unstaged, "untracked": working_tree.untracked, "ignored": working_tree.ignored})
+    pytest_content = _format_command_output("pytest", pytest_result.stdout, pytest_result.returncode, pytest_result.stderr)
+    ruff_content = _format_command_output("ruff check .", ruff_result.stdout, ruff_result.returncode, ruff_result.stderr)
+
     validation_checksums = {
         "algorithm": CHECKSUM_ALGORITHM,
         # Legacy compatibility keys
@@ -809,11 +813,11 @@ def create_review_bundle(
         "committed_paths": committed_diff.paths_checksum,
         "git_log": committed_diff.git_log_checksum,
         "diff_stat": committed_diff.diff_stat_checksum,
-        "working_tree": working_tree.status_checksum,
+        "working_tree": checksum_text(working_tree_content),
         "normalization": checksum_text(dump_yaml({"findings": [finding.__dict__ for finding in normalization]})),
         "artifacts": checksum_text(dump_yaml({"findings": [finding.__dict__ for finding in artifacts]})),
-        "pytest": checksum_text(pytest_result.stdout + pytest_result.stderr),
-        "ruff": checksum_text(ruff_result.stdout + ruff_result.stderr),
+        "pytest": checksum_text(pytest_content),
+        "ruff": checksum_text(ruff_content),
 
         # Complete deterministic set
         "manifest_payload": manifest.integrity["manifest_checksum"],
@@ -821,15 +825,15 @@ def create_review_bundle(
         "parity_report": checksum_text(dump_yaml(parity_report_to_manifest(parity))),
         "changed_paths": committed_diff.paths_checksum,
         "binary_report": checksum_text(dump_yaml({"binary_files": committed_diff.binary_files})),
-        "working_tree_report": working_tree.status_checksum,
+        "working_tree_report": checksum_text(working_tree_content),
         "staged_patch": checksum_text(staged_diff.stdout),
         "unstaged_patch": checksum_text(unstaged_diff.stdout),
         "untracked_report": checksum_text(dump_yaml({"paths": working_tree.untracked})),
         "ignored_report": checksum_text(dump_yaml({"paths": working_tree.ignored})),
         "normalization_report": checksum_text(dump_yaml({"findings": [finding.__dict__ for finding in normalization]})),
         "artifact_report": checksum_text(dump_yaml({"findings": [finding.__dict__ for finding in artifacts]})),
-        "pytest_output": checksum_text(pytest_result.stdout + pytest_result.stderr),
-        "ruff_output": checksum_text(ruff_result.stdout + ruff_result.stderr),
+        "pytest_output": checksum_text(pytest_content),
+        "ruff_output": checksum_text(ruff_content),
     }
 
     files_to_write = {
@@ -841,15 +845,15 @@ def create_review_bundle(
         committed_dir / "diff_stat.txt": committed_diff.diff_stat,
         committed_dir / "patch.diff": committed_diff.patch,
         committed_dir / "binary_files.yaml": dump_yaml({"binary_files": committed_diff.binary_files}),
-        working_tree_dir / "status.yaml": dump_yaml({"classification": working_tree.classification, "staged": working_tree.staged, "unstaged": working_tree.unstaged, "untracked": working_tree.untracked, "ignored": working_tree.ignored}),
+        working_tree_dir / "status.yaml": working_tree_content,
         working_tree_dir / "staged.patch": staged_diff.stdout,
         working_tree_dir / "unstaged.patch": unstaged_diff.stdout,
         working_tree_dir / "untracked.yaml": dump_yaml({"paths": working_tree.untracked}),
         working_tree_dir / "ignored.yaml": dump_yaml({"paths": working_tree.ignored}),
         normalization_dir / "report.yaml": dump_yaml({"findings": [finding.__dict__ for finding in normalization]}),
         artifacts_dir / "report.yaml": dump_yaml({"findings": [finding.__dict__ for finding in artifacts]}),
-        validation_dir / "pytest_output.txt": _format_command_output("pytest", pytest_result.stdout, pytest_result.returncode, pytest_result.stderr),
-        validation_dir / "ruff_output.txt": _format_command_output("ruff check .", ruff_result.stdout, ruff_result.returncode, ruff_result.stderr),
+        validation_dir / "pytest_output.txt": pytest_content,
+        validation_dir / "ruff_output.txt": ruff_content,
         validation_dir / "checksums.yaml": dump_yaml(validation_checksums),
         validation_dir / "diagnostics.md": format_diagnostics_report(identity, parity, working_tree, normalization, file_modes, artifacts, cleanliness),
     }
