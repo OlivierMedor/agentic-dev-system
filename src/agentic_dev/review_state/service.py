@@ -14,7 +14,7 @@ from .git_identity import (
     resolve_repository_identity,
     run_git,
 )
-from .integrity import CHECKSUM_ALGORITHM, checksum_bytes, checksum_text, dump_yaml, load_yaml_mapping, write_text_file
+from .integrity import CHECKSUM_ALGORITHM, checksum_bytes, checksum_text, dump_yaml, load_yaml_mapping, write_text_file, compute_checksum_info
 from .models import (
     ArtifactFinding,
     CleanlinessReport,
@@ -447,7 +447,7 @@ def build_review_manifest(
     strict_clean_passed: bool,
 ) -> ReviewManifest:
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
         "repository": identity_to_manifest(repository),
         "committed_diff": {
             "commit_count": committed_diff.commit_count,
@@ -476,10 +476,10 @@ def build_review_manifest(
             "strict_clean_passed": strict_clean_passed,
         },
     }
-    manifest_checksum = checksum_text(dump_yaml(payload))
+    manifest_checksum = compute_checksum_info(dump_yaml(payload).encode("utf-8"))
     payload["integrity"] = {"algorithm": CHECKSUM_ALGORITHM, "manifest_checksum": manifest_checksum}
     return ReviewManifest(
-        schema_version=1,
+        schema_version=2,
         repository=payload["repository"],
         committed_diff=payload["committed_diff"],
         working_tree=payload["working_tree"],
@@ -491,7 +491,7 @@ def build_review_manifest(
 
 
 def validate_review_manifest(manifest: dict[str, Any]) -> None:
-    if manifest.get("schema_version") != 1:
+    if manifest.get("schema_version") not in (1, 2):
         raise ValueError("Unsupported review manifest schema version.")
     if "repository" not in manifest or "committed_diff" not in manifest:
         raise ValueError("Review manifest is missing required sections.")
@@ -845,31 +845,31 @@ def create_review_bundle(
         "algorithm": CHECKSUM_ALGORITHM,
         # Legacy compatibility keys
         "manifest": manifest.integrity["manifest_checksum"],
-        "committed_patch": committed_diff.patch_checksum,
-        "committed_paths": committed_diff.paths_checksum,
-        "git_log": committed_diff.git_log_checksum,
-        "diff_stat": committed_diff.diff_stat_checksum,
-        "working_tree": checksum_text(working_tree_content),
-        "normalization": checksum_text(dump_yaml({"findings": [finding.__dict__ for finding in normalization]})),
-        "artifacts": checksum_text(dump_yaml({"findings": [finding.__dict__ for finding in artifacts]})),
-        "pytest": checksum_text(pytest_content),
-        "ruff": checksum_text(ruff_content),
+        "committed_patch": compute_checksum_info(committed_diff.patch.encode("utf-8"), is_binary=True),
+        "committed_paths": compute_checksum_info(("\n".join(committed_diff.paths) + ("\n" if committed_diff.paths else "")).encode("utf-8")),
+        "git_log": compute_checksum_info(committed_diff.git_log.encode("utf-8")),
+        "diff_stat": compute_checksum_info(committed_diff.diff_stat.encode("utf-8")),
+        "working_tree": compute_checksum_info(working_tree_content.encode("utf-8")),
+        "normalization": compute_checksum_info(dump_yaml({"findings": [finding.__dict__ for finding in normalization]}).encode("utf-8")),
+        "artifacts": compute_checksum_info(dump_yaml({"findings": [finding.__dict__ for finding in artifacts]}).encode("utf-8")),
+        "pytest": compute_checksum_info(pytest_content.encode("utf-8")),
+        "ruff": compute_checksum_info(ruff_content.encode("utf-8")),
 
         # Complete deterministic set
         "manifest_payload": manifest.integrity["manifest_checksum"],
-        "repository_identity": checksum_text(dump_yaml(identity_to_manifest(identity))),
-        "parity_report": checksum_text(dump_yaml(parity_report_to_manifest(parity))),
-        "changed_paths": committed_diff.paths_checksum,
-        "binary_report": checksum_text(dump_yaml({"binary_files": committed_diff.binary_files})),
-        "working_tree_report": checksum_text(working_tree_content),
-        "staged_patch": checksum_text(staged_diff.stdout),
-        "unstaged_patch": checksum_text(unstaged_diff.stdout),
-        "untracked_report": checksum_text(dump_yaml({"paths": working_tree.untracked})),
-        "ignored_report": checksum_text(dump_yaml({"paths": working_tree.ignored})),
-        "normalization_report": checksum_text(dump_yaml({"findings": [finding.__dict__ for finding in normalization]})),
-        "artifact_report": checksum_text(dump_yaml({"findings": [finding.__dict__ for finding in artifacts]})),
-        "pytest_output": checksum_text(pytest_content),
-        "ruff_output": checksum_text(ruff_content),
+        "repository_identity": compute_checksum_info(dump_yaml(identity_to_manifest(identity)).encode("utf-8")),
+        "parity_report": compute_checksum_info(dump_yaml(parity_report_to_manifest(parity)).encode("utf-8")),
+        "changed_paths": compute_checksum_info(("\n".join(committed_diff.paths) + ("\n" if committed_diff.paths else "")).encode("utf-8")),
+        "binary_report": compute_checksum_info(dump_yaml({"binary_files": committed_diff.binary_files}).encode("utf-8")),
+        "working_tree_report": compute_checksum_info(working_tree_content.encode("utf-8")),
+        "staged_patch": compute_checksum_info(staged_diff.stdout.encode("utf-8"), is_binary=True),
+        "unstaged_patch": compute_checksum_info(unstaged_diff.stdout.encode("utf-8"), is_binary=True),
+        "untracked_report": compute_checksum_info(dump_yaml({"paths": working_tree.untracked}).encode("utf-8")),
+        "ignored_report": compute_checksum_info(dump_yaml({"paths": working_tree.ignored}).encode("utf-8")),
+        "normalization_report": compute_checksum_info(dump_yaml({"findings": [finding.__dict__ for finding in normalization]}).encode("utf-8")),
+        "artifact_report": compute_checksum_info(dump_yaml({"findings": [finding.__dict__ for finding in artifacts]}).encode("utf-8")),
+        "pytest_output": compute_checksum_info(pytest_content.encode("utf-8")),
+        "ruff_output": compute_checksum_info(ruff_content.encode("utf-8")),
     }
 
     files_to_write = {
@@ -913,6 +913,55 @@ def create_review_bundle(
     )
 
 
+def checksums_match(expected: Any, actual: Any) -> bool:
+    if expected == actual:
+        return True
+    expected_bytes = expected.get("byte_sha256") if isinstance(expected, dict) else expected
+    expected_canonical = expected.get("canonical_text_sha256") if isinstance(expected, dict) else None
+    
+    actual_bytes = actual.get("byte_sha256") if isinstance(actual, dict) else actual
+    actual_canonical = actual.get("canonical_text_sha256") if isinstance(actual, dict) else None
+    
+    if expected_bytes and actual_bytes and expected_bytes == actual_bytes:
+        return True
+    if expected_canonical and actual_canonical and expected_canonical == actual_canonical:
+        return True
+    return False
+
+
+def verify_checksum_entry(actual_bytes: bytes, expected_checksum: Any) -> bool:
+    actual_hash = checksum_bytes(actual_bytes)
+    if isinstance(expected_checksum, dict):
+        byte_sha = expected_checksum.get("byte_sha256")
+        canonical_sha = expected_checksum.get("canonical_text_sha256")
+        canonicalization = expected_checksum.get("canonicalization", {})
+        allowed = canonicalization.get("allowed", False)
+        
+        if actual_hash == byte_sha:
+            return True
+        if allowed and canonical_sha is not None:
+            try:
+                text_content = actual_bytes.decode("utf-8", errors="replace")
+                normalized_text = text_content.replace("\r\n", "\n")
+                if checksum_text(normalized_text) == canonical_sha:
+                    return True
+            except Exception:
+                pass
+        return False
+    else:
+        # Version 1 string representation (fallback compatibility)
+        if actual_hash == expected_checksum:
+            return True
+        try:
+            text_content = actual_bytes.decode("utf-8", errors="replace")
+            normalized_text_content = text_content.replace("\r\n", "\n")
+            if checksum_text(normalized_text_content) == expected_checksum:
+                return True
+        except Exception:
+            pass
+        return False
+
+
 def validate_review_bundle(project_path: Path, story: str, base_ref: str = "origin/main", command_runner: CommandRunner = run_git) -> ReviewBundleValidation:
     project_path = project_path.resolve()
     story_path = _ensure_story_path(project_path, story)
@@ -936,8 +985,7 @@ def validate_review_bundle(project_path: Path, story: str, base_ref: str = "orig
         manifest_copy = dict(manifest)
         integrity = manifest_copy.pop("integrity", {})
         expected_manifest_checksum = integrity.get("manifest_checksum")
-        actual_manifest_checksum = checksum_text(dump_yaml(manifest_copy))
-        if expected_manifest_checksum != actual_manifest_checksum:
+        if not verify_checksum_entry(dump_yaml(manifest_copy).encode("utf-8"), expected_manifest_checksum):
             reasons.append("corrupt manifest checksum")
     except Exception as e:
         reasons.append(f"could not verify manifest checksum: {e}")
@@ -969,7 +1017,9 @@ def validate_review_bundle(project_path: Path, story: str, base_ref: str = "orig
             checksums = {}
 
     if checksums and "manifest" in checksums:
-        if checksums.get("manifest") != manifest.get("integrity", {}).get("manifest_checksum"):
+        expected = checksums.get("manifest")
+        actual = manifest.get("integrity", {}).get("manifest_checksum")
+        if not checksums_match(expected, actual):
             reasons.append("manifest checksum mismatch")
 
     # 4. Check for ambiguous review state
@@ -1000,8 +1050,6 @@ def validate_review_bundle(project_path: Path, story: str, base_ref: str = "orig
 
         try:
             file_bytes = file_path.read_bytes()
-            actual_hash = checksum_bytes(file_bytes)
-            
             expected_hash = None
             for key in checksum_keys:
                 if key in checksums:
@@ -1009,11 +1057,7 @@ def validate_review_bundle(project_path: Path, story: str, base_ref: str = "orig
                     break
             
             if expected_hash is not None:
-                if actual_hash != expected_hash:
-                    text_content = file_bytes.decode("utf-8", errors="replace")
-                    normalized_text_content = text_content.replace("\r\n", "\n")
-                    if checksum_text(normalized_text_content) == expected_hash:
-                        continue
+                if not verify_checksum_entry(file_bytes, expected_hash):
                     reasons.append(f"corrupt evidence checksum: {desc}")
         except Exception as e:
             reasons.append(f"failed to verify evidence integrity for {desc}: {e}")

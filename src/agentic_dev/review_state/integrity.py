@@ -39,3 +39,45 @@ def write_text_file(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
 
+
+def is_binary_content(data: bytes) -> bool:
+    if b"\x00" in data[:8000]:
+        return True
+    return False
+
+
+def generate_checksum_metadata(data: bytes, allow_canonical: bool = True) -> dict[str, Any]:
+    is_bin = is_binary_content(data)
+    byte_sha = checksum_bytes(data)
+    if is_bin:
+        return {
+            "byte_sha256": byte_sha,
+            "canonical_text_sha256": None,
+            "content_type": "binary",
+            "canonicalization": {
+                "allowed": False
+            }
+        }
+    else:
+        try:
+            text = data.decode("utf-8", errors="replace")
+            normalized = text.replace("\r\n", "\n")
+            canonical_sha = checksum_text(normalized)
+        except Exception:
+            canonical_sha = None
+            
+        allowed = allow_canonical and canonical_sha is not None
+        return {
+            "byte_sha256": byte_sha,
+            "canonical_text_sha256": canonical_sha if allowed else None,
+            "content_type": "text",
+            "canonicalization": {
+                "allowed": allowed,
+                "line_endings": "lf" if allowed else None
+            }
+        }
+
+
+def compute_checksum_info(data: bytes, is_binary: bool = False) -> dict[str, Any]:
+    return generate_checksum_metadata(data, allow_canonical=not is_binary)
+

@@ -19,6 +19,16 @@ class RepositoryIdentity:
     detached_head: bool
     missing_remote: bool
     missing_base_ref: bool
+    repository_id: str | None = None
+    remote_url: str | None = None
+    normalized_remote_url: str | None = None
+    root_commit_shas: list[str] = field(default_factory=list)
+    repository_id_strength: str | None = None
+    repository_id_version: int | None = None
+
+    @property
+    def root_commit_sha(self) -> str | None:
+        return self.root_commit_shas[0] if self.root_commit_shas else None
 
 
 @dataclass(frozen=True)
@@ -32,6 +42,16 @@ class HostIdentity:
     git_dir: Path | None
     detached_head: bool | None = None
     shallow_clone: bool | None = None
+    repository_id: str | None = None
+    remote_url: str | None = None
+    normalized_remote_url: str | None = None
+    root_commit_shas: list[str] = field(default_factory=list)
+    repository_id_strength: str | None = None
+    repository_id_version: int | None = None
+
+    @property
+    def root_commit_sha(self) -> str | None:
+        return self.root_commit_shas[0] if self.root_commit_shas else None
 
 
 @dataclass(frozen=True)

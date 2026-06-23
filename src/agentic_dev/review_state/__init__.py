@@ -12,7 +12,7 @@ from .git_identity import (
     parity_report_to_manifest,
     resolve_repository_identity,
 )
-from .integrity import CHECKSUM_ALGORITHM, checksum_bytes, checksum_mapping, checksum_text, dump_yaml, load_yaml_mapping
+from .integrity import CHECKSUM_ALGORITHM, checksum_bytes, checksum_mapping, checksum_text, dump_yaml, load_yaml_mapping, compute_checksum_info
 from .manifest import build_review_manifest, validate_review_manifest
 from .normalization import classify_normalization
 from .service import create_review_bundle, validate_review_bundle, ReviewBundleDiagnosticsServiceResult
@@ -38,6 +38,7 @@ __all__ = [
     "checksum_text",
     "dump_yaml",
     "load_yaml_mapping",
+    "compute_checksum_info",
     "build_review_manifest",
     "validate_review_manifest",
     "classify_normalization",

@@ -44,6 +44,8 @@ def mock_git_runner(cwd: Path, custom_outputs: dict[str, str | tuple[int, str, s
         "git ls-files": "",
         "git diff --cached --name-only": "",
         "git diff --name-only": "",
+        "git config --get remote.origin.url": "https://github.com/OlivierMedor/agentic-dev-system.git\n",
+        "git rev-list --max-parents=0 HEAD": "rootcommit\n",
         "pytest": "12 passed in 0.34s\n",
         "ruff check .": "All checks passed!\n",
     }
