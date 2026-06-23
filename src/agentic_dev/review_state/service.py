@@ -54,6 +54,7 @@ class ReviewBundleServiceResult:
     cleanliness: CleanlinessReport
     manifest_path: Path
     validation_report_path: Path
+    strict_clean_passed: bool
 
 
 @dataclass(frozen=True)
@@ -402,6 +403,9 @@ def derive_cleanliness(
     tracked_review_artifacts: list[str],
     tracked_runtime_artifacts: list[str],
 ) -> CleanlinessReport:
+    real_staged = [p for p in staged if p not in normalization_only and p not in file_mode_only]
+    real_unstaged = [p for p in unstaged if p not in normalization_only and p not in file_mode_only]
+
     classification = "clean"
     strict_blockers: list[str] = []
     if ambiguous:
@@ -412,8 +416,6 @@ def derive_cleanliness(
         strict_blockers.extend(tracked_review_artifacts)
         strict_blockers.extend(tracked_runtime_artifacts)
     else:
-        real_staged = [p for p in staged if p not in normalization_only and p not in file_mode_only]
-        real_unstaged = [p for p in unstaged if p not in normalization_only and p not in file_mode_only]
         if real_staged or real_unstaged or untracked:
             classification = "dirty"
         elif normalization_only or file_mode_only:
@@ -423,8 +425,8 @@ def derive_cleanliness(
 
     return CleanlinessReport(
         classification=classification,
-        staged=sorted(set(staged)),
-        unstaged=sorted(set(unstaged)),
+        staged=sorted(set(real_staged)),
+        unstaged=sorted(set(real_unstaged)),
         untracked=sorted(set(untracked)),
         ignored=sorted(set(ignored)),
         normalization_only=sorted(set(normalization_only)),
@@ -751,29 +753,11 @@ def create_review_bundle(
         tracked_runtime_artifacts=tracked_runtime_artifacts,
     )
 
-    # 3. Handle strict clean checks
-    if strict_clean:
-        rejections = []
-        if cleanliness.classification == "dirty":
-            rejections.append("repository is dirty")
-        if cleanliness.classification == "ambiguous":
-            rejections.append("repository cleanliness is ambiguous")
-        if tracked_review_artifacts:
-            rejections.append(f"tracked review artifacts: {', '.join(tracked_review_artifacts)}")
-        if tracked_runtime_artifacts:
-            rejections.append(f"tracked runtime artifacts: {', '.join(tracked_runtime_artifacts)}")
-        if host_identity is not None and not parity.matched:
-            rejections.append(f"host/container parity mismatch: {', '.join(parity.mismatches)}")
-        
-        if rejections:
-            raise ValueError("Strict review bundle generation failed: " + "; ".join(rejections))
-
-
-
-    # Post-generation: Generate artifacts and checksums
+    # 3. Validation results recorded
     strict_clean_passed = cleanliness.classification not in {"dirty", "ambiguous"} and not cleanliness.strict_blockers
     if host_identity is not None:
         strict_clean_passed = strict_clean_passed and parity.matched
+    # Post-generation: Generate artifacts and checksums
 
     manifest = build_review_manifest(identity, committed_diff, working_tree, normalization, artifacts, parity, strict_clean_passed=strict_clean_passed)
     manifest_text = dump_yaml(
@@ -919,6 +903,7 @@ def create_review_bundle(
         cleanliness=cleanliness,
         manifest_path=review_bundle_path / REVIEW_BUNDLE_MANIFEST,
         validation_report_path=validation_dir / "diagnostics.md",
+        strict_clean_passed=strict_clean_passed,
     )
 
 

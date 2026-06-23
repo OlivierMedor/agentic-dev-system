@@ -8,7 +8,7 @@ param (
 
 $ErrorActionPreference = "Stop"
 
-$tempFile = Join-Path (Split-Path $PSScriptRoot) "host_identity_temp.json"
+$tempFile = Join-Path $env:TEMP "host_identity_temp_$([guid]::NewGuid()).json"
 $resolvedTempFile = (Get-Item -ErrorAction SilentlyContinue $tempFile)
 
 $exitCode = 0
@@ -20,10 +20,10 @@ try {
     & $genScript -ProjectRoot "$PSScriptRoot\.." -BaseRef $BaseRef -OutputPath $tempFile
 
     # 2. Build the Docker compose command arguments
-    # Note: .host_identity_temp.json is written at repository root, which maps to /app/host_identity_temp.json inside Docker
-    $dockerFile = "/app/host_identity_temp.json"
+    # Note: .host_identity_temp.json is written at OS temp directory, which we explicitly mount
+    $dockerFile = "/tmp/host_identity_temp.json"
     
-    $dockerArgs = @("run", "--rm", "dev", "agentic", "review-bundle", "--story", $Story, "--base-ref", $BaseRef, "--host-identity-file", $dockerFile)
+    $dockerArgs = @("run", "--rm", "-v", "${tempFile}:${dockerFile}:ro", "dev", "agentic", "review-bundle", "--story", $Story, "--base-ref", $BaseRef, "--host-identity-file", $dockerFile)
     if ($StrictClean) {
         $dockerArgs += "--strict-clean"
     }

@@ -1643,6 +1643,10 @@ def main() -> None:
                 print("\nGenerated:")
                 for path in result.generated_files:
                     print(f"  - {path}")
+                if args.strict_clean and not result.strict_clean_passed:
+                    import sys
+                    print("Strict review bundle generation failed.", file=sys.stderr)
+                    parser.exit(status=1)
 
         if args.command == "quality-gate":
             result = run_quality_gate_mode(args.project, args.story, mode=args.mode)

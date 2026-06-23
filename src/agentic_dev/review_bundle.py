@@ -50,6 +50,7 @@ class ReviewBundleResult:
     generated_files: list[Path]
     pytest_passed: bool
     ruff_passed: bool
+    strict_clean_passed: bool
 
 
 @dataclass(frozen=True)
@@ -562,4 +563,5 @@ def create_review_bundle(
         generated_files=generated_files,
         pytest_passed=result.pytest_passed,
         ruff_passed=result.ruff_passed,
+        strict_clean_passed=result.strict_clean_passed,
     )
