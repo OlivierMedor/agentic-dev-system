@@ -9,10 +9,33 @@ from agentic_dev.cloud_review_packet import create_cloud_review_packet
 STORY = "story_010_cloud_review_packet"
 
 
+@pytest.fixture(autouse=True)
+def mock_validate_review_bundle(monkeypatch: pytest.MonkeyPatch) -> None:
+    from agentic_dev.review_state.service import ReviewBundleValidation
+    monkeypatch.setattr(
+        "agentic_dev.cloud_review_packet.validate_review_bundle",
+        lambda *args, **kwargs: ReviewBundleValidation(True, [], None, Path(), Path())
+    )
+
 def create_story(project_path: Path, story: str = STORY, story_content: str = "# Story\n") -> Path:
     story_path = project_path / "stories" / story
     story_path.mkdir(parents=True)
     (story_path / "story.md").write_text(story_content, encoding="utf-8")
+    
+    review_bundle_path = story_path / "review_bundle"
+    review_bundle_path.mkdir(exist_ok=True)
+    (review_bundle_path / "manifest.yaml").write_text(
+        "schema_version: 2\n"
+        "repository:\n  head_sha: abcdef\n"
+        "committed_diff:\n  staged_files: []\n"
+        "working_tree:\n  classification: clean\n"
+        "validation:\n  strict_clean_passed: true\n  host_container_git_match: true\n"
+        "host:\n  status: passed\n  matched: true\n"
+    )
+    (story_path / "status.yaml").write_text("ready_for_review: true\n")
+    (story_path / "reports").mkdir(exist_ok=True)
+    (story_path / "reports" / "quality_gate_result.yaml").write_text("status: PASS\n")
+    
     return story_path
 
 
@@ -102,9 +125,9 @@ def test_cloud_review_context_includes_story_and_present_evidence(tmp_path: Path
     story_content = "# STORY-010\n\nCloud review packet acceptance criteria.\n"
     story_path = create_story(tmp_path, story_content=story_content)
     reports_path = story_path / "reports"
-    reports_path.mkdir()
+    reports_path.mkdir(exist_ok=True)
     (reports_path / "quality_gate_result.yaml").write_text(
-        "status: READY_FOR_REVIEW\nready_for_review: true\n",
+        "status: PASS\nready_for_review: true\n",
         encoding="utf-8",
     )
     (reports_path / "finalize_story_result.yaml").write_text(
@@ -112,7 +135,7 @@ def test_cloud_review_context_includes_story_and_present_evidence(tmp_path: Path
         encoding="utf-8",
     )
     review_bundle_path = story_path / "review_bundle"
-    review_bundle_path.mkdir()
+    review_bundle_path.mkdir(exist_ok=True)
     (review_bundle_path / "handoff.md").write_text(
         "# Handoff\n\nTests and ruff passed.\n",
         encoding="utf-8",
@@ -155,7 +178,7 @@ def test_cloud_review_context_includes_story_and_present_evidence(tmp_path: Path
     context = read_packet_file(story_path, "cloud_review_context.md")
     assert "Cloud review packet acceptance criteria." in context
     assert "## Quality gate result" in context
-    assert "status: READY_FOR_REVIEW" in context
+    assert "status: PASS" in context
     assert "## Finalize story result" in context
     assert "status: ready_for_review" in context
     assert "## Review bundle handoff" in context
@@ -205,9 +228,9 @@ def test_cloud_review_context_mentions_missing_optional_evidence_clearly(
 
     context = read_packet_file(story_path, "cloud_review_context.md")
     assert "## Missing optional evidence" in context
-    assert "`reports/quality_gate_result.yaml` was not found." in context
+    assert "`agent_plan.yaml` was not found." in context
     assert "`review_bundle/handoff.md` was not found." in context
-    assert "reports/quality_gate_result.yaml" in result.missing_optional_files
+    assert "agent_plan.yaml" in result.missing_optional_files
     assert "review_bundle/handoff.md" in result.missing_optional_files
 
 
@@ -216,7 +239,7 @@ def test_existing_cloud_review_packet_files_are_not_overwritten_by_default(
 ) -> None:
     story_path = create_story(tmp_path)
     packet_path = story_path / "cloud_review_packet"
-    packet_path.mkdir()
+    packet_path.mkdir(exist_ok=True)
     prompt_path = packet_path / "cloud_review_prompt.md"
     prompt_path.write_text("keep this prompt\n", encoding="utf-8")
 
@@ -229,7 +252,7 @@ def test_existing_cloud_review_packet_files_are_not_overwritten_by_default(
 def test_force_regenerates_existing_cloud_review_packet_files(tmp_path: Path) -> None:
     story_path = create_story(tmp_path)
     packet_path = story_path / "cloud_review_packet"
-    packet_path.mkdir()
+    packet_path.mkdir(exist_ok=True)
     prompt_path = packet_path / "cloud_review_prompt.md"
     prompt_path.write_text("old prompt\n", encoding="utf-8")
 
@@ -273,7 +296,7 @@ def test_cloud_review_packet_validation_failure_raises_value_error(
 ) -> None:
     story_path = create_story(tmp_path)
     review_bundle_path = story_path / "review_bundle"
-    review_bundle_path.mkdir()
+    review_bundle_path.mkdir(exist_ok=True)
     (review_bundle_path / "manifest.yaml").write_text("schema_version: 1\n", encoding="utf-8")
 
     # Mock validate_review_bundle to return invalid

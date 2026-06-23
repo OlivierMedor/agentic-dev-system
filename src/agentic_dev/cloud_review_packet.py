@@ -64,12 +64,59 @@ def create_cloud_review_packet(project_path: Path, story: str, force: bool = Fal
     if not story_file.exists():
         raise FileNotFoundError(f"Required story file does not exist: {story_file}")
 
+    import yaml
     review_bundle_path = story_path / "review_bundle"
     manifest_path = review_bundle_path / "manifest.yaml"
-    if manifest_path.exists():
-        validation = validate_review_bundle(project_path, story)
-        if not validation.valid:
-            raise ValueError("Review bundle validation failed: " + "; ".join(validation.reasons))
+    status_path = story_path / "status.yaml"
+    quality_gate_path = story_path / "reports" / "quality_gate_result.yaml"
+
+    if not manifest_path.exists():
+        raise ValueError("Missing mandatory evidence: review_bundle/manifest.yaml")
+
+    validation = validate_review_bundle(project_path, story)
+    if not validation.valid:
+        raise ValueError("Review bundle validation failed: " + "; ".join(validation.reasons))
+
+    reasons = []
+
+    try:
+        manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+        wt_class = manifest.get("working_tree", {}).get("classification")
+        if wt_class not in ("clean", "normalization-only", "file-mode-only"):
+            reasons.append("working tree is dirty or ambiguous")
+        if not manifest.get("validation", {}).get("strict_clean_passed"):
+            reasons.append("strict_clean_passed is false")
+        
+        host_matched = manifest.get("host", {}).get("matched")
+        host_status = manifest.get("host", {}).get("status")
+        host_validation = manifest.get("validation", {}).get("host_container_git_match")
+        if host_status != "passed" or not host_matched or not host_validation:
+            reasons.append("required host parity is not checked or failed")
+    except Exception as e:
+        reasons.append(f"Invalid manifest.yaml: {e}")
+
+    try:
+        if not status_path.exists():
+            reasons.append("Missing mandatory evidence: status.yaml")
+        else:
+            status_doc = yaml.safe_load(status_path.read_text(encoding="utf-8"))
+            if not status_doc.get("ready_for_review"):
+                reasons.append("story ready_for_review is false")
+    except Exception as e:
+        reasons.append(f"Invalid status.yaml: {e}")
+
+    try:
+        if not quality_gate_path.exists():
+            reasons.append("Missing mandatory evidence: reports/quality_gate_result.yaml")
+        else:
+            qg_doc = yaml.safe_load(quality_gate_path.read_text(encoding="utf-8"))
+            if qg_doc.get("status") != "PASS":
+                reasons.append("quality gate status is not passing")
+    except Exception as e:
+        reasons.append(f"Invalid quality_gate_result.yaml: {e}")
+
+    if reasons:
+        raise ValueError("Cloud packet readiness validation failed: " + "; ".join(reasons))
 
     packet_path = story_path / "cloud_review_packet"
     packet_path.mkdir(parents=True, exist_ok=True)
