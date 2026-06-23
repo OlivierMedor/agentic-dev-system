@@ -8,7 +8,7 @@ param (
 
 $ErrorActionPreference = "Stop"
 
-$tempFile = Join-Path $PSScriptRoot "..`host_identity_temp.json"
+$tempFile = Join-Path (Split-Path $PSScriptRoot) "host_identity_temp.json"
 $resolvedTempFile = (Get-Item -ErrorAction SilentlyContinue $tempFile)
 
 $exitCode = 0

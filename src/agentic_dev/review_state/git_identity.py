@@ -289,7 +289,7 @@ def load_host_identity(path: Path | None = None) -> HostIdentity | None:
     path = path or _default_host_identity_path()
     if path is None or not path.exists():
         return None
-    text = path.read_text(encoding="utf-8")
+    text = path.read_text(encoding="utf-8-sig")
     loaded: dict[str, object]
     if path.suffix.lower() == ".json":
         loaded = json.loads(text)

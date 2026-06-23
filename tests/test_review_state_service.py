@@ -556,3 +556,38 @@ def test_powershell_json_integration(tmp_path: Path) -> None:
     assert loaded.repository_id_version == 1
 
 
+def test_real_powershell_generation_integration(tmp_path: Path) -> None:
+    import sys
+    import subprocess
+    from agentic_dev.review_state.git_identity import load_host_identity
+    
+    if sys.platform != "win32":
+        import pytest
+        pytest.skip("PowerShell test only runs on Windows")
+        
+    script_path = Path(__file__).parent.parent / "scripts" / "generate_host_identity.ps1"
+    assert script_path.exists()
+    
+    out_json = tmp_path / "powershell_generated.json"
+    cmd = [
+        "powershell",
+        "-File",
+        str(script_path),
+        "-ProjectRoot",
+        str(Path(__file__).parent.parent),
+        "-BaseRef",
+        "origin/main",
+        "-OutputPath",
+        str(out_json),
+    ]
+    res = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    assert res.returncode == 0, f"PowerShell script failed: {res.stderr}\nStdout: {res.stdout}"
+    assert out_json.exists()
+    
+    loaded = load_host_identity(out_json)
+    assert loaded is not None
+    assert loaded.head_sha is not None
+    assert loaded.repository_id_strength in ("strong", "weak")
+
+
+

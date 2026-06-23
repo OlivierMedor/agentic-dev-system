@@ -449,6 +449,11 @@ def build_review_manifest(
     payload = {
         "schema_version": 2,
         "repository": identity_to_manifest(repository),
+        "host": {
+            "supplied": parity.supplied,
+            "matched": parity.matched,
+            "status": parity.status,
+        },
         "committed_diff": {
             "commit_count": committed_diff.commit_count,
             "changed_file_count": committed_diff.changed_file_count,
@@ -487,7 +492,9 @@ def build_review_manifest(
         artifacts=payload["artifacts"],
         validation=payload["validation"],
         integrity=payload["integrity"],
+        host=payload["host"],
     )
+
 
 
 def validate_review_manifest(manifest: dict[str, Any]) -> None:
@@ -773,6 +780,7 @@ def create_review_bundle(
         {
             "schema_version": manifest.schema_version,
             "repository": manifest.repository,
+            "host": manifest.host,
             "committed_diff": manifest.committed_diff,
             "working_tree": manifest.working_tree,
             "normalization": manifest.normalization,
@@ -781,6 +789,7 @@ def create_review_bundle(
             "integrity": manifest.integrity,
         },
     )
+
 
     helpers = _load_review_bundle_helpers()
     untracked_snapshot = helpers["build_untracked_snapshots"](project_path, untracked_filtered)

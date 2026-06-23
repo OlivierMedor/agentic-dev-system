@@ -155,3 +155,5 @@ class ReviewManifest:
     artifacts: list[dict[str, Any]]
     validation: dict[str, Any]
     integrity: dict[str, Any]
+    host: dict[str, Any] | None = None
+
