@@ -442,7 +442,7 @@ def derive_cleanliness(
 def build_review_manifest(
     repository: RepositoryIdentity,
     committed_diff: CommittedDiffEvidence,
-    working_tree: WorkingTreeEvidence,
+    cleanliness: CleanlinessReport,
     normalization: list[NormalizationFinding],
     artifacts: list[ArtifactFinding],
     parity: HostContainerParityReport,
@@ -468,11 +468,11 @@ def build_review_manifest(
             "diff_stat_checksum": committed_diff.diff_stat_checksum,
         },
         "working_tree": {
-            "classification": working_tree.classification,
-            "staged": working_tree.staged,
-            "unstaged": working_tree.unstaged,
-            "untracked": working_tree.untracked,
-            "ignored": working_tree.ignored,
+            "classification": cleanliness.classification,
+            "staged": cleanliness.staged,
+            "unstaged": cleanliness.unstaged,
+            "untracked": cleanliness.untracked,
+            "ignored": cleanliness.ignored,
         },
         "normalization": [finding.__dict__ for finding in normalization],
         "artifacts": [finding.__dict__ for finding in artifacts],
@@ -759,7 +759,7 @@ def create_review_bundle(
         strict_clean_passed = strict_clean_passed and parity.matched
     # Post-generation: Generate artifacts and checksums
 
-    manifest = build_review_manifest(identity, committed_diff, working_tree, normalization, artifacts, parity, strict_clean_passed=strict_clean_passed)
+    manifest = build_review_manifest(identity, committed_diff, cleanliness, normalization, artifacts, parity, strict_clean_passed=strict_clean_passed)
     manifest_text = dump_yaml(
         {
             "schema_version": manifest.schema_version,
