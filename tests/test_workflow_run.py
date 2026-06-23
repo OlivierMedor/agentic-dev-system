@@ -36,6 +36,15 @@ CLOUD_REVIEW_PREP_STEPS = [
 ]
 
 
+@pytest.fixture(autouse=True)
+def mock_validate_review_bundle(monkeypatch: pytest.MonkeyPatch) -> None:
+    from agentic_dev.review_state.service import ReviewBundleValidation
+    monkeypatch.setattr(
+        "agentic_dev.cloud_review_packet.validate_review_bundle",
+        lambda *args, **kwargs: ReviewBundleValidation(True, [], None, Path(), Path())
+    )
+
+
 def create_story(project_path: Path, story: str = STORY) -> Path:
     story_path = project_path / "stories" / story
     story_path.mkdir(parents=True)
@@ -557,9 +566,23 @@ def test_workflow_run_cloud_review_prep_can_refresh_existing_packet_files(
     tmp_path: Path,
 ) -> None:
     story_path = create_story(tmp_path)
+    (story_path / "status.yaml").write_text("ready_for_review: true\n", encoding="utf-8")
+    review_bundle_path = story_path / "review_bundle"
+    review_bundle_path.mkdir(exist_ok=True)
+    (review_bundle_path / "manifest.yaml").write_text(
+        "schema_version: 2\n"
+        "repository:\n  head_sha: abcdef\n"
+        "committed_diff:\n  staged_files: []\n"
+        "working_tree:\n  classification: clean\n"
+        "validation:\n  strict_clean_passed: true\n  host_container_git_match: true\n"
+        "host:\n  status: passed\n  matched: true\n"
+    )
+    (story_path / "reports").mkdir(exist_ok=True)
+    (story_path / "reports" / "quality_gate_result.yaml").write_text("status: PASS\n", encoding="utf-8")
+    
     write_finalize_result(story_path, ready_for_review=True)
     packet_path = story_path / "cloud_review_packet"
-    packet_path.mkdir()
+    packet_path.mkdir(exist_ok=True)
     prompt_path = packet_path / "cloud_review_prompt.md"
     prompt_path.write_text("old prompt\n", encoding="utf-8")
 
