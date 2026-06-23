@@ -23,7 +23,7 @@ try {
     # Note: .host_identity_temp.json is written at OS temp directory, which we explicitly mount
     $dockerFile = "/tmp/host_identity_temp.json"
     
-    $dockerArgs = @("run", "--rm", "-v", "${tempFile}:${dockerFile}:ro", "dev", "agentic", "review-bundle", "--story", $Story, "--base-ref", $BaseRef, "--host-identity-file", $dockerFile)
+    $dockerArgs = @("run", "--rm", "-T", "-v", "${tempFile}:${dockerFile}:ro", "dev", "agentic", "review-bundle", "--story", $Story, "--base-ref", $BaseRef, "--host-identity-file", $dockerFile)
     if ($StrictClean) {
         $dockerArgs += "--strict-clean"
     }
