@@ -80,6 +80,11 @@ def write_required_reports(story_path: Path) -> None:
         "# Local Review Report\n\nREADY_FOR_REVIEW\n",
         encoding="utf-8",
     )
+    import yaml
+    (reports_path / "local_review_decision.yaml").write_text(
+        yaml.safe_dump({"decision": "ready_for_review"}),
+        encoding="utf-8",
+    )
 
 
 def write_simulated_review_bundle_evidence(story_path: Path) -> None:

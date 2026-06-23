@@ -237,10 +237,13 @@ def run_pre_merge_quality_gate(project_path: Path, story: str) -> QualityGateRes
     else:
         failed_checks.append("Ruff output does not clearly show a passing result.")
 
-    if text_file_contains(story_path / "reports" / "local_review_report.md", READY_FOR_REVIEW):
-        passed_checks.append("Local reviewer marked the story READY_FOR_REVIEW.")
+    from agentic_dev.local_execution_recording import load_local_review_decision, DECISION_READY_FOR_REVIEW
+    decision = load_local_review_decision(story_path / "reports")
+    
+    if decision is not None and decision.decision == DECISION_READY_FOR_REVIEW:
+        passed_checks.append("Structured local review decision is ready_for_review.")
     else:
-        failed_checks.append("Local reviewer report does not contain READY_FOR_REVIEW.")
+        failed_checks.append("A structured local review decision of 'ready_for_review' is required.")
 
     add_test_layer_checks(story_path, passed_checks, failed_checks)
 
