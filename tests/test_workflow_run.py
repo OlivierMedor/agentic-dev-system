@@ -578,7 +578,7 @@ def test_workflow_run_cloud_review_prep_can_refresh_existing_packet_files(
         "host:\n  status: passed\n  matched: true\n"
     )
     (story_path / "reports").mkdir(exist_ok=True)
-    (story_path / "reports" / "quality_gate_result.yaml").write_text("status: PASS\n", encoding="utf-8")
+    (story_path / "reports" / "quality_gate_result.yaml").write_text("status: READY_FOR_REVIEW\n", encoding="utf-8")
     
     write_finalize_result(story_path, ready_for_review=True)
     packet_path = story_path / "cloud_review_packet"

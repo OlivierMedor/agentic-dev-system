@@ -82,7 +82,7 @@ def create_cloud_review_packet(project_path: Path, story: str, force: bool = Fal
     try:
         manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
         wt_class = manifest.get("working_tree", {}).get("classification")
-        if wt_class not in ("clean", "normalization-only", "file-mode-only"):
+        if wt_class not in ("clean", "normalization-only", "file-mode-only", "normalization_noise_only"):
             reasons.append("working tree is dirty or ambiguous")
         if not manifest.get("validation", {}).get("strict_clean_passed"):
             reasons.append("strict_clean_passed is false")
@@ -110,7 +110,7 @@ def create_cloud_review_packet(project_path: Path, story: str, force: bool = Fal
             reasons.append("Missing mandatory evidence: reports/quality_gate_result.yaml")
         else:
             qg_doc = yaml.safe_load(quality_gate_path.read_text(encoding="utf-8"))
-            if qg_doc.get("status") != "PASS":
+            if qg_doc.get("status") != "READY_FOR_REVIEW":
                 reasons.append("quality gate status is not passing")
     except Exception as e:
         reasons.append(f"Invalid quality_gate_result.yaml: {e}")

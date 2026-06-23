@@ -34,7 +34,7 @@ def create_story(project_path: Path, story: str = STORY, story_content: str = "#
     )
     (story_path / "status.yaml").write_text("ready_for_review: true\n")
     (story_path / "reports").mkdir(exist_ok=True)
-    (story_path / "reports" / "quality_gate_result.yaml").write_text("status: PASS\n")
+    (story_path / "reports" / "quality_gate_result.yaml").write_text("status: READY_FOR_REVIEW\n")
     
     return story_path
 
@@ -127,7 +127,7 @@ def test_cloud_review_context_includes_story_and_present_evidence(tmp_path: Path
     reports_path = story_path / "reports"
     reports_path.mkdir(exist_ok=True)
     (reports_path / "quality_gate_result.yaml").write_text(
-        "status: PASS\nready_for_review: true\n",
+        "status: READY_FOR_REVIEW\nready_for_review: true\n",
         encoding="utf-8",
     )
     (reports_path / "finalize_story_result.yaml").write_text(
@@ -178,7 +178,7 @@ def test_cloud_review_context_includes_story_and_present_evidence(tmp_path: Path
     context = read_packet_file(story_path, "cloud_review_context.md")
     assert "Cloud review packet acceptance criteria." in context
     assert "## Quality gate result" in context
-    assert "status: PASS" in context
+    assert "status: READY_FOR_REVIEW" in context
     assert "## Finalize story result" in context
     assert "status: ready_for_review" in context
     assert "## Review bundle handoff" in context
@@ -314,5 +314,39 @@ def test_cloud_review_packet_validation_failure_raises_value_error(
     monkeypatch.setattr("agentic_dev.cloud_review_packet.validate_review_bundle", mock_validate)
 
     with pytest.raises(ValueError, match="Review bundle validation failed: HEAD changed after review bundle generation; corrupt manifest checksum"):
+        create_cloud_review_packet(tmp_path, STORY)
+
+
+def test_cloud_review_packet_accepts_normalization_noise_only(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    story_path = create_story(tmp_path)
+    
+    # Modify manifest to have normalization_noise_only classification
+    manifest_path = story_path / "review_bundle" / "manifest.yaml"
+    manifest_content = manifest_path.read_text(encoding="utf-8")
+    manifest_content = manifest_content.replace(
+        "classification: clean",
+        "classification: normalization_noise_only"
+    )
+    manifest_path.write_text(manifest_content, encoding="utf-8")
+    
+    # Ensure validation passes
+    result = create_cloud_review_packet(tmp_path, STORY)
+    assert (result.packet_path / "cloud_review_prompt.md").exists()
+
+
+def test_cloud_review_packet_rejects_non_canonical_quality_gate_status(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    story_path = create_story(tmp_path)
+    
+    # Modify quality gate status to something non-canonical but passing-like
+    qg_path = story_path / "reports" / "quality_gate_result.yaml"
+    qg_path.write_text("status: PASS\n", encoding="utf-8")
+    
+    with pytest.raises(ValueError, match="quality gate status is not passing"):
         create_cloud_review_packet(tmp_path, STORY)
 
