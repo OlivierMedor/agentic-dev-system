@@ -90,6 +90,7 @@ def install_finalize_doubles(
             generated_files=[review_bundle_path / "handoff.md"],
             pytest_passed=True,
             ruff_passed=True,
+            strict_clean_passed=True,
         )
 
     def fake_run_quality_gate(project_path: Path, story: str) -> QualityGateResult:

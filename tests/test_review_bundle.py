@@ -417,7 +417,7 @@ def test_cli_review_bundle_flags(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 
         story_path = project_path / "stories" / story_name
         (story_path / "review_bundle").mkdir(exist_ok=True)
-        return ReviewBundleResult(story_path / "review_bundle", [], True, True)
+        return ReviewBundleResult(story_path / "review_bundle", [], True, True, True)
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("agentic_dev.cli.create_review_bundle", fake_create_review_bundle)
