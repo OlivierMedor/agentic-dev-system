@@ -1,0 +1,28 @@
+test_layers_version: 1
+unit_tests:
+  required: true
+  action: add_or_update
+  frequency: every_commit
+  evidence_or_reason: Explain unit test coverage.
+integration_tests:
+  required: true
+  action: confirm_existing
+  frequency: every_pull_request
+  evidence_or_reason: Explain integration coverage.
+mock_e2e_tests:
+  required: true
+  action: confirm_existing
+  frequency: before_merge
+  evidence_or_reason: Explain mock E2E coverage.
+live_read_only_checks:
+  required: false
+  action: not_applicable_with_reason
+  frequency: scheduled_or_before_release
+  evidence_or_reason: Explain why live checks are not applicable or how they will
+    be scheduled.
+remote_dev_smoke_tests:
+  required: false
+  action: not_applicable_with_reason
+  frequency: after_remote_dev_deploy
+  evidence_or_reason: Explain why remote smoke tests are not applicable or how they
+    will be scheduled.
