@@ -1,0 +1,9 @@
+story: evidence-derived-local-execution-recording
+status: request_changes
+ready_for_review: false
+review_bundle_path: /app/stories/evidence-derived-local-execution-recording/review_bundle
+quality_gate_result_path: /app/stories/evidence-derived-local-execution-recording/reports/quality_gate_result.yaml
+test_layer_result_path: /app/stories/evidence-derived-local-execution-recording/reports/test_layer_result.yaml
+finalize_report_path: /app/stories/evidence-derived-local-execution-recording/reports/finalize_story_report.md
+next_action: Fix the failed checks, regenerate any missing reports, then run the quality
+  gate again.
