@@ -23,7 +23,6 @@ class CommandRunner(Protocol):
 
 def run_git(command: list[str], cwd: Path) -> CommandResult:
     import os
-    import subprocess
     env = os.environ.copy()
     env["GIT_PAGER"] = "cat"
     env["PAGER"] = "cat"

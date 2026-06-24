@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Any
 
 from agentic_dev.local_evidence_validation import validate_local_evidence
 

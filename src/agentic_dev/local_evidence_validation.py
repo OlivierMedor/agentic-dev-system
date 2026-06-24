@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from agentic_dev.review_state.integrity import checksum_text, load_yaml_mapping
 from agentic_dev.review_state.service import validate_review_bundle

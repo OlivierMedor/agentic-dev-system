@@ -890,8 +890,8 @@ def record_local_execution(
         reports_written.append(_write_developer_report(record, reports_path))
     if ROLE_TEST in valid_roles:
         reports_written.append(_write_test_report(record, reports_path))
-    if ROLE_LOCAL_REVIEWER in valid_roles or review_decision is not None:
-        reports_written.append(_write_local_review_report(record, review_decision, reports_path))
+    if ROLE_LOCAL_REVIEWER in valid_roles:
+        reports_written.append(_write_local_review_report(record, None, reports_path))
 
     return LocalExecutionResult(
         story=story,

@@ -78,7 +78,6 @@ CommandRunner = Callable[[list[str], Path], CommandResult]
 def run_command(command: list[str], cwd: Path) -> CommandResult:
     """Run a command and capture output without raising on failure."""
     import os
-    import subprocess
     env = os.environ.copy()
     
     if command and command[0] == "git":
@@ -114,7 +113,7 @@ def run_command(command: list[str], cwd: Path) -> CommandResult:
             stdout="",
             stderr=str(e),
         )
-    except subprocess.TimeoutExpired as e:
+    except subprocess.TimeoutExpired:
         return CommandResult(
             command=" ".join(command),
             returncode=124,

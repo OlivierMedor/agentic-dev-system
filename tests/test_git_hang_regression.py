@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 from agentic_dev.review_state.git_identity import run_git
