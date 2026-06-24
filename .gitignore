@@ -77,3 +77,11 @@ reports/local_model_role_recommendations.yaml
 # OS
 .DS_Store
 Thumbs.db
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+
+# Scratch / one-off scripts
+scratch/
