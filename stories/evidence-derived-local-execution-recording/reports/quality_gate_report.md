@@ -14,20 +14,21 @@ REQUEST_CHANGES
 - Found required file: status.yaml
 - Found required file: test_plan.yaml
 - Found required file: monitoring_plan.yaml
+- Found required file: reports/developer_report.md
+- Found required file: reports/test_report.md
+- Found required file: reports/local_review_report.md
 - Found required file: review_bundle/handoff.md
 - Found required file: review_bundle/pytest_output.txt
 - Found required file: review_bundle/ruff_output.txt
-- pytest output shows a passing result.
 - Ruff output shows a passing result.
 - Test layer result status is PASSED.
 
 ## Failed checks
 
 - Missing required file: agent_plan.yaml
-- Missing required file: reports/developer_report.md
-- Missing required file: reports/test_report.md
-- Missing required file: reports/local_review_report.md
-- A structured local review decision of 'ready_for_review' is required.
+- pytest output does not clearly show a passing result.
+- Local execution record is invalid: review bundle validation failed: ambiguous review state
+- A structured local review decision of 'ready_for_review' is required. review bundle validation failed: ambiguous review state
 
 ## Next recommended action
 

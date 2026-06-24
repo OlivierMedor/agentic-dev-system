@@ -61,7 +61,7 @@ def validate_local_evidence(
         return _build_invalid_result(failure_reasons, review_decision_present)
 
     # Re-compute record checksum
-    record_checksum = record_data.get("record_checksum")
+    record_checksum = record_data.get("integrity", {}).get("record_checksum")
     if not record_checksum:
         failure_reasons.append("execution record is missing record_checksum")
         return _build_invalid_result(failure_reasons, review_decision_present)
@@ -80,30 +80,34 @@ def validate_local_evidence(
     # Validate bindings
     manifest_path = review_bundle_path / "manifest.yaml"
     manifest_checksum = checksum_text(manifest_path.read_text(encoding="utf-8"))
-    if record_data.get("manifest_checksum") != manifest_checksum:
+    
+    review_evidence = record_data.get("review_evidence", {})
+    if review_evidence.get("manifest_checksum") != manifest_checksum:
         failure_reasons.append("execution record manifest_checksum does not match canonical manifest")
 
     repository = manifest.get("repository", {})
-    if record_data.get("head_sha") != repository.get("head_sha"):
+    record_repo = record_data.get("repository", {})
+    if record_repo.get("head_sha") != repository.get("head_sha"):
         failure_reasons.append("execution record head_sha mismatch")
-    if record_data.get("base_sha") != repository.get("base_sha"):
+    if record_repo.get("base_sha") != repository.get("base_sha"):
         failure_reasons.append("execution record base_sha mismatch")
-    if record_data.get("merge_base_sha") != repository.get("merge_base_sha"):
+    if record_repo.get("merge_base_sha") != repository.get("merge_base_sha"):
         failure_reasons.append("execution record merge_base_sha mismatch")
 
     # Cleanliness
     cleanliness = manifest.get("working_tree", {}).get("classification")
-    if record_data.get("cleanliness") != cleanliness:
+    if review_evidence.get("cleanliness") != cleanliness:
         failure_reasons.append("execution record cleanliness mismatch")
 
     # Host Parity
     host_status = manifest.get("host", {}).get("status")
-    parity_status = record_data.get("parity_status")
+    parity_status = review_evidence.get("parity_status")
     if parity_status != host_status and host_status is not None:
         failure_reasons.append("execution record parity_status mismatch")
 
-    roles_covered = record_data.get("roles_covered", [])
-    role_evidence = record_data.get("role_evidence", {})
+    execution = record_data.get("execution", {})
+    roles_covered = execution.get("roles_covered", [])
+    role_evidence = execution.get("role_evidence", {})
 
     # Validate Role Evidence
     if "developer" in roles_covered:
