@@ -381,6 +381,7 @@ def _record_to_yaml_dict(record: LocalExecutionRecord) -> dict[str, Any]:
             "executor": record.executor,
             "executed_at": record.executed_at,
             "roles_covered": record.roles_covered,
+            "role_evidence": record.role_evidence,
         },
         "provenance": {
             "ai_role_agents_executed": record.ai_role_agents_executed,

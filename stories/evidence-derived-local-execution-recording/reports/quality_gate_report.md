@@ -20,15 +20,15 @@ REQUEST_CHANGES
 - Found required file: review_bundle/handoff.md
 - Found required file: review_bundle/pytest_output.txt
 - Found required file: review_bundle/ruff_output.txt
+- pytest output shows a passing result.
 - Ruff output shows a passing result.
 - Test layer result status is PASSED.
 
 ## Failed checks
 
 - Missing required file: agent_plan.yaml
-- pytest output does not clearly show a passing result.
-- Local execution record is invalid: review bundle validation failed: ambiguous review state
-- A structured local review decision of 'ready_for_review' is required. review bundle validation failed: ambiguous review state
+- Local execution record is invalid: execution record manifest_checksum does not match canonical manifest; execution record cleanliness mismatch; developer role claimed but missing patch checksum in role_evidence; test role claimed but missing pytest evidence checksum in role_evidence; review decision manifest_checksum mismatch
+- A structured local review decision of 'ready_for_review' is required. execution record manifest_checksum does not match canonical manifest; execution record cleanliness mismatch; developer role claimed but missing patch checksum in role_evidence; test role claimed but missing pytest evidence checksum in role_evidence; review decision manifest_checksum mismatch
 
 ## Next recommended action
 

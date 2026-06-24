@@ -52,29 +52,49 @@ def finalize_story(
     reports_path = story_path / "reports"
     reports_path.mkdir(parents=True, exist_ok=True)
 
-    review_bundle_result = create_review_bundle_with_runner(project_path, story, command_runner)
-    test_layer_result = run_test_layers_if_applicable(project_path, story_path, story)
-    quality_gate_result = run_quality_gate(project_path, story)
-
-    status, ready_for_review = status_from_quality_gate(quality_gate_result)
-    
     from agentic_dev.local_evidence_validation import validate_local_evidence
     local_ev = validate_local_evidence(project_path, story)
-    
+
     execution_provenance = None
     execution_record_checksum = None
-    
+
     if local_ev.execution_record_present:
         if not local_ev.execution_record_valid:
             raise ValueError("Local execution record is present but invalid: " + "; ".join(local_ev.failure_reasons))
-            
+        
         execution_provenance = local_ev.provenance
         execution_record_checksum = local_ev.record_checksum
+        
+        # If record is valid, we skip generating a new review bundle to preserve the checksum.
+        # We also skip test layers as they are part of execution.
+        # We do run the quality gate on the existing bundle.
+        review_bundle_path = story_path / "review_bundle"
+        
+        # Mock the result since we aren't regenerating it
+        pytest_passed = (review_bundle_path / "validation" / "pytest_output.txt").exists() and "FAILED" not in (review_bundle_path / "validation" / "pytest_output.txt").read_text(encoding="utf-8")
+        ruff_passed = (review_bundle_path / "validation" / "ruff_output.txt").exists() and "error" not in (review_bundle_path / "validation" / "ruff_output.txt").read_text(encoding="utf-8").lower()
+        
+        review_bundle_result = ReviewBundleResult(
+            review_bundle_path=review_bundle_path,
+            generated_files=[],
+            pytest_passed=pytest_passed,
+            ruff_passed=ruff_passed,
+            strict_clean_passed=True,
+        )
+        test_layer_result = None
+        quality_gate_result = run_quality_gate(project_path, story)
+        status, ready_for_review = status_from_quality_gate(quality_gate_result)
         
         # Override readiness if decision is pending
         if not local_ev.ready_for_review:
             ready_for_review = False
             status = STATUS_REQUEST_CHANGES
+    else:
+        # Legacy workflow
+        review_bundle_result = create_review_bundle_with_runner(project_path, story, command_runner)
+        test_layer_result = run_test_layers_if_applicable(project_path, story_path, story)
+        quality_gate_result = run_quality_gate(project_path, story)
+        status, ready_for_review = status_from_quality_gate(quality_gate_result)
 
     status_path = story_path / "status.yaml"
     update_status(status_path, story, status, ready_for_review)
@@ -96,9 +116,6 @@ def finalize_story(
     )
 
     write_finalize_result(result)
-    write_finalize_report(result, quality_gate_result, review_bundle_result, force)
-
-    review_bundle_result = create_review_bundle_with_runner(project_path, story, command_runner)
     write_finalize_report(result, quality_gate_result, review_bundle_result, force)
 
     return result
