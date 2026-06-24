@@ -42,7 +42,15 @@ stories/**/reports/codex_tasks/*
 stories/**/reports/codex_runtime/*
 !stories/**/reports/codex_runtime/.gitkeep
 stories/**/reports/local_execution/*
-!stories/**/reports/local_execution/.gitkeep
+stories/**/reports/local_execution/.gitkeep
+stories/**/reports/local_execution_record.yaml
+stories/**/reports/local_review_decision.yaml
+stories/**/reports/local_execution_report.md
+stories/**/reports/local_review_report.md
+stories/**/reports/quality_gate_report.md
+stories/**/reports/quality_gate_result.yaml
+stories/**/reports/finalize_story_report.md
+stories/**/reports/finalize_story_result.yaml
 .agentic/support_queue/**/*.yaml
 .agentic/support_queue/**/*.md
 !.agentic/support_queue/**/.gitkeep

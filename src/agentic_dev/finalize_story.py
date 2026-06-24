@@ -121,11 +121,11 @@ def finalize_story(
     )
 
     write_finalize_result(result)
-    write_finalize_report(result, quality_gate_result, review_bundle_result, force)
+    write_finalize_report(result, quality_gate_result, review_bundle_result, force, is_legacy)
 
     if is_legacy:
         review_bundle_result = create_review_bundle_with_runner(project_path, story, command_runner)
-        write_finalize_report(result, quality_gate_result, review_bundle_result, force)
+        write_finalize_report(result, quality_gate_result, review_bundle_result, force, is_legacy)
 
     return result
 
@@ -211,7 +211,15 @@ def write_finalize_report(
     quality_gate_result: QualityGateResult,
     review_bundle_result: ReviewBundleResult,
     force: bool,
+    is_legacy: bool = True,
 ) -> None:
+    
+    action_text = ""
+    if is_legacy:
+        action_text = f"- Created or refreshed the review bundle at `{result.review_bundle_path}`.\n- Ran test layer validation when `test_plan.yaml` used `test_layers_version: 1`.\n- Ran the quality gate and wrote `{result.quality_gate_result_path}`.\n- Regenerated the review bundle after the quality gate so final evidence is captured."
+    else:
+        action_text = f"- Preserved the existing bound review bundle at `{result.review_bundle_path}`.\n- Ran test layer validation when `test_plan.yaml` used `test_layers_version: 1`.\n- Ran the quality gate and wrote `{result.quality_gate_result_path}`."
+
     content = f"""# Finalize Story Report
 
 ## Story
@@ -220,10 +228,7 @@ def write_finalize_report(
 
 ## What finalize-story did
 
-- Created or refreshed the review bundle at `{result.review_bundle_path}`.
-- Ran test layer validation when `test_plan.yaml` used `test_layers_version: 1`.
-- Ran the quality gate and wrote `{result.quality_gate_result_path}`.
-- Regenerated the review bundle after the quality gate so final evidence is captured.
+{action_text}
 - Wrote finalize result data to `{result.finalize_result_path}`.
 - Updated `status.yaml` without committing, pushing, merging, deploying, or calling cloud models.
 
