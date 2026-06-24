@@ -1,7 +1,6 @@
 """Regression tests: finalize_story provenance must never be 'unknown'."""
 from pathlib import Path
 import yaml
-import pytest
 
 from agentic_dev.finalize_story import finalize_story
 from agentic_dev.local_execution_recording import record_local_execution
