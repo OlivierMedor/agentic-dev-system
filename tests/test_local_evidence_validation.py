@@ -33,7 +33,7 @@ def test_evidence_validation_manifest_mismatch(tmp_path: Path):
         story_dir = tmp_path / "stories" / "some-story"
         reports_dir = story_dir / "reports"
         reports_dir.mkdir(parents=True, exist_ok=True)
-        (reports_dir / "local_execution_record.yaml").write_text("record_checksum: abcd\nmanifest_checksum: wrong\nexecution_mode: local\nexecution_type: manual\nroles_covered: []\n")
+        (reports_dir / "local_execution_record.yaml").write_text("integrity:\n  record_checksum: abcd\nreview_evidence:\n  manifest_checksum: wrong\nexecution:\n  mode: local\n  type: manual\n  roles_covered: []\n")
         
         bundle_dir = story_dir / "review_bundle"
         bundle_dir.mkdir(parents=True, exist_ok=True)
