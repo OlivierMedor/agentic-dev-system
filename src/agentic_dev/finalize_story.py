@@ -29,7 +29,7 @@ class FinalizeStoryResult:
     finalize_report_path: Path
     finalize_result_path: Path
     next_action: str
-    execution_provenance: dict[str, str] | None
+    execution_provenance: dict[str, object] | None
     execution_record_checksum: str | None
 
 
@@ -86,6 +86,16 @@ def finalize_story(
             status = STATUS_REQUEST_CHANGES
     else:
         is_legacy = True
+        execution_provenance = {
+            "execution_mode": "legacy_role_agent",
+            "execution_type": "legacy_role_agent",
+            "executor": "legacy_role_agent",
+            "roles_covered": [],
+            "execution_record_checksum": None,
+            "readiness_source": "legacy_role_agent",
+            "review_decision": None,
+            "review_decision_checksum": None,
+        }
         review_bundle_result = create_review_bundle_with_runner(project_path, story, command_runner)
         test_layer_result = run_test_layers_if_applicable(project_path, story_path, story)
         quality_gate_result = run_quality_gate(project_path, story)

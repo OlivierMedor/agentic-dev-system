@@ -16,9 +16,10 @@ class LocalEvidenceValidationResult:
     decision: str
     ready_for_review: bool
     roles_covered: list[str]
-    provenance: dict[str, str]
+    provenance: dict[str, object]
     failure_reasons: list[str]
     record_checksum: str | None = None
+    review_decision_checksum: str | None = None
 
 
 def validate_local_evidence(
@@ -131,21 +132,31 @@ def validate_local_evidence(
     # Check if execution record is fundamentally valid
     execution_record_valid = len(failure_reasons) == 0
 
-    provenance = {
-        "execution_mode": record_data.get("execution_mode", "unknown"),
-        "execution_type": record_data.get("execution_type", "unknown"),
-        "executor": record_data.get("executor", "unknown"),
+    # --- Provenance: read from correct nested keys ---
+    execution_sect = record_data.get("execution", {})
+    provenance: dict[str, object] = {
+        "execution_mode": execution_sect.get("mode", "unknown"),
+        "execution_type": execution_sect.get("type", "unknown"),
+        "executor": execution_sect.get("executor", "unknown"),
+        "roles_covered": execution_sect.get("roles_covered", []),
+        "execution_record_checksum": record_checksum,
+        "readiness_source": "pending",  # updated below once decision validated
+        "review_decision": "pending",
+        "review_decision_checksum": None,
     }
 
     # Now validate Review Decision
     decision_valid = False
     decision_val = "pending"
     ready_for_review = False
+    review_decision_checksum: str | None = None
 
     if review_decision_present:
         try:
             decision_data = load_yaml_mapping(decision_path.read_text(encoding="utf-8"))
             decision_val = decision_data.get("decision", "pending")
+            # Compute checksum over the raw decision file text
+            review_decision_checksum = checksum_text(decision_path.read_text(encoding="utf-8"))
             if decision_data.get("execution_record_checksum") != record_checksum:
                 failure_reasons.append("review decision bound to different execution record")
             elif decision_data.get("head_sha") != repository.get("head_sha"):
@@ -156,6 +167,12 @@ def validate_local_evidence(
                 decision_valid = True
                 if decision_val == "ready_for_review":
                     ready_for_review = True
+                    provenance["readiness_source"] = "structured_local_review"
+                    provenance["review_decision"] = decision_val
+                    provenance["review_decision_checksum"] = review_decision_checksum
+                else:
+                    provenance["review_decision"] = decision_val
+                    provenance["review_decision_checksum"] = review_decision_checksum
         except Exception as e:
             failure_reasons.append(f"corrupt local_review_decision.yaml: {e}")
             decision_val = "pending"
@@ -182,6 +199,7 @@ def validate_local_evidence(
         provenance=provenance,
         failure_reasons=failure_reasons,
         record_checksum=record_checksum,
+        review_decision_checksum=review_decision_checksum,
     )
 
 def _build_invalid_result(failure_reasons: list[str], record_checksum: str | None = None, review_decision_present: bool = False) -> LocalEvidenceValidationResult:
