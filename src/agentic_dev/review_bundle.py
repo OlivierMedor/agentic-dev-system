@@ -99,7 +99,7 @@ def run_command(command: list[str], cwd: Path) -> CommandResult:
             check=False,
             env=env,
             stdin=subprocess.DEVNULL,
-            timeout=60,
+            timeout=300,
         )
         return CommandResult(
             command=" ".join(command),
