@@ -36,7 +36,7 @@ ROLE_TEST = "test"
 ROLE_DOCS = "docs"
 ROLE_RESEARCH = "research"
 ROLE_LOCAL_REVIEWER = "local_reviewer"
-ALL_ROLES = frozenset({ROLE_DEVELOPER, ROLE_TEST, ROLE_DOCS, ROLE_RESEARCH, ROLE_LOCAL_REVIEWER})
+ALL_ROLES = frozenset({ROLE_DEVELOPER, ROLE_TEST, ROLE_DOCS, ROLE_RESEARCH})
 
 # Acceptable cleanliness states for recording
 ACCEPTABLE_CLEANLINESS = frozenset({"clean", "normalization_noise_only", "clean_with_generated_artifacts"})
@@ -84,7 +84,7 @@ class LocalExecutionRecord:
     evidence_derived: bool
     human_attestation_supplied: bool
     attestation_checksum: str | None
-    readiness_decision: str
+    role_evidence: dict[str, Any]
     local_execution_recorded: bool
     record_checksum: str
 
@@ -165,11 +165,13 @@ def _validate_role_coverage(
     requested_roles: list[str],
     manifest: dict[str, Any],
     review_bundle_path: Path,
-    review_decision: LocalReviewDecision | None,
-) -> tuple[list[str], list[str]]:
-    """Validate role coverage against evidence. Returns (valid_roles, errors)."""
+) -> tuple[list[str], list[str], dict[str, Any]]:
+    """Validate role coverage against evidence. Returns (valid_roles, errors, role_evidence)."""
+    from agentic_dev.review_state.integrity import checksum_text
+    from agentic_dev.quality_gate import pytest_passed
     valid_roles: list[str] = []
     errors: list[str] = []
+    role_evidence: dict[str, Any] = {}
 
     committed_diff = manifest.get("committed_diff", {})
 
@@ -179,45 +181,51 @@ def _validate_role_coverage(
             continue
 
         if role == ROLE_DEVELOPER:
-            # Requires committed implementation evidence
             if committed_diff.get("commit_count", 0) == 0:
                 errors.append("developer role requires committed implementation (commit_count=0)")
+            elif not committed_diff.get("patch_checksum"):
+                errors.append("developer role requires committed_patch_checksum in manifest")
             else:
                 valid_roles.append(role)
+                role_evidence["developer"] = {
+                    "committed_patch_checksum": committed_diff.get("patch_checksum"),
+                    "changed_paths": committed_diff.get("paths", [])
+                }
 
         elif role == ROLE_TEST:
-            # Requires validated passing pytest evidence
             pytest_path = review_bundle_path / "validation" / "pytest_output.txt"
+            if not pytest_path.exists():
+                pytest_path = review_bundle_path / "pytest_output.txt"
             if not pytest_passed(pytest_path):
                 errors.append("test role requires passing pytest evidence in review bundle")
             else:
                 valid_roles.append(role)
+                role_evidence["test"] = {
+                    "pytest_evidence_checksum": checksum_text(pytest_path.read_text(encoding="utf-8", errors="replace"))
+                }
 
         elif role == ROLE_DOCS:
-            # Requires documentation changes in committed diff
             doc_paths = [p for p in committed_diff.get("paths", []) if "/docs/" in p or p.endswith(".md")]
             if not doc_paths:
-                errors.append("docs role requires documentation changes in committed diff")
+                errors.append("docs role requires documentation changes in committed diff or explicitly passed artifacts")
             else:
                 valid_roles.append(role)
+                role_evidence["docs"] = {
+                    "paths": doc_paths,
+                    "checksums": {}
+                }
 
         elif role == ROLE_RESEARCH:
-            # Requires a checksummed research artifact reference in the attestation or manifest
-            # For now, require it to be explicitly in committed diff paths
             research_paths = [p for p in committed_diff.get("paths", []) if "research" in p.lower()]
             if not research_paths:
-                errors.append("research role requires research artifacts in committed diff")
+                errors.append("research role requires explicit research artifacts")
             else:
                 valid_roles.append(role)
+                role_evidence["research"] = {
+                    "artifacts": [{"path": p, "checksum": ""} for p in research_paths]
+                }
 
-        elif role == ROLE_LOCAL_REVIEWER:
-            # Requires a structured review decision
-            if review_decision is None:
-                errors.append("local_reviewer role requires a structured review decision (use agentic record-local-review)")
-            else:
-                valid_roles.append(role)
-
-    return valid_roles, errors
+    return valid_roles, errors, role_evidence
 
 
 def _build_evidence_payload(
@@ -227,12 +235,13 @@ def _build_evidence_payload(
     manifest_checksum: str,
     review_bundle_path: Path,
     valid_roles: list[str],
+    role_evidence: dict[str, Any],
     execution_type: str,
     executor: str,
     attestation_checksum: str | None,
-    review_decision: LocalReviewDecision | None,
 ) -> dict[str, Any]:
     """Build the deterministic evidence payload for checksum computation."""
+    from agentic_dev.review_state.integrity import checksum_text
     repository = manifest.get("repository", {})
     committed_diff = manifest.get("committed_diff", {})
     working_tree = manifest.get("working_tree", {})
@@ -242,15 +251,15 @@ def _build_evidence_payload(
     pytest_checksum_val = ""
     ruff_checksum_val = ""
     pytest_path = review_bundle_path / "validation" / "pytest_output.txt"
+    if not pytest_path.exists():
+        pytest_path = review_bundle_path / "pytest_output.txt"
     ruff_path = review_bundle_path / "validation" / "ruff_output.txt"
+    if not ruff_path.exists():
+        ruff_path = review_bundle_path / "ruff_output.txt"
     if pytest_path.exists():
         pytest_checksum_val = checksum_text(pytest_path.read_text(encoding="utf-8", errors="replace"))
     if ruff_path.exists():
         ruff_checksum_val = checksum_text(ruff_path.read_text(encoding="utf-8", errors="replace"))
-
-    readiness_decision = DECISION_PENDING
-    if review_decision is not None:
-        readiness_decision = review_decision.decision
 
     return {
         "schema_version": SCHEMA_VERSION,
@@ -279,6 +288,7 @@ def _build_evidence_payload(
             "type": execution_type,
             "executor": executor,
             "roles_covered": sorted(valid_roles),
+            "role_evidence": role_evidence,
         },
         "provenance": {
             "ai_role_agents_executed": False,
@@ -288,7 +298,6 @@ def _build_evidence_payload(
         },
         "readiness": {
             "local_execution_recorded": True,
-            "readiness_decision": readiness_decision,
         },
     }
 
@@ -336,7 +345,7 @@ def _build_record(
         evidence_derived=provenance["evidence_derived"],
         human_attestation_supplied=provenance["human_attestation_supplied"],
         attestation_checksum=provenance["attestation_checksum"],
-        readiness_decision=readiness["readiness_decision"],
+        role_evidence=execution["role_evidence"],
         local_execution_recorded=readiness["local_execution_recorded"],
         record_checksum=record_checksum,
     )
@@ -381,7 +390,6 @@ def _record_to_yaml_dict(record: LocalExecutionRecord) -> dict[str, Any]:
         },
         "readiness": {
             "local_execution_recorded": record.local_execution_recorded,
-            "readiness_decision": record.readiness_decision,
         },
         "integrity": {
             "record_checksum": record.record_checksum,
@@ -444,7 +452,6 @@ def _write_developer_report(record: LocalExecutionRecord, reports_path: Path) ->
 ## Readiness
 
 - **Local execution recorded**: {record.local_execution_recorded}
-- **Readiness decision**: {record.readiness_decision}
 
 > Readiness is not granted by this report. A structured local review decision or quality gate approval is required.
 
@@ -495,7 +502,6 @@ def _write_test_report(record: LocalExecutionRecord, reports_path: Path) -> Path
 
 ## Readiness
 
-- **Readiness decision**: {record.readiness_decision}
 
 > Test truth comes from validated pytest evidence, not from this report. Editing this report does not alter test results.
 
@@ -578,7 +584,6 @@ This story was implemented through a local, evidence-derived workflow.
 - **Executor**: {record.executor}
 - **Recorded at**: {record.executed_at}
 - **Roles covered**: {', '.join(record.roles_covered) if record.roles_covered else 'None'}
-- **Readiness decision**: {record.readiness_decision}
 
 ## Evidence bindings
 
@@ -681,7 +686,6 @@ def record_local_execution(
     executor_name: str | None = None,
     roles: list[str] | None = None,
     attestation_file: Path | None = None,
-    manifest_path: Path | None = None,
     dry_run: bool = False,
     force: bool = False,
     base_ref: str = "origin/main",
@@ -719,8 +723,7 @@ def record_local_execution(
     review_bundle_path = story_path / "review_bundle"
 
     # Determine manifest path
-    if manifest_path is None:
-        manifest_path = review_bundle_path / "manifest.yaml"
+    manifest_path = review_bundle_path / "manifest.yaml"
 
     # Validate path safety
     _safe_relative_path(manifest_path.resolve(), project_path)
@@ -785,13 +788,7 @@ def record_local_execution(
             raise ValueError(f"Invalid attestation: {att_error}")
         attestation_checksum = att_checksum
 
-    # 7. Load existing review decision if present
-    review_decision = load_local_review_decision(reports_path)
-
-    # 8. Validate role coverage
-    valid_roles, role_errors = _validate_role_coverage(
-        roles_requested, manifest, review_bundle_path, review_decision
-    )
+    valid_roles, role_errors, role_evidence = _validate_role_coverage(roles_requested, manifest, review_bundle_path)
     if role_errors:
         raise ValueError("Role coverage validation failed: " + "; ".join(role_errors))
 
@@ -806,18 +803,7 @@ def record_local_execution(
             pass
 
     # 10. Build evidence payload (deterministic, for checksum)
-    payload = _build_evidence_payload(
-        story_slug=story,
-        story_id=story_id,
-        manifest=manifest,
-        manifest_checksum=manifest_checksum,
-        review_bundle_path=review_bundle_path,
-        valid_roles=valid_roles,
-        execution_type=execution_type,
-        executor=executor,
-        attestation_checksum=attestation_checksum,
-        review_decision=review_decision,
-    )
+    payload = _build_evidence_payload(story_slug=story, story_id=story_id, manifest=manifest, manifest_checksum=manifest_checksum, review_bundle_path=review_bundle_path, valid_roles=valid_roles, role_evidence=role_evidence, execution_type=execution_type, executor=executor, attestation_checksum=attestation_checksum)
 
     # 11. Compute record checksum (excludes executed_at for idempotency)
     record_checksum = _compute_record_checksum(payload)
@@ -869,7 +855,6 @@ def record_local_execution(
         dry_run_report.append(f"Cleanliness: {record.cleanliness}")
         dry_run_report.append(f"Parity status: {record.parity_status}")
         dry_run_report.append(f"Roles covered: {', '.join(record.roles_covered)}")
-        dry_run_report.append(f"Readiness decision: {record.readiness_decision}")
         dry_run_report.append(f"Record checksum: {record.record_checksum}")
         dry_run_report.append("\nWould write:")
         dry_run_report.append(f"  reports/{LOCAL_EXECUTION_RECORD_FILENAME}")
@@ -888,7 +873,7 @@ def record_local_execution(
             record_path=record_path,
             dry_run=True,
             reports_written=[],
-            review_decision=review_decision,
+            review_decision=None,
         )
 
     # 15. Write canonical record
@@ -915,5 +900,5 @@ def record_local_execution(
         record_path=written_record_path,
         dry_run=False,
         reports_written=reports_written,
-        review_decision=review_decision,
+        review_decision=None,
     )

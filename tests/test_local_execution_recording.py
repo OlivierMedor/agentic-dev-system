@@ -22,7 +22,7 @@ def test_record_local_execution_dry_run(tmp_path: Path) -> None:
     reports_path.mkdir(parents=True, exist_ok=True)
 
     # Write dummy evidence
-    validation_path.joinpath("pytest_output.txt").write_text("=== 1 passed ===")
+    validation_path.joinpath("pytest_output.txt").write_text("status: passed")
     validation_path.joinpath("ruff_output.txt").write_text("All checks passed!")
 
     # Write dummy manifest
@@ -34,7 +34,8 @@ def test_record_local_execution_dry_run(tmp_path: Path) -> None:
         },
         "working_tree": {"classification": "clean"},
         "validation": {"strict_clean_passed": True},
-        "integrity": {"evidence_checksums": {}},
+        "integrity": {"evidence_checksums": {"committed_patch": "fake"}},
+        "committed_diff": {"commit_count": 1, "patch_checksum": "fake"},
     }
     manifest_path = review_bundle_path / "manifest.yaml"
     manifest_path.write_text(yaml.safe_dump(manifest_data))
@@ -42,12 +43,12 @@ def test_record_local_execution_dry_run(tmp_path: Path) -> None:
     # Mock validate_review_bundle to avoid needing real git/manifest checks
     # For now, we assume tests handle full integration or we mock the validation
     # This is a basic test skeleton
-    from agentic_dev.review_state.service import ReviewBundleValidationResult
+    from agentic_dev.review_state.service import ReviewBundleValidation
     import agentic_dev.local_execution_recording as ler
 
     # We mock validate_review_bundle for the dry run test
     original_validate = ler.validate_review_bundle
-    ler.validate_review_bundle = lambda p, s, base_ref=None: ReviewBundleValidationResult(valid=True, reasons=[], manifest=manifest_data)
+    ler.validate_review_bundle = lambda p, s, base_ref=None: ReviewBundleValidation(valid=True, reasons=[], manifest=manifest_data, manifest_path=None, checksum_path=None)
     
     try:
         result = record_local_execution(
@@ -71,7 +72,7 @@ def test_record_local_review_decision(tmp_path: Path) -> None:
 
     manifest_data = {
         "repository": {"head_sha": "abcd123"},
-        "integrity": {"evidence_checksums": {}},
+        "integrity": {"evidence_checksums": {"committed_patch": "fake"}},
     }
     manifest_path = review_bundle_path / "manifest.yaml"
     manifest_path.write_text(yaml.safe_dump(manifest_data))
@@ -86,9 +87,9 @@ def test_record_local_review_decision(tmp_path: Path) -> None:
     (reports_path / LOCAL_EXECUTION_RECORD_FILENAME).write_text(yaml.safe_dump(execution_record))
 
     import agentic_dev.local_review as lr
-    from agentic_dev.review_state.service import ReviewBundleValidationResult
+    from agentic_dev.review_state.service import ReviewBundleValidation
     original_validate = lr.validate_review_bundle
-    lr.validate_review_bundle = lambda p, s, base_ref=None: ReviewBundleValidationResult(valid=True, reasons=[], manifest=manifest_data)
+    lr.validate_review_bundle = lambda p, s, base_ref=None: ReviewBundleValidation(valid=True, reasons=[], manifest=manifest_data, manifest_path=None, checksum_path=None)
     
     # Also mock checksum_text so manifest_checksum matches
     original_checksum = lr.checksum_text
