@@ -57,6 +57,7 @@ def finalize_story(
 
     execution_provenance = None
     execution_record_checksum = None
+    is_legacy = False
 
     if local_ev.execution_record_present:
         if not local_ev.execution_record_valid:
@@ -65,12 +66,7 @@ def finalize_story(
         execution_provenance = local_ev.provenance
         execution_record_checksum = local_ev.record_checksum
         
-        # If record is valid, we skip generating a new review bundle to preserve the checksum.
-        # We also skip test layers as they are part of execution.
-        # We do run the quality gate on the existing bundle.
         review_bundle_path = story_path / "review_bundle"
-        
-        # Mock the result since we aren't regenerating it
         pytest_passed = (review_bundle_path / "validation" / "pytest_output.txt").exists() and "FAILED" not in (review_bundle_path / "validation" / "pytest_output.txt").read_text(encoding="utf-8")
         ruff_passed = (review_bundle_path / "validation" / "ruff_output.txt").exists() and "error" not in (review_bundle_path / "validation" / "ruff_output.txt").read_text(encoding="utf-8").lower()
         
@@ -85,12 +81,11 @@ def finalize_story(
         quality_gate_result = run_quality_gate(project_path, story)
         status, ready_for_review = status_from_quality_gate(quality_gate_result)
         
-        # Override readiness if decision is pending
         if not local_ev.ready_for_review:
             ready_for_review = False
             status = STATUS_REQUEST_CHANGES
     else:
-        # Legacy workflow
+        is_legacy = True
         review_bundle_result = create_review_bundle_with_runner(project_path, story, command_runner)
         test_layer_result = run_test_layers_if_applicable(project_path, story_path, story)
         quality_gate_result = run_quality_gate(project_path, story)
@@ -117,6 +112,10 @@ def finalize_story(
 
     write_finalize_result(result)
     write_finalize_report(result, quality_gate_result, review_bundle_result, force)
+
+    if is_legacy:
+        review_bundle_result = create_review_bundle_with_runner(project_path, story, command_runner)
+        write_finalize_report(result, quality_gate_result, review_bundle_result, force)
 
     return result
 
