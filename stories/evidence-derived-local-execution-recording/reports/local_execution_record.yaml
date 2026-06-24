@@ -1,0 +1,69 @@
+schema_version: 1
+story:
+  slug: evidence-derived-local-execution-recording
+  story_id: story_067
+repository:
+  branch: story/067-evidence-derived-local-execution-recording-implementation
+  head_sha: b67f12560a1ab3cf1bd737129b84dd42bd581894
+  base_ref: origin/main
+  base_sha: 62f12076e00b4fc7dcb8149696a89e87a9e260cb
+  merge_base_sha: 62f12076e00b4fc7dcb8149696a89e87a9e260cb
+review_evidence:
+  manifest_path: stories/evidence-derived-local-execution-recording/review_bundle/manifest.yaml
+  manifest_checksum: 54d6d39cfa82ef3f94f1929509b7e6a4be30c285399bfd3eabb638e57a8d8137
+  committed_patch_checksum: 693103ca2df15fb3383fd86eb2dc76c258d84951d0115d290711399162746a32
+  pytest_checksum: c4313280d2e7ff078ca677c452872b26e2aa73fc72cbdb366d17248d75d2c436
+  ruff_checksum: 3d7f8b068f38c787874681ca28b95ef0fa6c5939ace738daaa8ba3d0ff8d74e3
+  cleanliness: normalization_noise_only
+  parity_status: passed
+execution:
+  mode: local
+  type: manual
+  executor: local-operator
+  executed_at: '2026-06-24T11:43:47.193114+00:00'
+  roles_covered:
+  - developer
+  - test
+  role_evidence:
+    developer:
+      committed_patch_checksum: 693103ca2df15fb3383fd86eb2dc76c258d84951d0115d290711399162746a32
+      changed_paths:
+      - .gitignore
+      - scratch/generate_host_identity.py
+      - scratch/run_lifecycle.py
+      - src/agentic_dev/cli.py
+      - src/agentic_dev/cloud_review_packet.py
+      - src/agentic_dev/finalize_story.py
+      - src/agentic_dev/local_evidence_validation.py
+      - src/agentic_dev/local_execution_recording.py
+      - src/agentic_dev/local_review.py
+      - src/agentic_dev/quality_gate.py
+      - src/agentic_dev/review_bundle.py
+      - src/agentic_dev/review_state/git_identity.py
+      - stories/evidence-derived-local-execution-recording/agent_plan.yaml
+      - stories/evidence-derived-local-execution-recording/reports/finalize_story_report.md
+      - stories/evidence-derived-local-execution-recording/reports/finalize_story_result.yaml
+      - stories/evidence-derived-local-execution-recording/reports/quality_gate_report.md
+      - stories/evidence-derived-local-execution-recording/reports/quality_gate_result.yaml
+      - stories/evidence-derived-local-execution-recording/reports/test_layer_report.md
+      - stories/evidence-derived-local-execution-recording/reports/test_layer_result.yaml
+      - stories/evidence-derived-local-execution-recording/status.yaml
+      - tests/e2e/test_agentic_workflow.py
+      - tests/test_finalize_story_explicit.py
+      - tests/test_finalize_story_provenance.py
+      - tests/test_git_hang_regression.py
+      - tests/test_local_evidence_validation.py
+      - tests/test_local_execution_recording.py
+      - tests/test_local_review.py
+      - tests/test_quality_gate.py
+    test:
+      pytest_evidence_checksum: c4313280d2e7ff078ca677c452872b26e2aa73fc72cbdb366d17248d75d2c436
+provenance:
+  ai_role_agents_executed: false
+  evidence_derived: true
+  human_attestation_supplied: false
+  attestation_checksum: null
+readiness:
+  local_execution_recorded: true
+integrity:
+  record_checksum: 0eddfdf51ace28a671e30088fd241aa0f818c533694f635d5a10ed80476e78a7

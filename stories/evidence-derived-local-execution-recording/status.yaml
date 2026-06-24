@@ -1,4 +1,4 @@
 story_id: story_067
 slug: evidence-derived-local-execution-recording
-status: request_changes
-ready_for_review: false
+status: ready_for_review
+ready_for_review: true

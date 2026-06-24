@@ -17,10 +17,24 @@ def mock_validate_review_bundle(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda *args, **kwargs: ReviewBundleValidation(True, [], None, Path(), Path())
     )
 
-def create_story(project_path: Path, story: str = STORY, story_content: str = "# Story\n") -> Path:
+def create_story(project_path: Path, story: str = STORY, story_content: str = None) -> Path:
+    if story_content is None:
+        story_content = f"# {story}\n\nstory_id: {story}\n\n## Acceptance Criteria\n\n- valid criteria\n"
+
     story_path = project_path / "stories" / story
-    story_path.mkdir(parents=True)
+    story_path.mkdir(parents=True, exist_ok=True)
     (story_path / "story.md").write_text(story_content, encoding="utf-8")
+    
+    blueprints_path = project_path / "blueprints"
+    blueprints_path.mkdir(exist_ok=True)
+    bp_file = blueprints_path / "blueprint.yaml"
+    if not bp_file.exists():
+        bp_file.write_text("stories:\n  - slug: " + story + "\n    story_id: " + story + "\n    title: " + story + "\n", encoding="utf-8")
+    else:
+        # append
+        bp = bp_file.read_text(encoding="utf-8")
+        if story not in bp:
+            bp_file.write_text(bp + "  - slug: " + story + "\n    story_id: " + story + "\n    title: " + story + "\n", encoding="utf-8")
     
     review_bundle_path = story_path / "review_bundle"
     review_bundle_path.mkdir(exist_ok=True)
@@ -122,7 +136,7 @@ def test_cloud_review_prompt_includes_required_review_instructions(tmp_path: Pat
 
 
 def test_cloud_review_context_includes_story_and_present_evidence(tmp_path: Path) -> None:
-    story_content = "# STORY-010\n\nCloud review packet acceptance criteria.\n"
+    story_content = f"# {STORY}\n\nstory_id: {STORY}\n\nCloud review packet acceptance criteria.\n"
     story_path = create_story(tmp_path, story_content=story_content)
     reports_path = story_path / "reports"
     reports_path.mkdir(exist_ok=True)
@@ -202,7 +216,7 @@ def test_cloud_review_context_includes_story_implementation_scope_and_no_not_in_
     tmp_path: Path,
 ) -> None:
     story_content = (
-        "# STORY-062\n\n"
+        "# STORY-062\n\nstory_id: story_010_cloud_review_packet\n\n"
         "## Implementation Review Scope\n\n"
         "- agentic demo-subtasks\n"
         "- deterministic fake-model mode\n"
@@ -350,3 +364,32 @@ def test_cloud_review_packet_rejects_non_canonical_quality_gate_status(
     with pytest.raises(ValueError, match="quality gate status is not passing"):
         create_cloud_review_packet(tmp_path, STORY)
 
+
+def test_cloud_review_packet_rejects_unknown_title(tmp_path: Path) -> None:
+    create_story(tmp_path, story_content="# UNKNOWN: title\n\n## Acceptance Criteria\n\n- fine\n")
+    with pytest.raises(ValueError, match="title starts with UNKNOWN"):
+        create_cloud_review_packet(tmp_path, STORY)
+
+def test_cloud_review_packet_rejects_todo_sections(tmp_path: Path) -> None:
+    create_story(tmp_path, story_content=f"# {STORY}\n\nstory_id: {STORY}\n\n## Acceptance Criteria\n\n- TODO\n")
+    with pytest.raises(ValueError, match="contains only TODO"):
+        create_cloud_review_packet(tmp_path, STORY)
+
+def test_cloud_review_packet_rejects_missing_blueprint(tmp_path: Path) -> None:
+    create_story(tmp_path)
+    (tmp_path / "blueprints" / "blueprint.yaml").unlink()
+    with pytest.raises(ValueError, match="no authoritative requirements source can be resolved"):
+        create_cloud_review_packet(tmp_path, STORY)
+
+def test_cloud_review_packet_rejects_blueprint_id_mismatch(tmp_path: Path) -> None:
+    create_story(tmp_path, story_content="# OTHER_TITLE\n\nstory_id: WRONG_ID\n\n## Acceptance Criteria\n\n- Fine\n")
+    with pytest.raises(ValueError, match="does not match blueprint identity"):
+        create_cloud_review_packet(tmp_path, STORY)
+
+def test_cloud_review_packet_includes_blueprint_and_cleanliness_stats(tmp_path: Path) -> None:
+    story_path = create_story(tmp_path)
+    create_cloud_review_packet(tmp_path, STORY)
+    context = read_packet_file(story_path, "cloud_review_context.md")
+    assert "## Blueprint requirements" in context
+    assert "## Cleanliness Summary" in context
+    assert "policy_cleanliness: clean" in context

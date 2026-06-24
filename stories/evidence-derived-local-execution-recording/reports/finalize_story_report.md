@@ -15,20 +15,20 @@ evidence-derived-local-execution-recording
 
 ## Quality gate result
 
-- Quality gate status: REQUEST_CHANGES
-- Test layer result: /app/stories/evidence-derived-local-execution-recording/reports/test_layer_result.yaml
-- Ready for review: False
+- Quality gate status: READY_FOR_REVIEW
+- Test layer result: not applicable
+- Ready for review: True
 - pytest in final review bundle passed: True
 - Ruff in final review bundle passed: True
 
 ## Story status update
 
-- status: request_changes
-- ready_for_review: false
+- status: ready_for_review
+- ready_for_review: true
 
 ## Next recommended action
 
-Fix the failed checks, regenerate any missing reports, then run the quality gate again.
+Send the story to a human or cloud reviewer.
 
 Human or cloud review is still required before merge.
 
