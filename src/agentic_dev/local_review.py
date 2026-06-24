@@ -30,7 +30,8 @@ class LocalReviewResult:
     story_path: Path
     decision: LocalReviewDecision
     decision_path: Path
-    report_path: Path
+    dry_run: bool
+    report_path: Path | None = None
 
 
 def record_local_review(
@@ -41,6 +42,7 @@ def record_local_review(
     notes: str | None = None,
     base_ref: str = "origin/main",
     force: bool = False,
+    dry_run: bool = False,
 ) -> LocalReviewResult:
     """Record a structured local review decision for a story.
 
@@ -124,6 +126,7 @@ def record_local_review(
                     story_path=story_path,
                     decision=existing,
                     decision_path=decision_path,
+        dry_run=dry_run,
                     report_path=report_path,
                 )
         raise ValueError(
@@ -152,7 +155,8 @@ def record_local_review(
     # 6. Write decision file
     reports_path.mkdir(parents=True, exist_ok=True)
     content = yaml.safe_dump(payload, sort_keys=False, allow_unicode=True)
-    write_text_file(decision_path, content)
+    if not dry_run:
+        write_text_file(decision_path, content)
 
     review_decision = LocalReviewDecision(
         schema_version=payload["schema_version"],
@@ -211,5 +215,6 @@ def record_local_review(
         story_path=story_path,
         decision=review_decision,
         decision_path=decision_path,
+        dry_run=dry_run,
         report_path=report_path,
     )

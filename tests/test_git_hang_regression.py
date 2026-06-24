@@ -1,4 +1,6 @@
 from pathlib import Path
+import subprocess
+import pytest
 
 from agentic_dev.review_state.git_identity import run_git
 
@@ -33,3 +35,27 @@ def test_run_git_no_pager(tmp_path: Path):
     assert result.returncode == 0
     assert "Changed 1999" in result.stdout
     assert "Line 1999" in result.stdout
+
+def test_run_git_timeout_handling(tmp_path: Path, monkeypatch):
+    """
+    Ensure run_git wraps subprocess.TimeoutExpired properly, including the exact command,
+    cwd, timeout value, and captured stderr.
+    """
+    def mock_run(*args, **kwargs):
+        raise subprocess.TimeoutExpired(
+            cmd=args[0],
+            timeout=kwargs.get("timeout", 60),
+            output=b"some stdout output",
+            stderr=b"some stderr output"
+        )
+    
+    monkeypatch.setattr(subprocess, "run", mock_run)
+    
+    with pytest.raises(RuntimeError) as exc_info:
+        run_git(["git", "diff"], tmp_path)
+    
+    err_msg = str(exc_info.value)
+    assert "Git subprocess timed out after 60s in" in err_msg
+    assert "git --no-pager diff" in err_msg
+    assert str(tmp_path) in err_msg
+    assert "some stderr output" in err_msg

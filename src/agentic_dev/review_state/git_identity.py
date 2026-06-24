@@ -53,7 +53,8 @@ def run_git(command: list[str], cwd: Path) -> CommandResult:
         res.stderr = completed.stderr
         return res
     except subprocess.TimeoutExpired as e:
-        raise RuntimeError(f"Git subprocess timed out after 60s in {cwd}: {' '.join(command)}") from e
+        stderr_msg = f"\nStderr: {e.stderr}" if e.stderr else ""
+        raise RuntimeError(f"Git subprocess timed out after 60s in {cwd}: {' '.join(command)}{stderr_msg}") from e
 
 
 def _run(command: list[str], cwd: Path, command_runner: CommandRunner | None) -> str:

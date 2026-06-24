@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from agentic_dev.review_state.service import validate_review_bundle
-from agentic_dev.local_evidence_validation import validate_local_evidence
+from agentic_dev.local_evidence_validation import validate_local_evidence, LocalEvidenceValidationResult
 
 
 PACKET_FILENAMES = [
@@ -140,7 +140,7 @@ def create_cloud_review_packet(project_path: Path, story: str, force: bool = Fal
     evidence = read_optional_evidence(story_path)
 
     prompt = build_prompt()
-    context = build_context(story, story_content, evidence)
+    context = build_context(story, story_content, evidence, local_ev, story_path)
     checklist = build_checklist()
     result_template = build_result_template()
 
@@ -234,7 +234,7 @@ human reviewer. Do not call external tools or cloud APIs from this packet.
 """
 
 
-def build_context(story: str, story_content: str, evidence: Evidence) -> str:
+def build_context(story: str, story_content: str, evidence: Evidence, local_ev: LocalEvidenceValidationResult, story_path: Path) -> str:
     sections = [
         "# Cloud Review Context",
         "",
@@ -247,6 +247,40 @@ def build_context(story: str, story_content: str, evidence: Evidence) -> str:
         fenced("markdown", story_content),
         "",
     ]
+    
+    if local_ev.execution_record_present and local_ev.execution_record_valid:
+        import yaml
+        record_path = story_path / "reports" / "local_execution_record.yaml"
+        decision_path = story_path / "reports" / "local_review_decision.yaml"
+        
+        record_data = yaml.safe_load(record_path.read_text(encoding="utf-8")) if record_path.exists() else {}
+        decision_data = yaml.safe_load(decision_path.read_text(encoding="utf-8")) if decision_path.exists() else {}
+        
+        local_execution_block = {
+            "local_execution": {
+                "present": True,
+                "valid": True,
+                "execution_mode": local_ev.provenance.get("execution_mode"),
+                "executor": local_ev.provenance.get("executor"),
+                "roles_covered": local_ev.roles_covered,
+                "role_evidence": record_data.get("execution", {}).get("role_evidence", {}),
+                "record_checksum": local_ev.record_checksum,
+                "manifest_checksum": record_data.get("review_evidence", {}).get("manifest_checksum"),
+                "review_decision": {
+                    "decision": decision_data.get("decision"),
+                    "checksum": decision_data.get("attestation_checksum"),
+                    "reviewer": decision_data.get("reviewer"),
+                },
+                "readiness_source": "structured_local_review"
+            }
+        }
+        
+        sections.extend([
+            "## Local Execution Provenance",
+            "",
+            fenced("yaml", yaml.safe_dump(local_execution_block, sort_keys=False)),
+            "",
+        ])
 
     for relative_path, label, content in evidence.present_files:
         sections.extend(

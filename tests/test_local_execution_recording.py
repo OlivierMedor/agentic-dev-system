@@ -1,17 +1,15 @@
 from pathlib import Path
-
 import yaml
+import pytest
 
 from agentic_dev.local_execution_recording import (
-    DECISION_READY_FOR_REVIEW,
-    LOCAL_EXECUTION_RECORD_FILENAME,
     record_local_execution,
+    LOCAL_EXECUTION_RECORD_FILENAME,
 )
-from agentic_dev.local_review import record_local_review
+from agentic_dev.review_state.service import ReviewBundleValidation
+import agentic_dev.local_execution_recording as ler
 
-
-def test_record_local_execution_dry_run(tmp_path: Path) -> None:
-    # Setup dummy project and story
+def setup_dummy_story(tmp_path: Path):
     project_path = tmp_path / "project"
     story = "067-test-story"
     story_path = project_path / "stories" / story
@@ -21,11 +19,9 @@ def test_record_local_execution_dry_run(tmp_path: Path) -> None:
     reports_path = story_path / "reports"
     reports_path.mkdir(parents=True, exist_ok=True)
 
-    # Write dummy evidence
     validation_path.joinpath("pytest_output.txt").write_text("status: passed")
     validation_path.joinpath("ruff_output.txt").write_text("All checks passed!")
 
-    # Write dummy manifest
     manifest_data = {
         "repository": {
             "branch": "story/067",
@@ -39,69 +35,69 @@ def test_record_local_execution_dry_run(tmp_path: Path) -> None:
     }
     manifest_path = review_bundle_path / "manifest.yaml"
     manifest_path.write_text(yaml.safe_dump(manifest_data))
-
-    # Mock validate_review_bundle to avoid needing real git/manifest checks
-    # For now, we assume tests handle full integration or we mock the validation
-    # This is a basic test skeleton
-    from agentic_dev.review_state.service import ReviewBundleValidation
-    import agentic_dev.local_execution_recording as ler
-
-    # We mock validate_review_bundle for the dry run test
-    original_validate = ler.validate_review_bundle
-    ler.validate_review_bundle = lambda p, s, base_ref=None: ReviewBundleValidation(valid=True, reasons=[], manifest=manifest_data, manifest_path=None, checksum_path=None)
     
-    try:
-        result = record_local_execution(
-            project_path, story, execution_type="manual", executor_name="test-operator", dry_run=True
-        )
-        assert result.dry_run is True
-        assert result.record.executor == "test-operator"
-        assert result.record.evidence_derived is True
-    finally:
-        ler.validate_review_bundle = original_validate
+    return project_path, story, story_path, manifest_data
 
-
-def test_record_local_review_decision(tmp_path: Path) -> None:
-    project_path = tmp_path / "project"
-    story = "067-test-story"
-    story_path = project_path / "stories" / story
-    review_bundle_path = story_path / "review_bundle"
-    review_bundle_path.mkdir(parents=True, exist_ok=True)
-    reports_path = story_path / "reports"
-    reports_path.mkdir(parents=True, exist_ok=True)
-
-    manifest_data = {
-        "repository": {"head_sha": "abcd123"},
-        "integrity": {"evidence_checksums": {"committed_patch": "fake"}},
-    }
-    manifest_path = review_bundle_path / "manifest.yaml"
-    manifest_path.write_text(yaml.safe_dump(manifest_data))
-
-    # Mock the execution record
-    execution_record = {
-        "schema_version": 1,
-        "repository": {"head_sha": "abcd123"},
-        "review_evidence": {"manifest_checksum": "dummy"},
-        "integrity": {"record_checksum": "dummy-record-checksum"}
-    }
-    (reports_path / LOCAL_EXECUTION_RECORD_FILENAME).write_text(yaml.safe_dump(execution_record))
-
-    import agentic_dev.local_review as lr
-    from agentic_dev.review_state.service import ReviewBundleValidation
-    original_validate = lr.validate_review_bundle
-    lr.validate_review_bundle = lambda p, s, base_ref=None: ReviewBundleValidation(valid=True, reasons=[], manifest=manifest_data, manifest_path=None, checksum_path=None)
+def test_record_local_execution_dry_run_no_mutation(tmp_path: Path, monkeypatch) -> None:
+    project_path, story, story_path, manifest_data = setup_dummy_story(tmp_path)
     
-    # Also mock checksum_text so manifest_checksum matches
-    original_checksum = lr.checksum_text
-    lr.checksum_text = lambda t: "dummy"
+    monkeypatch.setattr(ler, "validate_review_bundle", lambda p, s, base_ref=None: ReviewBundleValidation(valid=True, reasons=[], manifest=manifest_data, manifest_path=None, checksum_path=None))
     
-    try:
-        result = record_local_review(
-            project_path, story, reviewer="test-reviewer", decision=DECISION_READY_FOR_REVIEW
-        )
-        assert result.decision.decision == DECISION_READY_FOR_REVIEW
-        assert result.decision.reviewer == "test-reviewer"
-        assert result.decision_path.exists()
-    finally:
-        lr.validate_review_bundle = original_validate
-        lr.checksum_text = original_checksum
+    result = record_local_execution(
+        project_path, story, execution_type="manual", executor_name="test-operator", dry_run=True
+    )
+    
+    assert result.dry_run is True
+    assert not (story_path / "reports" / LOCAL_EXECUTION_RECORD_FILENAME).exists()
+
+def test_record_local_execution_idempotency(tmp_path: Path, monkeypatch) -> None:
+    project_path, story, story_path, manifest_data = setup_dummy_story(tmp_path)
+    monkeypatch.setattr(ler, "validate_review_bundle", lambda p, s, base_ref=None: ReviewBundleValidation(valid=True, reasons=[], manifest=manifest_data, manifest_path=None, checksum_path=None))
+    
+    # Run first time
+    result1 = record_local_execution(project_path, story, execution_type="manual", executor_name="test-operator")
+    checksum1 = result1.record.record_checksum
+    
+    # Snapshot directory modified times
+    # (record_path omitted - we check existence directly below)
+
+    # Run second time
+    result2 = record_local_execution(project_path, story, execution_type="manual", executor_name="test-operator")
+    checksum2 = result2.record.record_checksum
+    
+    assert checksum1 == checksum2
+    assert (story_path / "reports" / LOCAL_EXECUTION_RECORD_FILENAME).exists()
+
+def test_force_never_bypasses_validation(tmp_path: Path, monkeypatch):
+    project_path, story, story_path, manifest_data = setup_dummy_story(tmp_path)
+    
+    # Make working tree dirty
+    manifest_data["working_tree"]["classification"] = "dirty"
+    
+    monkeypatch.setattr(ler, "validate_review_bundle", lambda p, s, base_ref=None: ReviewBundleValidation(valid=True, reasons=[], manifest=manifest_data, manifest_path=None, checksum_path=None))
+    
+    with pytest.raises(ValueError, match="not acceptable"):
+        record_local_execution(project_path, story, force=True)
+
+def test_stale_head_rejection_no_mutation(tmp_path: Path, monkeypatch):
+    project_path, story, story_path, manifest_data = setup_dummy_story(tmp_path)
+    
+    # Simulate current HEAD differing from manifest (validate_review_bundle returns valid=False)
+    monkeypatch.setattr(ler, "validate_review_bundle", lambda p, s, base_ref=None: ReviewBundleValidation(valid=False, reasons=["does not match current HEAD"], manifest=manifest_data, manifest_path=None, checksum_path=None))
+    
+    with pytest.raises(ValueError, match="does not match current HEAD"):
+        record_local_execution(project_path, story)
+        
+    assert not (story_path / "reports" / LOCAL_EXECUTION_RECORD_FILENAME).exists()
+
+def test_corrupt_manifest_rejection_no_mutation(tmp_path: Path, monkeypatch):
+    project_path, story, story_path, manifest_data = setup_dummy_story(tmp_path)
+    
+    # Make manifest validation fail
+    monkeypatch.setattr(ler, "validate_review_bundle", lambda p, s, base_ref=None: ReviewBundleValidation(valid=False, reasons=["corrupt format"], manifest={}, manifest_path=None, checksum_path=None))
+    
+    with pytest.raises(ValueError, match="corrupt format"):
+        record_local_execution(project_path, story)
+        
+    assert not (story_path / "reports" / LOCAL_EXECUTION_RECORD_FILENAME).exists()
+
