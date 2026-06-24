@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from agentic_dev.review_state.service import validate_review_bundle
+from agentic_dev.local_evidence_validation import validate_local_evidence
 
 
 PACKET_FILENAMES = [
@@ -78,7 +79,15 @@ def create_cloud_review_packet(project_path: Path, story: str, force: bool = Fal
         raise ValueError("Review bundle validation failed: " + "; ".join(validation.reasons))
 
     reasons = []
-
+    
+    local_ev = validate_local_evidence(project_path, story)
+    if local_ev.execution_record_present:
+        if not local_ev.execution_record_valid:
+            reasons.append("Local execution record is present but invalid: " + "; ".join(local_ev.failure_reasons))
+        elif not local_ev.ready_for_review:
+            # Must never present story as ready if pending review
+            reasons.append("Local execution record is valid, but structured local review decision is pending")
+    
     try:
         manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
         wt_class = manifest.get("working_tree", {}).get("classification")

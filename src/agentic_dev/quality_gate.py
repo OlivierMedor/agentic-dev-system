@@ -237,13 +237,29 @@ def run_pre_merge_quality_gate(project_path: Path, story: str) -> QualityGateRes
     else:
         failed_checks.append("Ruff output does not clearly show a passing result.")
 
-    from agentic_dev.local_execution_recording import load_local_review_decision, DECISION_READY_FOR_REVIEW
-    decision = load_local_review_decision(story_path / "reports")
+    from agentic_dev.local_evidence_validation import validate_local_evidence
+    local_ev = validate_local_evidence(project_path, story)
     
-    if decision is not None and decision.decision == DECISION_READY_FOR_REVIEW:
-        passed_checks.append("Structured local review decision is ready_for_review.")
+    if local_ev.execution_record_present:
+        if not local_ev.execution_record_valid:
+            failed_checks.append("Local execution record is invalid: " + "; ".join(local_ev.failure_reasons))
+        else:
+            passed_checks.append("Local execution record is valid.")
+            
+        if local_ev.ready_for_review:
+            passed_checks.append("Structured local review decision is ready_for_review.")
+        else:
+            msg = "A structured local review decision of 'ready_for_review' is required."
+            if local_ev.failure_reasons:
+                msg += " " + "; ".join(local_ev.failure_reasons)
+            failed_checks.append(msg)
     else:
-        failed_checks.append("A structured local review decision of 'ready_for_review' is required.")
+        from agentic_dev.local_execution_recording import load_local_review_decision, DECISION_READY_FOR_REVIEW
+        decision = load_local_review_decision(story_path / "reports")
+        if decision is not None and decision.decision == DECISION_READY_FOR_REVIEW:
+            passed_checks.append("Structured local review decision is ready_for_review.")
+        else:
+            failed_checks.append("A structured local review decision of 'ready_for_review' is required.")
 
     add_test_layer_checks(story_path, passed_checks, failed_checks)
 

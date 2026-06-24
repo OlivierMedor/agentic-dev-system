@@ -77,6 +77,17 @@ CommandRunner = Callable[[list[str], Path], CommandResult]
 
 def run_command(command: list[str], cwd: Path) -> CommandResult:
     """Run a command and capture output without raising on failure."""
+    import os
+    import subprocess
+    env = os.environ.copy()
+    
+    if command and command[0] == "git":
+        env["GIT_PAGER"] = "cat"
+        env["PAGER"] = "cat"
+        env["GIT_TERMINAL_PROMPT"] = "0"
+        if len(command) > 1 and command[1] != "--no-pager":
+            command = ["git", "--no-pager"] + command[1:]
+            
     try:
         completed = subprocess.run(
             command,
@@ -86,6 +97,9 @@ def run_command(command: list[str], cwd: Path) -> CommandResult:
             encoding="utf-8",
             errors="replace",
             check=False,
+            env=env,
+            stdin=subprocess.DEVNULL,
+            timeout=60,
         )
         return CommandResult(
             command=" ".join(command),
@@ -99,6 +113,13 @@ def run_command(command: list[str], cwd: Path) -> CommandResult:
             returncode=127,
             stdout="",
             stderr=str(e),
+        )
+    except subprocess.TimeoutExpired as e:
+        return CommandResult(
+            command=" ".join(command),
+            returncode=124,
+            stdout="",
+            stderr=f"Subprocess timed out after 60s in {cwd}: {' '.join(command)}",
         )
 
 

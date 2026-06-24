@@ -736,7 +736,6 @@ def main() -> None:
     record_local_execution_parser.add_argument("--executor-name")
     record_local_execution_parser.add_argument("--role", dest="roles", action="append")
     record_local_execution_parser.add_argument("--attestation-file", type=Path)
-    record_local_execution_parser.add_argument("--manifest-path", type=Path)
     record_local_execution_parser.add_argument("--dry-run", action="store_true")
     record_local_execution_parser.add_argument("--force", action="store_true")
 
@@ -2081,7 +2080,6 @@ def main() -> None:
                 executor_name=args.executor_name,
                 roles=args.roles,
                 attestation_file=args.attestation_file,
-                manifest_path=args.manifest_path,
                 dry_run=args.dry_run,
                 force=args.force,
             )

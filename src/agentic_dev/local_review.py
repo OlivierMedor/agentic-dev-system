@@ -61,7 +61,6 @@ def record_local_review(
         raise FileNotFoundError(f"Story folder does not exist: {story_path}")
 
     reports_path = story_path / "reports"
-    reports_path.mkdir(parents=True, exist_ok=True)
 
     # 1. Validate the review bundle
     validation = validate_review_bundle(project_path, story, base_ref=base_ref)
@@ -151,6 +150,7 @@ def record_local_review(
     payload["attestation_checksum"] = attestation_checksum
 
     # 6. Write decision file
+    reports_path.mkdir(parents=True, exist_ok=True)
     content = yaml.safe_dump(payload, sort_keys=False, allow_unicode=True)
     write_text_file(decision_path, content)
 
@@ -198,7 +198,7 @@ def record_local_review(
         evidence_derived=record_data.get("provenance", {}).get("evidence_derived", True),
         human_attestation_supplied=record_data.get("provenance", {}).get("human_attestation_supplied", False),
         attestation_checksum=record_data.get("provenance", {}).get("attestation_checksum"),
-        readiness_decision=review_decision.decision,
+        role_evidence=record_data.get("execution", {}).get("role_evidence", {}),
         local_execution_recorded=record_data.get("readiness", {}).get("local_execution_recorded", True),
         record_checksum=execution_record_checksum,
     )

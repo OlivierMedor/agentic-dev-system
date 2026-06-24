@@ -29,6 +29,8 @@ class FinalizeStoryResult:
     finalize_report_path: Path
     finalize_result_path: Path
     next_action: str
+    execution_provenance: dict[str, str] | None
+    execution_record_checksum: str | None
 
 
 def finalize_story(
@@ -55,6 +57,25 @@ def finalize_story(
     quality_gate_result = run_quality_gate(project_path, story)
 
     status, ready_for_review = status_from_quality_gate(quality_gate_result)
+    
+    from agentic_dev.local_evidence_validation import validate_local_evidence
+    local_ev = validate_local_evidence(project_path, story)
+    
+    execution_provenance = None
+    execution_record_checksum = None
+    
+    if local_ev.execution_record_present:
+        if not local_ev.execution_record_valid:
+            raise ValueError("Local execution record is present but invalid: " + "; ".join(local_ev.failure_reasons))
+            
+        execution_provenance = local_ev.provenance
+        execution_record_checksum = local_ev.record_checksum
+        
+        # Override readiness if decision is pending
+        if not local_ev.ready_for_review:
+            ready_for_review = False
+            status = STATUS_REQUEST_CHANGES
+
     status_path = story_path / "status.yaml"
     update_status(status_path, story, status, ready_for_review)
 
@@ -70,6 +91,8 @@ def finalize_story(
         finalize_report_path=reports_path / "finalize_story_report.md",
         finalize_result_path=reports_path / "finalize_story_result.yaml",
         next_action=quality_gate_result.next_action,
+        execution_provenance=execution_provenance,
+        execution_record_checksum=execution_record_checksum,
     )
 
     write_finalize_result(result)
@@ -150,6 +173,8 @@ def write_finalize_result(result: FinalizeStoryResult) -> None:
         else None,
         "finalize_report_path": str(result.finalize_report_path),
         "next_action": result.next_action,
+        "execution_provenance": result.execution_provenance,
+        "execution_record_checksum": result.execution_record_checksum,
     }
 
     result.finalize_result_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
