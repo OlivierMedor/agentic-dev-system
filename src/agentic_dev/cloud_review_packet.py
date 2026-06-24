@@ -91,7 +91,7 @@ def create_cloud_review_packet(project_path: Path, story: str, force: bool = Fal
     try:
         manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
         wt_class = manifest.get("working_tree", {}).get("classification")
-        if wt_class not in ("clean", "normalization-only", "file-mode-only", "normalization_noise_only"):
+        if wt_class not in ("clean", "normalization-only", "file-mode-only", "normalization_noise_only", "clean_with_generated_artifacts"):
             reasons.append("working tree is dirty or ambiguous")
         if not manifest.get("validation", {}).get("strict_clean_passed"):
             reasons.append("strict_clean_passed is false")
