@@ -1,20 +1,20 @@
 story: evidence-derived-local-execution-recording
 status: ready_for_review
 ready_for_review: true
-review_bundle_path: /app/stories/evidence-derived-local-execution-recording/review_bundle
-quality_gate_result_path: /app/stories/evidence-derived-local-execution-recording/reports/quality_gate_result.yaml
+review_bundle_path: C:\tmp\agentic-dev-system-clean\stories\evidence-derived-local-execution-recording\review_bundle
+quality_gate_result_path: C:\tmp\agentic-dev-system-clean\stories\evidence-derived-local-execution-recording\reports\quality_gate_result.yaml
 test_layer_result_path: null
-finalize_report_path: /app/stories/evidence-derived-local-execution-recording/reports/finalize_story_report.md
+finalize_report_path: C:\tmp\agentic-dev-system-clean\stories\evidence-derived-local-execution-recording\reports\finalize_story_report.md
 next_action: Send the story to a human or cloud reviewer.
 execution_provenance:
   execution_mode: local
   execution_type: manual
-  executor: local-operator
+  executor: agentic-operator
   roles_covered:
   - developer
   - test
-  execution_record_checksum: 0eddfdf51ace28a671e30088fd241aa0f818c533694f635d5a10ed80476e78a7
+  execution_record_checksum: af92fb45f40f7477a1e78fdfeccb85b4906c1d0e63a5e3b64260d6012e45e630
   readiness_source: structured_local_review
   review_decision: ready_for_review
-  review_decision_checksum: 9ed2a77333421b9c92930925bebd87e70402fe1e20b9535c393bcde9fbdc7679
-execution_record_checksum: 0eddfdf51ace28a671e30088fd241aa0f818c533694f635d5a10ed80476e78a7
+  review_decision_checksum: 140925895136f2608f6922349933819dd4b56fef4d5fa5d979b6220008c4714c
+execution_record_checksum: af92fb45f40f7477a1e78fdfeccb85b4906c1d0e63a5e3b64260d6012e45e630

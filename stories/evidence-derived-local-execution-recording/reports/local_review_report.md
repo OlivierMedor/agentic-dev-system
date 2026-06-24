@@ -4,8 +4,8 @@
 
 - **Type**: Evidence-derived local execution (not AI reviewer output)
 - **No AI reviewer executed this story.** This report reflects the structured local review decision.
-- **Executor**: local-operator
-- **Recorded at**: 2026-06-24T11:43:47.193114+00:00
+- **Executor**: agentic-operator
+- **Recorded at**: 2026-06-24T13:14:04.632488+00:00
 
 ## Story
 
@@ -14,24 +14,24 @@
 ## Git Identity
 
 - **Branch**: story/067-evidence-derived-local-execution-recording-implementation
-- **HEAD SHA**: b67f12560a1ab3cf1bd737129b84dd42bd581894
-- **Manifest checksum**: 54d6d39cfa82ef3f94f1929509b7e6a4be30c285399bfd3eabb638e57a8d8137
+- **HEAD SHA**: adad05de17c9eef415284ea2517d9d353b4660c4
+- **Manifest checksum**: c487b54faf948766daffc8e96ef102bc6633523a43880956d0223d7cb63fb1bb
 
 ## Review Decision
 
 - **Decision**: ready_for_review
-- **Reviewer**: local-operator
-- **Timestamp**: 2026-06-24T11:43:56.805958+00:00
+- **Reviewer**: agentic-operator
+- **Timestamp**: 2026-06-24T13:14:13.865709+00:00
 - **Notes**: None
-- **Decision checksum**: 6649c9048fa51a0ad4d2ffb9450e1bfd36ae3ba64e209597ed022c49be2d9287
-- **Execution record checksum**: 0eddfdf51ace28a671e30088fd241aa0f818c533694f635d5a10ed80476e78a7
+- **Decision checksum**: 72a61a0b44021c6801e4504ac41ad3068d35611bbb07ce257edeae99150bac29
+- **Execution record checksum**: af92fb45f40f7477a1e78fdfeccb85b4906c1d0e63a5e3b64260d6012e45e630
 
 > This decision is binding only when the attestation checksum matches the canonical record.
 
 ## Canonical record
 
 - **Record file**: reports/local_execution_record.yaml
-- **Record checksum**: 0eddfdf51ace28a671e30088fd241aa0f818c533694f635d5a10ed80476e78a7
+- **Record checksum**: af92fb45f40f7477a1e78fdfeccb85b4906c1d0e63a5e3b64260d6012e45e630
 
 > Readiness is controlled by the structured review decision, not by text in this file.
 > Inserting 'READY_FOR_REVIEW' into this file does not grant readiness.

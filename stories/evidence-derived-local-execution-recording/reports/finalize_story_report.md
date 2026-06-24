@@ -6,11 +6,11 @@ evidence-derived-local-execution-recording
 
 ## What finalize-story did
 
-- Created or refreshed the review bundle at `/app/stories/evidence-derived-local-execution-recording/review_bundle`.
+- Created or refreshed the review bundle at `C:\tmp\agentic-dev-system-clean\stories\evidence-derived-local-execution-recording\review_bundle`.
 - Ran test layer validation when `test_plan.yaml` used `test_layers_version: 1`.
-- Ran the quality gate and wrote `/app/stories/evidence-derived-local-execution-recording/reports/quality_gate_result.yaml`.
+- Ran the quality gate and wrote `C:\tmp\agentic-dev-system-clean\stories\evidence-derived-local-execution-recording\reports\quality_gate_result.yaml`.
 - Regenerated the review bundle after the quality gate so final evidence is captured.
-- Wrote finalize result data to `/app/stories/evidence-derived-local-execution-recording/reports/finalize_story_result.yaml`.
+- Wrote finalize result data to `C:\tmp\agentic-dev-system-clean\stories\evidence-derived-local-execution-recording\reports\finalize_story_result.yaml`.
 - Updated `status.yaml` without committing, pushing, merging, deploying, or calling cloud models.
 
 ## Quality gate result
