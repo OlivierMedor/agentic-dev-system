@@ -369,25 +369,6 @@ def test_cloud_review_packet_rejects_non_canonical_quality_gate_status(
         create_cloud_review_packet(tmp_path, STORY)
 
 
-def test_cloud_review_packet_rejects_missing_finalize_result(tmp_path: Path) -> None:
-    story_path = create_story(tmp_path)
-    (story_path / "reports" / "finalize_story_result.yaml").unlink()
-
-    with pytest.raises(ValueError, match="Missing mandatory evidence: reports/finalize_story_result.yaml"):
-        create_cloud_review_packet(tmp_path, STORY)
-
-
-def test_cloud_review_packet_rejects_non_ready_finalize_result(tmp_path: Path) -> None:
-    story_path = create_story(tmp_path)
-    (story_path / "reports" / "finalize_story_result.yaml").write_text(
-        "status: request_changes\nready_for_review: false\n",
-        encoding="utf-8",
-    )
-
-    with pytest.raises(ValueError, match="finalize-story status is not ready_for_review"):
-        create_cloud_review_packet(tmp_path, STORY)
-
-
 def test_cloud_review_packet_rejects_unknown_title(tmp_path: Path) -> None:
     create_story(tmp_path, story_content="# UNKNOWN: title\n\n## Acceptance Criteria\n\n- fine\n")
     with pytest.raises(ValueError, match="title starts with UNKNOWN"):

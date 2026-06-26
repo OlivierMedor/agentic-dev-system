@@ -7,7 +7,7 @@ from agentic_dev.artifact_policy import find_artifact_policy_violations
 
 STORY = "evidence-derived-local-execution-recording"
 
-STORY_LIFECYCLE_ARTIFACTS = [
+STORY_LIFECYCLE_REPORT_ARTIFACTS = [
     f"stories/{STORY}/reports/local_execution_record.yaml",
     f"stories/{STORY}/reports/local_review_decision.yaml",
     f"stories/{STORY}/reports/local_execution_report.md",
@@ -16,8 +16,20 @@ STORY_LIFECYCLE_ARTIFACTS = [
     f"stories/{STORY}/reports/quality_gate_result.yaml",
     f"stories/{STORY}/reports/finalize_story_report.md",
     f"stories/{STORY}/reports/finalize_story_result.yaml",
+]
+
+LOCAL_EXECUTION_OUTPUT_ARTIFACTS = [
     f"stories/{STORY}/reports/local_execution/state.yaml",
+    f"stories/{STORY}/reports/local_execution/developer/output.md",
+    f"stories/{STORY}/reports/local_execution/developer/execution.yaml",
+]
+
+GENERATED_CLOUD_REVIEW_PACKET_ARTIFACTS = [
     f"stories/{STORY}/cloud_review_packet/cloud_review_prompt.md",
+    f"stories/{STORY}/cloud_review_packet/cloud_review_context.md",
+    f"stories/{STORY}/cloud_review_packet/cloud_review_checklist.md",
+    f"stories/{STORY}/cloud_review_packet/cloud_review_result_template.md",
+    f"stories/{STORY}/cloud_review_packet/cloud_review_export.md",
 ]
 
 STATIC_STORY_FILES = [
@@ -56,9 +68,25 @@ def write_files(project_path: Path, paths: list[str]) -> None:
 
 
 def test_story_067_lifecycle_artifacts_are_classified_as_generated() -> None:
-    violations = find_artifact_policy_violations(STORY_LIFECYCLE_ARTIFACTS)
+    violations = find_artifact_policy_violations(STORY_LIFECYCLE_REPORT_ARTIFACTS)
 
-    assert [violation.path for violation in violations] == STORY_LIFECYCLE_ARTIFACTS
+    assert [violation.path for violation in violations] == STORY_LIFECYCLE_REPORT_ARTIFACTS
+
+
+def test_story_067_local_execution_outputs_are_classified_as_generated_except_gitkeep() -> None:
+    tracked_paths = [*LOCAL_EXECUTION_OUTPUT_ARTIFACTS, f"stories/{STORY}/reports/local_execution/.gitkeep"]
+
+    violations = find_artifact_policy_violations(tracked_paths)
+
+    assert [violation.path for violation in violations] == LOCAL_EXECUTION_OUTPUT_ARTIFACTS
+
+
+def test_story_067_cloud_review_packet_files_are_classified_as_generated_except_gitkeep() -> None:
+    tracked_paths = [*GENERATED_CLOUD_REVIEW_PACKET_ARTIFACTS, f"stories/{STORY}/cloud_review_packet/.gitkeep"]
+
+    violations = find_artifact_policy_violations(tracked_paths)
+
+    assert [violation.path for violation in violations] == GENERATED_CLOUD_REVIEW_PACKET_ARTIFACTS
 
 
 def test_legacy_role_agent_reports_remain_trackable() -> None:
@@ -72,7 +100,14 @@ def test_static_story_files_remain_trackable() -> None:
 def test_git_add_dot_does_not_stage_story_067_lifecycle_artifacts(tmp_path: Path) -> None:
     shutil.copyfile(Path(".gitignore"), tmp_path / ".gitignore")
     assert run_git(tmp_path, "init").returncode == 0
-    write_files(tmp_path, STORY_LIFECYCLE_ARTIFACTS + STATIC_STORY_FILES + LEGACY_ROLE_AGENT_REPORTS)
+    write_files(
+        tmp_path,
+        STORY_LIFECYCLE_REPORT_ARTIFACTS
+        + LOCAL_EXECUTION_OUTPUT_ARTIFACTS
+        + GENERATED_CLOUD_REVIEW_PACKET_ARTIFACTS
+        + STATIC_STORY_FILES
+        + LEGACY_ROLE_AGENT_REPORTS,
+    )
 
     add_result = run_git(tmp_path, "add", ".")
     assert add_result.returncode == 0, add_result.stderr
@@ -81,7 +116,7 @@ def test_git_add_dot_does_not_stage_story_067_lifecycle_artifacts(tmp_path: Path
     assert staged.returncode == 0, staged.stderr
     staged_paths = set(staged.stdout.splitlines())
 
-    for artifact_path in STORY_LIFECYCLE_ARTIFACTS:
+    for artifact_path in [*STORY_LIFECYCLE_REPORT_ARTIFACTS, *LOCAL_EXECUTION_OUTPUT_ARTIFACTS, *GENERATED_CLOUD_REVIEW_PACKET_ARTIFACTS]:
         assert artifact_path not in staged_paths
 
     for static_path in STATIC_STORY_FILES:
