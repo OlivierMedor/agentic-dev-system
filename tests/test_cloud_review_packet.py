@@ -49,6 +49,10 @@ def create_story(project_path: Path, story: str = STORY, story_content: str = No
     (story_path / "status.yaml").write_text("ready_for_review: true\n")
     (story_path / "reports").mkdir(exist_ok=True)
     (story_path / "reports" / "quality_gate_result.yaml").write_text("status: READY_FOR_REVIEW\n")
+    (story_path / "reports" / "finalize_story_result.yaml").write_text(
+        "status: ready_for_review\nready_for_review: true\n",
+        encoding="utf-8",
+    )
     
     return story_path
 
@@ -145,7 +149,7 @@ def test_cloud_review_context_includes_story_and_present_evidence(tmp_path: Path
         encoding="utf-8",
     )
     (reports_path / "finalize_story_result.yaml").write_text(
-        "status: ready_for_review\n",
+        "status: ready_for_review\nready_for_review: true\n",
         encoding="utf-8",
     )
     review_bundle_path = story_path / "review_bundle"
@@ -362,6 +366,25 @@ def test_cloud_review_packet_rejects_non_canonical_quality_gate_status(
     qg_path.write_text("status: PASS\n", encoding="utf-8")
     
     with pytest.raises(ValueError, match="quality gate status is not passing"):
+        create_cloud_review_packet(tmp_path, STORY)
+
+
+def test_cloud_review_packet_rejects_missing_finalize_result(tmp_path: Path) -> None:
+    story_path = create_story(tmp_path)
+    (story_path / "reports" / "finalize_story_result.yaml").unlink()
+
+    with pytest.raises(ValueError, match="Missing mandatory evidence: reports/finalize_story_result.yaml"):
+        create_cloud_review_packet(tmp_path, STORY)
+
+
+def test_cloud_review_packet_rejects_non_ready_finalize_result(tmp_path: Path) -> None:
+    story_path = create_story(tmp_path)
+    (story_path / "reports" / "finalize_story_result.yaml").write_text(
+        "status: request_changes\nready_for_review: false\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="finalize-story status is not ready_for_review"):
         create_cloud_review_packet(tmp_path, STORY)
 
 

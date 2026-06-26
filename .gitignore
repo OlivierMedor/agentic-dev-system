@@ -42,7 +42,7 @@ stories/**/reports/codex_tasks/*
 stories/**/reports/codex_runtime/*
 !stories/**/reports/codex_runtime/.gitkeep
 stories/**/reports/local_execution/*
-stories/**/reports/local_execution/.gitkeep
+!stories/**/reports/local_execution/.gitkeep
 stories/**/reports/local_execution_record.yaml
 stories/**/reports/local_review_decision.yaml
 stories/**/reports/local_execution_report.md

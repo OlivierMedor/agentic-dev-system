@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from agentic_dev.review_state.integrity import checksum_text, load_yaml_mapping
+from agentic_dev.review_state.integrity import checksum_mapping, checksum_text, load_yaml_mapping
 from agentic_dev.review_state.service import validate_review_bundle
 
 
@@ -65,18 +65,33 @@ def validate_local_evidence(
     record_checksum = record_data.get("integrity", {}).get("record_checksum")
     if not record_checksum:
         failure_reasons.append("execution record is missing record_checksum")
-        return _build_invalid_result(failure_reasons, review_decision_present)
+        return _build_invalid_result(
+            failure_reasons,
+            review_decision_present=review_decision_present,
+        )
+
+    computed_record_checksum = compute_local_execution_record_checksum(record_data)
+    if computed_record_checksum != record_checksum:
+        failure_reasons.append("execution record checksum mismatch")
 
     # Validate review bundle
     validation = validate_review_bundle(project_path, story, base_ref=base_ref)
     if not validation.valid:
         failure_reasons.append("review bundle validation failed: " + "; ".join(validation.reasons))
-        return _build_invalid_result(failure_reasons, review_decision_present)
+        return _build_invalid_result(
+            failure_reasons,
+            record_checksum=record_checksum,
+            review_decision_present=review_decision_present,
+        )
 
     manifest = validation.manifest
     if not manifest:
         failure_reasons.append("review manifest missing")
-        return _build_invalid_result(failure_reasons, review_decision_present)
+        return _build_invalid_result(
+            failure_reasons,
+            record_checksum=record_checksum,
+            review_decision_present=review_decision_present,
+        )
 
     # Validate bindings
     manifest_path = review_bundle_path / "manifest.yaml"
@@ -215,3 +230,20 @@ def _build_invalid_result(failure_reasons: list[str], record_checksum: str | Non
         failure_reasons=failure_reasons,
         record_checksum=record_checksum,
     )
+
+
+def compute_local_execution_record_checksum(record_data: dict[str, object]) -> str:
+    payload_data = {key: value for key, value in record_data.items() if key not in {"integrity", "execution"}}
+    repository_data = payload_data.get("repository")
+    if isinstance(repository_data, dict):
+        payload_data["repository"] = {
+            key: None if value == "" else value
+            for key, value in repository_data.items()
+        }
+    execution_data = {
+        key: value
+        for key, value in record_data.get("execution", {}).items()
+        if key != "executed_at"
+    }
+    payload_data["execution"] = execution_data
+    return checksum_mapping(payload_data)

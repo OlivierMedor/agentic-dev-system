@@ -11,6 +11,7 @@ import agentic_dev.finalize_story as fs
 import agentic_dev.local_execution_recording as ler
 import agentic_dev.local_review as lr
 import agentic_dev.local_evidence_validation as lev
+from agentic_dev.review_state.integrity import checksum_text
 
 def setup_dummy_project(tmp_path: Path):
     project_path = tmp_path / "project"
@@ -157,4 +158,59 @@ def test_finalize_story_rejects_stale_record(tmp_path: Path, monkeypatch):
     
     with pytest.raises(ValueError):
         finalize_story(project_path, story)
+
+
+def test_finalize_story_preserves_bound_review_bundle_for_valid_local_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    project_path, story, story_path, manifest_data = setup_dummy_project(tmp_path)
+    mock_validators(monkeypatch, manifest_data)
+    record_local_execution(project_path, story)
+    record_local_review(project_path, story, decision=DECISION_READY_FOR_REVIEW)
+    manifest_path = story_path / "review_bundle" / "manifest.yaml"
+    manifest_checksum_before = checksum_text(manifest_path.read_text(encoding="utf-8"))
+
+    def fail_if_regenerated(*args, **kwargs):
+        raise AssertionError("review bundle must not be regenerated for valid local evidence")
+
+    monkeypatch.setattr(fs, "create_review_bundle_with_runner", fail_if_regenerated)
+
+    result = finalize_story(project_path, story)
+
+    assert result.ready_for_review is True
+    assert checksum_text(manifest_path.read_text(encoding="utf-8")) == manifest_checksum_before
+    assert result.execution_provenance["readiness_source"] == "structured_local_review"
+    assert "Preserved the existing bound review bundle" in result.finalize_report_path.read_text(
+        encoding="utf-8",
+    )
+
+
+def test_finalize_story_legacy_regenerates_review_bundle_before_and_after_quality_gate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    project_path, story, story_path, manifest_data = setup_dummy_project(tmp_path)
+    mock_validators(monkeypatch, manifest_data)
+    calls = []
+
+    from agentic_dev.review_bundle import ReviewBundleResult
+
+    def fake_regenerate(project_path: Path, story: str, command_runner):
+        calls.append((project_path, story, command_runner))
+        return ReviewBundleResult(
+            review_bundle_path=story_path / "review_bundle",
+            generated_files=[],
+            pytest_passed=True,
+            ruff_passed=True,
+            strict_clean_passed=True,
+        )
+
+    monkeypatch.setattr(fs, "create_review_bundle_with_runner", fake_regenerate)
+
+    result = finalize_story(project_path, story)
+
+    assert result.ready_for_review is True
+    assert len(calls) == 2
+    assert result.execution_provenance["readiness_source"] == "legacy_role_agent"
 

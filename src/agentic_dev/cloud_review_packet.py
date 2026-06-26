@@ -70,6 +70,7 @@ def create_cloud_review_packet(project_path: Path, story: str, force: bool = Fal
     manifest_path = review_bundle_path / "manifest.yaml"
     status_path = story_path / "status.yaml"
     quality_gate_path = story_path / "reports" / "quality_gate_result.yaml"
+    finalize_result_path = story_path / "reports" / "finalize_story_result.yaml"
 
     if not manifest_path.exists():
         raise ValueError("Missing mandatory evidence: review_bundle/manifest.yaml")
@@ -180,6 +181,27 @@ def create_cloud_review_packet(project_path: Path, story: str, force: bool = Fal
                 reasons.append("quality gate status is not passing")
     except Exception as e:
         reasons.append(f"Invalid quality_gate_result.yaml: {e}")
+
+    try:
+        if not finalize_result_path.exists():
+            reasons.append("Missing mandatory evidence: reports/finalize_story_result.yaml")
+        else:
+            finalize_doc = yaml.safe_load(finalize_result_path.read_text(encoding="utf-8"))
+            if finalize_doc.get("status") != "ready_for_review":
+                reasons.append("finalize-story status is not ready_for_review")
+            if not finalize_doc.get("ready_for_review"):
+                reasons.append("finalize-story ready_for_review is false")
+
+            provenance = finalize_doc.get("execution_provenance") or {}
+            if local_ev.execution_record_present:
+                if provenance.get("readiness_source") != "structured_local_review":
+                    reasons.append("finalize-story readiness source is not structured_local_review")
+                if finalize_doc.get("execution_record_checksum") != local_ev.record_checksum:
+                    reasons.append("finalize-story execution_record_checksum mismatch")
+                if provenance.get("review_decision") != local_ev.decision:
+                    reasons.append("finalize-story review decision mismatch")
+    except Exception as e:
+        reasons.append(f"Invalid finalize_story_result.yaml: {e}")
 
     if reasons:
         raise ValueError("Cloud packet readiness validation failed: " + "; ".join(reasons))

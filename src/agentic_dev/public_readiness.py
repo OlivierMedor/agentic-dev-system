@@ -18,6 +18,7 @@ from agentic_dev.artifact_policy import (
     is_local_agent_context_output_path,
     is_local_agent_draft_output_path,
     is_local_execution_output_path,
+    is_story_lifecycle_report_artifact_path,
     is_local_model_raw_response_path,
     is_local_model_scorecard_result_path,
     is_local_model_scorecard_scoring_artifact_path,
@@ -131,6 +132,9 @@ def public_readiness_violation_reason(
 
     if is_local_execution_output_path(parts, filename):
         return "local execution output files must remain untracked"
+
+    if is_story_lifecycle_report_artifact_path(parts, filename):
+        return "story lifecycle evidence files must remain untracked"
 
     if is_local_model_raw_response_path(parts, filename):
         return "local model raw response files must remain untracked"
