@@ -427,7 +427,12 @@ def is_local_execution_output_path(parts: list[str], filename: str) -> bool:
 
 
 def is_story_lifecycle_report_artifact_path(parts: list[str], filename: str) -> bool:
-    if len(parts) != 4 or parts[0] != "stories" or parts[2] != "reports":
+    if (
+        len(parts) != 4
+        or parts[0] != "stories"
+        or parts[1] != "evidence-derived-local-execution-recording"
+        or parts[2] != "reports"
+    ):
         return False
 
     return filename in {
