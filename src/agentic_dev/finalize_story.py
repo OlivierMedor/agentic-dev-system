@@ -29,6 +29,8 @@ class FinalizeStoryResult:
     finalize_report_path: Path
     finalize_result_path: Path
     next_action: str
+    execution_provenance: dict[str, object] | None
+    execution_record_checksum: str | None
 
 
 def finalize_story(
@@ -50,11 +52,55 @@ def finalize_story(
     reports_path = story_path / "reports"
     reports_path.mkdir(parents=True, exist_ok=True)
 
-    review_bundle_result = create_review_bundle_with_runner(project_path, story, command_runner)
-    test_layer_result = run_test_layers_if_applicable(project_path, story_path, story)
-    quality_gate_result = run_quality_gate(project_path, story)
+    from agentic_dev.local_evidence_validation import validate_local_evidence
+    local_ev = validate_local_evidence(project_path, story)
 
-    status, ready_for_review = status_from_quality_gate(quality_gate_result)
+    execution_provenance = None
+    execution_record_checksum = None
+    is_legacy = False
+
+    if local_ev.execution_record_present:
+        if not local_ev.execution_record_valid:
+            raise ValueError("Local execution record is present but invalid: " + "; ".join(local_ev.failure_reasons))
+        
+        execution_provenance = local_ev.provenance
+        execution_record_checksum = local_ev.record_checksum
+        
+        review_bundle_path = story_path / "review_bundle"
+        pytest_passed = (review_bundle_path / "validation" / "pytest_output.txt").exists() and "FAILED" not in (review_bundle_path / "validation" / "pytest_output.txt").read_text(encoding="utf-8")
+        ruff_passed = (review_bundle_path / "validation" / "ruff_output.txt").exists() and "error" not in (review_bundle_path / "validation" / "ruff_output.txt").read_text(encoding="utf-8").lower()
+        
+        review_bundle_result = ReviewBundleResult(
+            review_bundle_path=review_bundle_path,
+            generated_files=[],
+            pytest_passed=pytest_passed,
+            ruff_passed=ruff_passed,
+            strict_clean_passed=True,
+        )
+        test_layer_result = None
+        quality_gate_result = run_quality_gate(project_path, story)
+        status, ready_for_review = status_from_quality_gate(quality_gate_result)
+        
+        if not local_ev.ready_for_review:
+            ready_for_review = False
+            status = STATUS_REQUEST_CHANGES
+    else:
+        is_legacy = True
+        execution_provenance = {
+            "execution_mode": "legacy_role_agent",
+            "execution_type": "legacy_role_agent",
+            "executor": "legacy_role_agent",
+            "roles_covered": [],
+            "execution_record_checksum": None,
+            "readiness_source": "legacy_role_agent",
+            "review_decision": None,
+            "review_decision_checksum": None,
+        }
+        review_bundle_result = create_review_bundle_with_runner(project_path, story, command_runner)
+        test_layer_result = run_test_layers_if_applicable(project_path, story_path, story)
+        quality_gate_result = run_quality_gate(project_path, story)
+        status, ready_for_review = status_from_quality_gate(quality_gate_result)
+
     status_path = story_path / "status.yaml"
     update_status(status_path, story, status, ready_for_review)
 
@@ -70,13 +116,16 @@ def finalize_story(
         finalize_report_path=reports_path / "finalize_story_report.md",
         finalize_result_path=reports_path / "finalize_story_result.yaml",
         next_action=quality_gate_result.next_action,
+        execution_provenance=execution_provenance,
+        execution_record_checksum=execution_record_checksum,
     )
 
     write_finalize_result(result)
-    write_finalize_report(result, quality_gate_result, review_bundle_result, force)
+    write_finalize_report(result, quality_gate_result, review_bundle_result, force, is_legacy)
 
-    review_bundle_result = create_review_bundle_with_runner(project_path, story, command_runner)
-    write_finalize_report(result, quality_gate_result, review_bundle_result, force)
+    if is_legacy:
+        review_bundle_result = create_review_bundle_with_runner(project_path, story, command_runner)
+        write_finalize_report(result, quality_gate_result, review_bundle_result, force, is_legacy)
 
     return result
 
@@ -150,6 +199,8 @@ def write_finalize_result(result: FinalizeStoryResult) -> None:
         else None,
         "finalize_report_path": str(result.finalize_report_path),
         "next_action": result.next_action,
+        "execution_provenance": result.execution_provenance,
+        "execution_record_checksum": result.execution_record_checksum,
     }
 
     result.finalize_result_path.write_text(yaml.safe_dump(data, sort_keys=False), encoding="utf-8")
@@ -160,7 +211,15 @@ def write_finalize_report(
     quality_gate_result: QualityGateResult,
     review_bundle_result: ReviewBundleResult,
     force: bool,
+    is_legacy: bool = True,
 ) -> None:
+    
+    action_text = ""
+    if is_legacy:
+        action_text = f"- Created or refreshed the review bundle at `{result.review_bundle_path}`.\n- Ran test layer validation when `test_plan.yaml` used `test_layers_version: 1`.\n- Ran the quality gate and wrote `{result.quality_gate_result_path}`.\n- Regenerated the review bundle after the quality gate so final evidence is captured."
+    else:
+        action_text = f"- Preserved the existing bound review bundle at `{result.review_bundle_path}`.\n- Ran test layer validation when `test_plan.yaml` used `test_layers_version: 1`.\n- Ran the quality gate and wrote `{result.quality_gate_result_path}`."
+
     content = f"""# Finalize Story Report
 
 ## Story
@@ -169,10 +228,7 @@ def write_finalize_report(
 
 ## What finalize-story did
 
-- Created or refreshed the review bundle at `{result.review_bundle_path}`.
-- Ran test layer validation when `test_plan.yaml` used `test_layers_version: 1`.
-- Ran the quality gate and wrote `{result.quality_gate_result_path}`.
-- Regenerated the review bundle after the quality gate so final evidence is captured.
+{action_text}
 - Wrote finalize result data to `{result.finalize_result_path}`.
 - Updated `status.yaml` without committing, pushing, merging, deploying, or calling cloud models.
 

@@ -41,6 +41,10 @@ def create_complete_story(project_path: Path, story: str = "story_005_quality_ga
         "Status: READY_FOR_REVIEW\n",
         encoding="utf-8",
     )
+    (reports_path / "local_review_decision.yaml").write_text(
+        yaml.safe_dump({"decision": "ready_for_review"}),
+        encoding="utf-8",
+    )
 
     (review_bundle_path / "handoff.md").write_text("# Handoff\n", encoding="utf-8")
     (review_bundle_path / "pytest_output.txt").write_text(
@@ -261,15 +265,15 @@ def test_local_review_without_ready_for_review_returns_request_changes(
 ) -> None:
     story = "story_005_quality_gate"
     story_path = create_complete_story(tmp_path, story)
-    (story_path / "reports" / "local_review_report.md").write_text(
-        "Status: REQUEST_CHANGES\n",
+    (story_path / "reports" / "local_review_decision.yaml").write_text(
+        yaml.safe_dump({"decision": "request_changes"}),
         encoding="utf-8",
     )
 
     result = run_quality_gate(tmp_path, story)
 
     assert result.status == REQUEST_CHANGES
-    assert "Local reviewer report does not contain READY_FOR_REVIEW." in result.failed_checks
+    assert "A structured local review decision of 'ready_for_review' is required." in result.failed_checks
 
 
 def test_failed_checks_are_listed_clearly(tmp_path: Path) -> None:

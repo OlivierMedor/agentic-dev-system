@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from agentic_dev.review_state.service import validate_review_bundle
+from agentic_dev.local_evidence_validation import validate_local_evidence, LocalEvidenceValidationResult
 
 
 PACKET_FILENAMES = [
@@ -69,6 +70,7 @@ def create_cloud_review_packet(project_path: Path, story: str, force: bool = Fal
     manifest_path = review_bundle_path / "manifest.yaml"
     status_path = story_path / "status.yaml"
     quality_gate_path = story_path / "reports" / "quality_gate_result.yaml"
+    finalize_result_path = story_path / "reports" / "finalize_story_result.yaml"
 
     if not manifest_path.exists():
         raise ValueError("Missing mandatory evidence: review_bundle/manifest.yaml")
@@ -78,11 +80,19 @@ def create_cloud_review_packet(project_path: Path, story: str, force: bool = Fal
         raise ValueError("Review bundle validation failed: " + "; ".join(validation.reasons))
 
     reasons = []
-
+    
+    local_ev = validate_local_evidence(project_path, story)
+    if local_ev.execution_record_present:
+        if not local_ev.execution_record_valid:
+            reasons.append("Local execution record is present but invalid: " + "; ".join(local_ev.failure_reasons))
+        elif not local_ev.ready_for_review:
+            # Must never present story as ready if pending review
+            reasons.append("Local execution record is valid, but structured local review decision is pending")
+    
     try:
         manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
         wt_class = manifest.get("working_tree", {}).get("classification")
-        if wt_class not in ("clean", "normalization-only", "file-mode-only", "normalization_noise_only"):
+        if wt_class not in ("clean", "normalization-only", "file-mode-only", "normalization_noise_only", "clean_with_generated_artifacts"):
             reasons.append("working tree is dirty or ambiguous")
         if not manifest.get("validation", {}).get("strict_clean_passed"):
             reasons.append("strict_clean_passed is false")
@@ -92,8 +102,65 @@ def create_cloud_review_packet(project_path: Path, story: str, force: bool = Fal
         host_validation = manifest.get("validation", {}).get("host_container_git_match")
         if host_status != "passed" or not host_matched or not host_validation:
             reasons.append("required host parity is not checked or failed")
+            
+        # Cleanliness validation for normalization
+        wt = manifest.get("working_tree", {})
+        wt_staged = wt.get("staged", [])
+        wt_unstaged = wt.get("unstaged", [])
+        wt_untracked = wt.get("untracked", [])
+        normalization_paths = manifest.get("normalization", [])
+        
+        if wt_class == "normalization_noise_only":
+            if manifest.get("validation", {}).get("normalization_matched") is False:
+                reasons.append("normalized repository and working-tree content do not match")
+            
+            # semantic unstaged paths must be zero
+            if len(wt_unstaged) > len(normalization_paths):
+                reasons.append("there are semantic unstaged changes")
+            
+            if len(wt_staged) > 0:
+                reasons.append("there are staged semantic changes")
+                
+            if len(wt_untracked) > 0:
+                reasons.append("there are untracked implementation files")
+                
     except Exception as e:
         reasons.append(f"Invalid manifest.yaml: {e}")
+
+    # Validate story content
+    story_content = read_text(story_file)
+    if story_content.lstrip().startswith("# UNKNOWN"):
+        reasons.append("story title starts with UNKNOWN")
+        
+    import re
+    sections = re.split(r'^##\s+', story_content, flags=re.MULTILINE)
+    for section in sections[1:]:
+        lines = [line.strip() for line in section.split('\n')[1:] if line.strip()]
+        if len(lines) == 1 and lines[0].lstrip('-* ').upper() == 'TODO':
+            reasons.append(f"required section '{section.splitlines()[0].strip()}' contains only TODO")
+            
+    # Load blueprint
+    blueprint_path = project_path / "blueprints" / "blueprint.yaml"
+    blueprint_snippet = "Blueprint unavailable"
+    if not blueprint_path.exists():
+        reasons.append("no authoritative requirements source can be resolved")
+    else:
+        try:
+            bp_data = yaml.safe_load(blueprint_path.read_text(encoding="utf-8"))
+            matches = [s for s in bp_data.get("stories", []) if s.get("slug") == story]
+            if not matches:
+                reasons.append("blueprint identity is missing")
+            elif len(matches) > 1:
+                reasons.append("multiple matching stories exist in blueprint")
+            else:
+                story_node = matches[0]
+                bp_id = story_node.get("id") or story_node.get("story_id")
+                if not bp_id or bp_id not in story_content:
+                    reasons.append("generated workspace story does not match blueprint identity")
+                blueprint_snippet = yaml.safe_dump(story_node, sort_keys=False)
+        except Exception as e:
+            reasons.append(f"Invalid blueprint.yaml: {e}")
+
 
     try:
         if not status_path.exists():
@@ -115,6 +182,27 @@ def create_cloud_review_packet(project_path: Path, story: str, force: bool = Fal
     except Exception as e:
         reasons.append(f"Invalid quality_gate_result.yaml: {e}")
 
+    try:
+        if not finalize_result_path.exists():
+            reasons.append("Missing mandatory evidence: reports/finalize_story_result.yaml")
+        else:
+            finalize_doc = yaml.safe_load(finalize_result_path.read_text(encoding="utf-8"))
+            if finalize_doc.get("status") != "ready_for_review":
+                reasons.append("finalize-story status is not ready_for_review")
+            if not finalize_doc.get("ready_for_review"):
+                reasons.append("finalize-story ready_for_review is false")
+
+            provenance = finalize_doc.get("execution_provenance") or {}
+            if local_ev.execution_record_present:
+                if provenance.get("readiness_source") != "structured_local_review":
+                    reasons.append("finalize-story readiness source is not structured_local_review")
+                if finalize_doc.get("execution_record_checksum") != local_ev.record_checksum:
+                    reasons.append("finalize-story execution_record_checksum mismatch")
+                if provenance.get("review_decision") != local_ev.decision:
+                    reasons.append("finalize-story review decision mismatch")
+    except Exception as e:
+        reasons.append(f"Invalid finalize_story_result.yaml: {e}")
+
     if reasons:
         raise ValueError("Cloud packet readiness validation failed: " + "; ".join(reasons))
 
@@ -127,11 +215,10 @@ def create_cloud_review_packet(project_path: Path, story: str, force: bool = Fal
         existing_list = ", ".join(str(path) for path in existing_files)
         raise ValueError(f"Cloud review packet files already exist: {existing_list}. Use --force to overwrite.")
 
-    story_content = read_text(story_file)
     evidence = read_optional_evidence(story_path)
 
     prompt = build_prompt()
-    context = build_context(story, story_content, evidence)
+    context = build_context(story, story_content, evidence, local_ev, story_path, blueprint_snippet, manifest)
     checklist = build_checklist()
     result_template = build_result_template()
 
@@ -225,7 +312,7 @@ human reviewer. Do not call external tools or cloud APIs from this packet.
 """
 
 
-def build_context(story: str, story_content: str, evidence: Evidence) -> str:
+def build_context(story: str, story_content: str, evidence: Evidence, local_ev: LocalEvidenceValidationResult, story_path: Path, blueprint_snippet: str, manifest: dict) -> str:
     sections = [
         "# Cloud Review Context",
         "",
@@ -238,6 +325,81 @@ def build_context(story: str, story_content: str, evidence: Evidence) -> str:
         fenced("markdown", story_content),
         "",
     ]
+    
+
+    wt = manifest.get("working_tree", {})
+    wt_class = wt.get("classification", "unknown")
+    wt_staged = wt.get("staged", []) or []
+    wt_unstaged = wt.get("unstaged", []) or []
+    wt_untracked = wt.get("untracked", []) or []
+    normalization_paths = manifest.get("normalization", []) or []
+    
+    porcelain_clean = len(wt_staged) == 0 and len(wt_unstaged) == 0 and len(wt_untracked) == 0
+    norm_only = len(normalization_paths)
+    semantic_unstaged = len(wt_unstaged) - norm_only if wt_class == "normalization_noise_only" else len(wt_unstaged)
+    
+    import yaml
+    cleanliness_block = {
+        "working_tree_cleanliness": {
+            "git_porcelain_clean": porcelain_clean,
+            "policy_cleanliness": wt_class,
+            "strict_clean_passed": manifest.get("validation", {}).get("strict_clean_passed", False),
+            "normalization_only_paths": norm_only,
+            "semantic_unstaged_paths": max(0, semantic_unstaged),
+            "staged_paths": len(wt_staged),
+            "untracked_semantic_paths": len(wt_untracked),
+            "committed_pr_changed_file_count": manifest.get("committed_diff", {}).get("changed_file_count", 0),
+        }
+    }
+    
+    sections.extend([
+        "## Cleanliness Summary",
+        "",
+        fenced("yaml", yaml.safe_dump(cleanliness_block, sort_keys=False)),
+        "",
+    ])
+    
+    sections.extend([
+        "## Blueprint requirements",
+        "",
+        fenced("yaml", blueprint_snippet),
+        "",
+    ])
+    
+    if local_ev.execution_record_present and local_ev.execution_record_valid:
+        import yaml
+        record_path = story_path / "reports" / "local_execution_record.yaml"
+        decision_path = story_path / "reports" / "local_review_decision.yaml"
+        
+        record_data = yaml.safe_load(record_path.read_text(encoding="utf-8")) if record_path.exists() else {}
+        decision_data = yaml.safe_load(decision_path.read_text(encoding="utf-8")) if decision_path.exists() else {}
+        
+        local_execution_block = {
+            "local_execution": {
+                "present": True,
+                "valid": True,
+                "execution_mode": local_ev.provenance.get("execution_mode"),
+                "executor": local_ev.provenance.get("executor"),
+                "roles_covered": local_ev.roles_covered,
+                "role_evidence": record_data.get("execution", {}).get("role_evidence", {}),
+                "record_checksum": local_ev.record_checksum,
+                "manifest_checksum": record_data.get("review_evidence", {}).get("manifest_checksum"),
+                "review_decision": {
+                    "decision": decision_data.get("decision"),
+                    "attestation_checksum": decision_data.get("attestation_checksum"),
+                    "file_checksum": local_ev.review_decision_checksum,
+                    "reviewer": decision_data.get("reviewer"),
+                },
+                "readiness_source": "structured_local_review"
+            }
+        }
+        
+        sections.extend([
+            "## Local Execution Provenance",
+            "",
+            fenced("yaml", yaml.safe_dump(local_execution_block, sort_keys=False)),
+            "",
+        ])
 
     for relative_path, label, content in evidence.present_files:
         sections.extend(

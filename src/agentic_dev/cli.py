@@ -55,6 +55,8 @@ from agentic_dev.local_model_runtime import (
     validate_local_model_runtime_config,
 )
 from agentic_dev.local_execution import run_local_execution
+from agentic_dev.local_execution_recording import record_local_execution
+from agentic_dev.local_review import record_local_review
 from agentic_dev.local_model_scorecard import (
     create_local_model_scorecard,
     create_local_model_scorecard_report,
@@ -723,6 +725,30 @@ def main() -> None:
         required=True,
         help="Path to the saved cloud model review result file.",
     )
+
+    record_local_execution_parser = subparsers.add_parser(
+        "record-local-execution",
+        help="Record evidence-derived local execution for a story.",
+    )
+    record_local_execution_parser.add_argument("--project", type=Path, default=Path.cwd())
+    record_local_execution_parser.add_argument("--story", required=True)
+    record_local_execution_parser.add_argument("--execution-type", default="manual")
+    record_local_execution_parser.add_argument("--executor-name")
+    record_local_execution_parser.add_argument("--role", dest="roles", action="append")
+    record_local_execution_parser.add_argument("--attestation-file", type=Path)
+    record_local_execution_parser.add_argument("--dry-run", action="store_true")
+    record_local_execution_parser.add_argument("--force", action="store_true")
+
+    record_local_review_parser = subparsers.add_parser(
+        "record-local-review",
+        help="Record a structured local review decision for a story.",
+    )
+    record_local_review_parser.add_argument("--project", type=Path, default=Path.cwd())
+    record_local_review_parser.add_argument("--story", required=True)
+    record_local_review_parser.add_argument("--reviewer")
+    record_local_review_parser.add_argument("--decision", default="pending")
+    record_local_review_parser.add_argument("--notes")
+    record_local_review_parser.add_argument("--force", action="store_true")
 
     remote_dev_packet_parser = subparsers.add_parser(
         "remote-dev-packet",
@@ -2045,6 +2071,46 @@ def main() -> None:
             print(f"Report: {result.cloud_review_report_path}")
             print(f"Status: {result.status_path}")
             print(f"Next action: {result.next_action}")
+
+        if args.command == "record-local-execution":
+            result = record_local_execution(
+                args.project,
+                args.story,
+                execution_type=args.execution_type,
+                executor_name=args.executor_name,
+                roles=args.roles,
+                attestation_file=args.attestation_file,
+                dry_run=args.dry_run,
+                force=args.force,
+            )
+
+            if args.dry_run:
+                return
+
+            print(f"Local execution recorded for: {result.story}")
+            print(f"Execution mode: {result.record.execution_mode}")
+            print(f"Execution type: {result.record.execution_type}")
+            print(f"Executor: {result.record.executor}")
+            print(f"Record checksum: {result.record.record_checksum}")
+            print("\nReports written:")
+            for p in result.reports_written:
+                print(f"  - {p}")
+
+        if args.command == "record-local-review":
+            result = record_local_review(
+                args.project,
+                args.story,
+                reviewer=args.reviewer,
+                decision=args.decision,
+                notes=args.notes,
+                force=args.force,
+            )
+
+            print(f"Local review recorded for: {result.story}")
+            print(f"Decision: {result.decision.decision}")
+            print(f"Reviewer: {result.decision.reviewer}")
+            print(f"Decision checksum: {result.decision.attestation_checksum}")
+            print(f"Report: {result.report_path}")
 
         if args.command == "remote-dev-packet":
             result = create_remote_dev_packet(args.project, args.story, args.force)

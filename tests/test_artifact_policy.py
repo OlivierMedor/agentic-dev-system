@@ -1,347 +1,126 @@
+import shutil
+import subprocess
+from pathlib import Path
+
 from agentic_dev.artifact_policy import find_artifact_policy_violations
 
 
-def violation_paths(paths: list[str]) -> list[str]:
-    return [violation.path for violation in find_artifact_policy_violations(paths)]
+STORY = "evidence-derived-local-execution-recording"
+
+STORY_LIFECYCLE_REPORT_ARTIFACTS = [
+    f"stories/{STORY}/reports/local_execution_record.yaml",
+    f"stories/{STORY}/reports/local_review_decision.yaml",
+    f"stories/{STORY}/reports/local_execution_report.md",
+    f"stories/{STORY}/reports/local_review_report.md",
+    f"stories/{STORY}/reports/quality_gate_report.md",
+    f"stories/{STORY}/reports/quality_gate_result.yaml",
+    f"stories/{STORY}/reports/finalize_story_report.md",
+    f"stories/{STORY}/reports/finalize_story_result.yaml",
+]
+
+LOCAL_EXECUTION_OUTPUT_ARTIFACTS = [
+    f"stories/{STORY}/reports/local_execution/state.yaml",
+    f"stories/{STORY}/reports/local_execution/developer/output.md",
+    f"stories/{STORY}/reports/local_execution/developer/execution.yaml",
+]
+
+GENERATED_CLOUD_REVIEW_PACKET_ARTIFACTS = [
+    f"stories/{STORY}/cloud_review_packet/cloud_review_prompt.md",
+    f"stories/{STORY}/cloud_review_packet/cloud_review_context.md",
+    f"stories/{STORY}/cloud_review_packet/cloud_review_checklist.md",
+    f"stories/{STORY}/cloud_review_packet/cloud_review_result_template.md",
+    f"stories/{STORY}/cloud_review_packet/cloud_review_export.md",
+]
+
+STATIC_STORY_FILES = [
+    f"stories/{STORY}/story.md",
+    f"stories/{STORY}/status.yaml",
+    f"stories/{STORY}/agent_plan.yaml",
+    f"stories/{STORY}/test_plan.yaml",
+    f"stories/{STORY}/monitoring_plan.yaml",
+    f"stories/{STORY}/cloud_review_packet/.gitkeep",
+    f"stories/{STORY}/reports/local_execution/.gitkeep",
+]
+
+LEGACY_ROLE_AGENT_REPORTS = [
+    f"stories/{STORY}/reports/developer_report.md",
+    f"stories/{STORY}/reports/test_report.md",
+    f"stories/{STORY}/reports/test_layer_report.md",
+    f"stories/{STORY}/reports/test_layer_result.yaml",
+]
 
 
-def test_allowed_project_paths_do_not_violate_artifact_policy() -> None:
-    allowed_paths = [
-        "src/agentic_dev/cli.py",
-        "stories/story_011_artifact_policy_guard/story.md",
-        "stories/story_011_artifact_policy_guard/reports/test_report.md",
-        "stories/story_011_artifact_policy_guard/prompt_pack/04_test_agent_prompt.md",
-        "stories/story_011_artifact_policy_guard/agent_plan.yaml",
-        "stories/story_011_artifact_policy_guard/story_runbook.md",
-        "stories/story_011_artifact_policy_guard/review_bundle/.gitkeep",
-        "stories/story_011_artifact_policy_guard/cloud_review_packet/.gitkeep",
-        "stories/story_011_artifact_policy_guard/remote_dev_validation/.gitkeep",
-        ".agentic/support_queue/pending/.gitkeep",
-        ".agentic/cloud_queue/requests/.gitkeep",
-        ".agentic/cloud_queue/exports/.gitkeep",
-        ".agentic/cloud_queue/audit/.gitkeep",
-        ".agentic/cloud_batches/records/.gitkeep",
-        ".agentic/cloud_batches/plans/.gitkeep",
-        ".agentic/cloud_batches/attempts/.gitkeep",
-        ".agentic/cloud_batches/audits/.gitkeep",
-        ".agentic/cloud_batches/locks/.gitkeep",
-        ".agentic/cloud_batches/recovery/.gitkeep",
-        ".agentic/cloud_applications/applications/.gitkeep",
-        ".agentic/cloud_applications/plans/.gitkeep",
-        ".agentic/cloud_applications/audits/.gitkeep",
-        ".agentic/cloud_applications/recovery/.gitkeep",
-        ".agentic/runtime_plans/revisions/.gitkeep",
-        ".agentic/runtime_plans/transactions/.gitkeep",
-        ".agentic/execution_leases/.gitkeep",
-        ".agentic/feature_scan/.gitkeep",
-        ".agentic/local_model_scorecard/prompts/developer_agent_prompt.md",
-        ".agentic/local_model_scorecard/scorecard_template.yaml",
-        ".agentic/local_model_scorecard/results/.gitkeep",
-        "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/.gitkeep",
-        "stories/story_047_local_agent_prompt_slimming/reports/local_agent_context/.gitkeep",
-        "stories/story_051_role_specific_context_builder/reports/role_context/.gitkeep",
-        "stories/story_052_codex_runtime_connector/reports/codex_tasks/.gitkeep",
-        "stories/story_056/reports/codex_runtime/.gitkeep",
-        "stories/story_060/reports/local_execution/.gitkeep",
-        ".agentic/improvement_queue/pending/.gitkeep",
-        ".agentic/maintenance_queue/pending/.gitkeep",
-        ".agentic/feature_queue/pending/.gitkeep",
-        ".env.example",
-        "blueprints/agentic-architecture.example.md",
-    ]
-
-    assert find_artifact_policy_violations(allowed_paths) == []
+def run_git(project_path: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *args],
+        cwd=project_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
 
 
-def test_private_operator_guidance_is_blocked() -> None:
-    assert violation_paths(["blueprints/agentic-architecture.md"]) == [
-        "blueprints/agentic-architecture.md",
-    ]
+def write_files(project_path: Path, paths: list[str]) -> None:
+    for relative_path in paths:
+        path = project_path / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("test\n", encoding="utf-8")
 
 
-def test_generated_review_bundle_files_are_blocked() -> None:
-    blocked_paths = [
-        "stories/story_011_artifact_policy_guard/review_bundle/handoff.md",
-        "stories/story_011_artifact_policy_guard/review_bundle/git_diff.patch",
-        "stories/story_011_artifact_policy_guard/review_bundle/pytest_output.txt",
-    ]
+def test_story_067_lifecycle_artifacts_are_classified_as_generated() -> None:
+    violations = find_artifact_policy_violations(STORY_LIFECYCLE_REPORT_ARTIFACTS)
 
-    assert violation_paths(blocked_paths) == blocked_paths
+    assert [violation.path for violation in violations] == STORY_LIFECYCLE_REPORT_ARTIFACTS
 
 
-def test_generated_cloud_review_packet_files_are_blocked() -> None:
-    blocked_paths = [
-        "stories/story_011_artifact_policy_guard/cloud_review_packet/cloud_review_prompt.md",
-        "stories/story_011_artifact_policy_guard/cloud_review_packet/cloud_review_context.md",
-    ]
+def test_story_067_local_execution_outputs_are_classified_as_generated_except_gitkeep() -> None:
+    tracked_paths = [*LOCAL_EXECUTION_OUTPUT_ARTIFACTS, f"stories/{STORY}/reports/local_execution/.gitkeep"]
 
-    assert violation_paths(blocked_paths) == blocked_paths
+    violations = find_artifact_policy_violations(tracked_paths)
 
-
-def test_generated_remote_dev_validation_files_are_blocked_except_gitkeep() -> None:
-    blocked_paths = [
-        "stories/story_024_remote_dev_validation_bundle/remote_dev_validation/remote_dev_packet.md",
-        "stories/story_024_remote_dev_validation_bundle/remote_dev_validation/remote_dev_result_template.yaml",
-    ]
-
-    assert violation_paths(
-        [
-            *blocked_paths,
-            "stories/story_024_remote_dev_validation_bundle/remote_dev_validation/.gitkeep",
-        ],
-    ) == blocked_paths
+    assert [violation.path for violation in violations] == LOCAL_EXECUTION_OUTPUT_ARTIFACTS
 
 
-def test_support_queue_runtime_files_are_blocked_except_gitkeep() -> None:
-    blocked_paths = [
-        ".agentic/support_queue/pending/SUPPORT-001.yaml",
-        ".agentic/support_queue/pending/SUPPORT-001_cloud_packet.md",
-    ]
+def test_story_067_cloud_review_packet_files_are_classified_as_generated_except_gitkeep() -> None:
+    tracked_paths = [*GENERATED_CLOUD_REVIEW_PACKET_ARTIFACTS, f"stories/{STORY}/cloud_review_packet/.gitkeep"]
 
-    assert violation_paths([*blocked_paths, ".agentic/support_queue/pending/.gitkeep"]) == blocked_paths
+    violations = find_artifact_policy_violations(tracked_paths)
 
-
-def test_cloud_queue_runtime_files_are_blocked_except_gitkeep() -> None:
-    blocked_paths = [
-        ".agentic/cloud_queue/requests/cloud-req-0001.yaml",
-        ".agentic/cloud_queue/exports/cloud-batch-0001/manifest.yaml",
-        ".agentic/cloud_queue/audit/cloud-event-000001.yaml",
-        ".agentic/cloud_queue/exports/cloud-batch-0001/cloud_queue_packet.zip",
-        ".agentic/cloud_batches/records/cloud-batch-0001.yaml",
-        ".agentic/cloud_batches/plans/cloud-batch-0001.yaml",
-        ".agentic/cloud_batches/attempts/cloud-batch-0001.json",
-        ".agentic/cloud_batches/audits/cloud-batch-0001.jsonl",
-        ".agentic/cloud_batches/locks/cloud-batch-0001.yaml",
-        ".agentic/cloud_batches/recovery/cloud-batch-0001.md",
-        ".agentic/cloud_applications/applications/cloud-application-0001.yaml",
-        ".agentic/cloud_applications/plans/cloud-application-0001.yaml",
-        ".agentic/cloud_applications/audits/application_audit.jsonl",
-        ".agentic/runtime_plans/revisions/runtime-plan-r1.yaml",
-        ".agentic/runtime_plans/active.yaml",
-        ".agentic/execution_leases/lease-0001.yaml",
-    ]
-
-    assert violation_paths(
-        [
-            *blocked_paths,
-            ".agentic/cloud_queue/requests/.gitkeep",
-            ".agentic/cloud_queue/exports/.gitkeep",
-            ".agentic/cloud_queue/audit/.gitkeep",
-            ".agentic/cloud_batches/records/.gitkeep",
-            ".agentic/cloud_batches/plans/.gitkeep",
-            ".agentic/cloud_batches/attempts/.gitkeep",
-            ".agentic/cloud_batches/audits/.gitkeep",
-            ".agentic/cloud_batches/locks/.gitkeep",
-            ".agentic/cloud_batches/recovery/.gitkeep",
-        ],
-    ) == blocked_paths
+    assert [violation.path for violation in violations] == GENERATED_CLOUD_REVIEW_PACKET_ARTIFACTS
 
 
-def test_feature_scan_runtime_files_are_blocked_except_gitkeep() -> None:
-    blocked_paths = [
-        ".agentic/feature_scan/feature_scan_packet.md",
-        ".agentic/feature_scan/feature_suggestions_template.yaml",
-        ".agentic/feature_scan/feature_record_report.md",
-    ]
-
-    assert violation_paths([*blocked_paths, ".agentic/feature_scan/.gitkeep"]) == blocked_paths
+def test_legacy_role_agent_reports_remain_trackable() -> None:
+    assert find_artifact_policy_violations(LEGACY_ROLE_AGENT_REPORTS) == []
 
 
-def test_local_model_scorecard_results_are_blocked_except_gitkeep() -> None:
-    blocked_paths = [
-        ".agentic/local_model_scorecard/results/qwen3/run_summary.md",
-        ".agentic/local_model_scorecard/results/qwen3/developer_agent_prompt_response.md",
-        ".agentic/local_model_scorecard/results/qwen3/developer_agent_prompt_raw_response.json",
-        "reports/local_model_scorecard_report.md",
-        ".agentic/local_model_scorecard/scorecard_scores.yaml",
-        "reports/local_model_role_recommendations.md",
-        "reports/local_model_role_recommendations.yaml",
-    ]
-
-    assert violation_paths(
-        [*blocked_paths, ".agentic/local_model_scorecard/results/.gitkeep"],
-    ) == blocked_paths
+def test_static_story_files_remain_trackable() -> None:
+    assert find_artifact_policy_violations(STATIC_STORY_FILES) == []
 
 
-def test_local_agent_draft_outputs_are_blocked_except_gitkeep() -> None:
-    blocked_paths = [
-        "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/docs_agent_gemma-4-26b_draft.md",
-        "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/docs_agent_gemma-4-26b_draft.yaml",
-        "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/docs_agent_gemma-4-26b_raw_response.json",
-    ]
+def test_git_add_dot_does_not_stage_story_067_lifecycle_artifacts(tmp_path: Path) -> None:
+    shutil.copyfile(Path(".gitignore"), tmp_path / ".gitignore")
+    assert run_git(tmp_path, "init").returncode == 0
+    write_files(
+        tmp_path,
+        STORY_LIFECYCLE_REPORT_ARTIFACTS
+        + LOCAL_EXECUTION_OUTPUT_ARTIFACTS
+        + GENERATED_CLOUD_REVIEW_PACKET_ARTIFACTS
+        + STATIC_STORY_FILES
+        + LEGACY_ROLE_AGENT_REPORTS,
+    )
 
-    assert violation_paths(
-        [
-            *blocked_paths,
-            "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/.gitkeep",
-        ],
-    ) == blocked_paths
+    add_result = run_git(tmp_path, "add", ".")
+    assert add_result.returncode == 0, add_result.stderr
 
+    staged = run_git(tmp_path, "diff", "--cached", "--name-only")
+    assert staged.returncode == 0, staged.stderr
+    staged_paths = set(staged.stdout.splitlines())
 
-def test_local_agent_context_packets_are_blocked_except_gitkeep() -> None:
-    blocked_paths = [
-        "stories/story_047_local_agent_prompt_slimming/reports/local_agent_context/docs_agent_gemma-4-26b_context.md",
-        "stories/story_047_local_agent_prompt_slimming/reports/local_agent_context/test_agent_devstral_context.md",
-    ]
+    for artifact_path in [*STORY_LIFECYCLE_REPORT_ARTIFACTS, *LOCAL_EXECUTION_OUTPUT_ARTIFACTS, *GENERATED_CLOUD_REVIEW_PACKET_ARTIFACTS]:
+        assert artifact_path not in staged_paths
 
-    assert violation_paths(
-        [
-            *blocked_paths,
-            "stories/story_047_local_agent_prompt_slimming/reports/local_agent_context/.gitkeep",
-        ],
-    ) == blocked_paths
+    for static_path in STATIC_STORY_FILES:
+        assert static_path in staged_paths
 
-
-def test_role_context_packets_are_blocked_except_gitkeep() -> None:
-    blocked_paths = [
-        "stories/story_051_role_specific_context_builder/reports/role_context/developer_agent_context.md",
-        "stories/story_051_role_specific_context_builder/reports/role_context/test_agent_context.md",
-    ]
-
-    assert violation_paths(
-        [
-            *blocked_paths,
-            "stories/story_051_role_specific_context_builder/reports/role_context/.gitkeep",
-        ],
-    ) == blocked_paths
-
-
-def test_codex_task_files_are_blocked_except_gitkeep() -> None:
-    blocked_paths = [
-        "stories/story_052_codex_runtime_connector/reports/codex_tasks/developer_agent_codex_task.md",
-        "stories/story_052_codex_runtime_connector/reports/codex_tasks/test_agent_codex_task.md",
-    ]
-
-    assert violation_paths(
-        [
-            *blocked_paths,
-            "stories/story_052_codex_runtime_connector/reports/codex_tasks/.gitkeep",
-        ],
-    ) == blocked_paths
-
-
-def test_codex_runtime_output_files_are_blocked_except_gitkeep() -> None:
-    blocked_paths = [
-        "stories/story_056/reports/codex_runtime/developer_agent_stdout.txt",
-        "stories/story_056/reports/codex_runtime/developer_agent_stderr.txt",
-    ]
-
-    assert violation_paths(
-        [
-            *blocked_paths,
-            "stories/story_056/reports/codex_runtime/.gitkeep",
-        ],
-    ) == blocked_paths
-
-
-def test_local_execution_outputs_are_blocked_except_gitkeep() -> None:
-    blocked_paths = [
-        "stories/story_060/reports/local_execution/state.yaml",
-        "stories/story_060/reports/local_execution/developer/output.md",
-        "stories/story_060/reports/local_execution/developer/execution.yaml",
-    ]
-
-    assert violation_paths(
-        [
-            *blocked_paths,
-            "stories/story_060/reports/local_execution/.gitkeep",
-        ],
-    ) == blocked_paths
-
-
-def test_local_model_raw_response_files_are_blocked() -> None:
-    blocked_paths = [
-        "reports/debug_docs_agent_prompt_raw_response.json",
-        "reports/nested/debug_docs_agent_prompt_raw_response.json",
-        "stories/story_047_local_agent_prompt_slimming/reports/local_agent_context/docs_agent_gemma_raw_response.json",
-    ]
-
-    assert violation_paths(blocked_paths) == blocked_paths
-
-
-def test_runtime_queue_item_files_are_blocked_except_gitkeep() -> None:
-    blocked_paths = [
-        ".agentic/improvement_queue/pending/IMP-20260605-120000.yaml",
-        ".agentic/maintenance_queue/approved/MAINT-20260605-120000.yaml",
-        ".agentic/feature_queue/closed/FEATURE-20260605-120000.yaml",
-    ]
-
-    assert violation_paths(
-        [
-            *blocked_paths,
-            ".agentic/improvement_queue/pending/.gitkeep",
-            ".agentic/maintenance_queue/approved/.gitkeep",
-            ".agentic/feature_queue/closed/.gitkeep",
-        ],
-    ) == blocked_paths
-
-
-def test_review_to_chatgpt_artifacts_are_blocked() -> None:
-    assert violation_paths(["review_to_chatgpt/handoff.md"]) == ["review_to_chatgpt/handoff.md"]
-
-
-def test_zip_artifacts_are_blocked() -> None:
-    assert violation_paths(["agentic_story001_review.zip"]) == ["agentic_story001_review.zip"]
-
-
-def test_environment_files_are_blocked_except_example() -> None:
-    assert violation_paths([".env", ".env.local", ".env.example"]) == [".env", ".env.local"]
-
-
-def test_codex_auth_and_config_state_are_blocked() -> None:
-    blocked_paths = [
-        ".codex/auth.json",
-        ".codex/config.toml",
-        ".codex/sessions/session.jsonl",
-        "codex-home/auth.json",
-        "codex-auth/auth.json",
-        "tmp/.codex/auth.json",
-    ]
-
-    assert violation_paths(blocked_paths) == blocked_paths
-
-
-def test_multiple_violations_are_all_reported() -> None:
-    paths = [
-        "src/agentic_dev/cli.py",
-        "stories/story_011_artifact_policy_guard/review_bundle/handoff.md",
-        "stories/story_011_artifact_policy_guard/cloud_review_packet/cloud_review_prompt.md",
-        "stories/story_011_artifact_policy_guard/remote_dev_validation/remote_dev_packet.md",
-        ".agentic/local_model_scorecard/results/qwen3/run_summary.md",
-        "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/docs_agent_gemma-4-26b_draft.md",
-        "stories/story_051_role_specific_context_builder/reports/role_context/developer_agent_context.md",
-        "stories/story_052_codex_runtime_connector/reports/codex_tasks/developer_agent_codex_task.md",
-        "stories/story_056/reports/codex_runtime/developer_agent_stdout.txt",
-        "stories/story_060/reports/local_execution/developer/output.md",
-        "reports/debug_docs_agent_prompt_raw_response.json",
-        "reports/local_model_scorecard_report.md",
-        ".agentic/local_model_scorecard/scorecard_scores.yaml",
-        "reports/local_model_role_recommendations.md",
-        "reports/local_model_role_recommendations.yaml",
-        "review_to_chatgpt/handoff.md",
-        "agentic_story001_review.zip",
-        ".env.local",
-        ".codex/auth.json",
-        ".env.example",
-    ]
-
-    assert violation_paths(paths) == [
-        "stories/story_011_artifact_policy_guard/review_bundle/handoff.md",
-        "stories/story_011_artifact_policy_guard/cloud_review_packet/cloud_review_prompt.md",
-        "stories/story_011_artifact_policy_guard/remote_dev_validation/remote_dev_packet.md",
-        ".agentic/local_model_scorecard/results/qwen3/run_summary.md",
-        "stories/story_045_local_agent_draft_runner/reports/local_agent_drafts/docs_agent_gemma-4-26b_draft.md",
-        "stories/story_051_role_specific_context_builder/reports/role_context/developer_agent_context.md",
-        "stories/story_052_codex_runtime_connector/reports/codex_tasks/developer_agent_codex_task.md",
-        "stories/story_056/reports/codex_runtime/developer_agent_stdout.txt",
-        "stories/story_060/reports/local_execution/developer/output.md",
-        "reports/debug_docs_agent_prompt_raw_response.json",
-        "reports/local_model_scorecard_report.md",
-        ".agentic/local_model_scorecard/scorecard_scores.yaml",
-        "reports/local_model_role_recommendations.md",
-        "reports/local_model_role_recommendations.yaml",
-        "review_to_chatgpt/handoff.md",
-        "agentic_story001_review.zip",
-        ".env.local",
-        ".codex/auth.json",
-    ]
+    for legacy_path in LEGACY_ROLE_AGENT_REPORTS:
+        assert legacy_path in staged_paths

@@ -18,7 +18,12 @@ try {
     }
 
     # 2. Get git parameters
-    $branch = (git branch --show-current).Trim()
+    $branchRaw = git branch --show-current
+    if ($null -eq $branchRaw) {
+        $branch = ""
+    } else {
+        $branch = ([string]$branchRaw).Trim()
+    }
     $headSha = (git rev-parse HEAD).Trim()
     $gitDir = (git rev-parse --git-dir).Trim()
     $shallowRepo = (git rev-parse --is-shallow-repository).Trim()
@@ -118,6 +123,13 @@ try {
             $hostName = ($hostPort -split ":", 2)[0]
         }
         
+        if ($null -eq $hostName) {
+            $hostName = ""
+        }
+        if ($null -eq $path) {
+            $path = ""
+        }
+
         # Lowercase host
         $hostName = $hostName.ToLower()
         if ($hostName -eq "github.com" -or $hostName -eq "ssh.github.com") {

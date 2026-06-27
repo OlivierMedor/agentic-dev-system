@@ -22,15 +22,39 @@ class CommandRunner(Protocol):
 
 
 def run_git(command: list[str], cwd: Path) -> CommandResult:
-    return subprocess.run(
-        command,
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        check=False,
-    )
+    import os
+    env = os.environ.copy()
+    env["GIT_PAGER"] = "cat"
+    env["PAGER"] = "cat"
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    
+    if command and command[0] == "git" and len(command) > 1 and command[1] != "--no-pager":
+        command = ["git", "--no-pager"] + command[1:]
+        
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+            env=env,
+            stdin=subprocess.DEVNULL,
+            timeout=60,
+        )
+        # Mocking a compatible return object
+        class _Result:
+            pass
+        res = _Result()
+        res.returncode = completed.returncode
+        res.stdout = completed.stdout
+        res.stderr = completed.stderr
+        return res
+    except subprocess.TimeoutExpired as e:
+        stderr_msg = f"\nStderr: {e.stderr}" if e.stderr else ""
+        raise RuntimeError(f"Git subprocess timed out after 60s in {cwd}: {' '.join(command)}{stderr_msg}") from e
 
 
 def _run(command: list[str], cwd: Path, command_runner: CommandRunner | None) -> str:

@@ -1,4 +1,10 @@
-# UNKNOWN: Story 067 - Evidence-Derived Local Execution Recording
+# Story 067 - Evidence-Derived Local Execution Recording
+
+## Blueprint Identity
+
+- Source Blueprint: `blueprints/blueprint.yaml`
+- Story ID: `story_067`
+- Slug: `evidence-derived-local-execution-recording`
 
 ## Goal
 
@@ -10,13 +16,20 @@ The current system rejects cloud-review packets for locally-implemented stories 
 
 ## Acceptance Criteria
 
-- TODO
+- The developer agent must be restricted to modifying `src/**`, `tests/**`, `docs/**`, and `stories/evidence-derived-local-execution-recording/reports/**`.
+- The test agent must be restricted to modifying `tests/**` and `stories/evidence-derived-local-execution-recording/reports/**`.
+- The documentation agent must be restricted to modifying `README.md`, `docs/**`, and `stories/evidence-derived-local-execution-recording/reports/**`.
+- The recording workflow must ensure execution log integrity and provenance fidelity.
+- The system must prevent fabricated reports and reject automatic ready for review declarations.
 
 ## Not In Scope
 
-- TODO
+- Performance tests
+- Load tests
 
 ## Definition of Done
 
-- TODO
-
+- Unit tests pass.
+- Integration tests pass.
+- Component tests pass.
+- Regression tests pass.

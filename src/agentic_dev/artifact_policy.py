@@ -179,6 +179,15 @@ def find_artifact_policy_violations(tracked_files: list[str]) -> list[ArtifactPo
             )
             continue
 
+        if is_story_lifecycle_report_artifact_path(parts, filename):
+            violations.append(
+                ArtifactPolicyViolation(
+                    path=normalized_path,
+                    reason="story lifecycle evidence file is tracked",
+                ),
+            )
+            continue
+
         if is_local_model_raw_response_path(parts, filename):
             violations.append(
                 ArtifactPolicyViolation(
@@ -415,6 +424,27 @@ def is_local_execution_output_path(parts: list[str], filename: str) -> bool:
         and parts[2] == "reports"
         and parts[3] == "local_execution"
     )
+
+
+def is_story_lifecycle_report_artifact_path(parts: list[str], filename: str) -> bool:
+    if (
+        len(parts) != 4
+        or parts[0] != "stories"
+        or parts[1] != "evidence-derived-local-execution-recording"
+        or parts[2] != "reports"
+    ):
+        return False
+
+    return filename in {
+        "local_execution_record.yaml",
+        "local_review_decision.yaml",
+        "local_execution_report.md",
+        "local_review_report.md",
+        "quality_gate_report.md",
+        "quality_gate_result.yaml",
+        "finalize_story_report.md",
+        "finalize_story_result.yaml",
+    }
 
 
 def is_local_model_scorecard_scoring_artifact_path(normalized_path: str) -> bool:

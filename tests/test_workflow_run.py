@@ -47,14 +47,25 @@ def mock_validate_review_bundle(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def create_story(project_path: Path, story: str = STORY) -> Path:
     story_path = project_path / "stories" / story
-    story_path.mkdir(parents=True)
-    (story_path / "story.md").write_text("# STORY-028\n", encoding="utf-8")
+    story_path.mkdir(parents=True, exist_ok=True)
+    (story_path / "story.md").write_text(f"# {story}\n\nstory_id: {story}\n\n## Acceptance Criteria\n\n- valid criteria\n", encoding="utf-8")
     (story_path / "status.yaml").write_text(
         f"story_id: {story}\n"
         "status: in_progress\n"
         "ready_for_review: false\n",
         encoding="utf-8",
     )
+    
+    blueprints_path = project_path / "blueprints"
+    blueprints_path.mkdir(exist_ok=True)
+    bp_file = blueprints_path / "blueprint.yaml"
+    if not bp_file.exists():
+        bp_file.write_text("stories:\n  - slug: " + story + "\n    story_id: " + story + "\n    title: " + story + "\n", encoding="utf-8")
+    else:
+        bp = bp_file.read_text(encoding="utf-8")
+        if story not in bp:
+            bp_file.write_text(bp + "  - slug: " + story + "\n    story_id: " + story + "\n    title: " + story + "\n", encoding="utf-8")
+            
     return story_path
 
 
