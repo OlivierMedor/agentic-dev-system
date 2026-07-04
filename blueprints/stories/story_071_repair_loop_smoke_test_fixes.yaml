@@ -1,0 +1,35 @@
+name: Repair Loop Smoke Test Fixes
+description: >
+  Fix the local repair loop smoke test flow so clear pytest assertion failures
+  remain local-repairable even when the story workspace lacks story.md, and so
+  harmless wording in a docstring does not trigger the wrong-domain safety gate.
+
+stories:
+  - story_id: story_071
+    slug: story_071_repair_loop_smoke_test_fixes
+    title: Repair Loop Smoke Test Fixes
+    goal: >
+      Update the repair loop so it can load a story contract from either
+      story.md or a matching blueprint, classify clear pytest assertion
+      failures as developer-repairable, and allow harmless symbol-normalization
+      wording while still blocking real trading, wallet, signing, deployment,
+      and live exchange behavior.
+    acceptance_criteria:
+      - Load story contract text from story.md when present.
+      - Load story contract text from a matching blueprints/stories YAML file when story.md is missing.
+      - Classify clear pytest assertion failures as developer-repairable local issues instead of manual support.
+      - Allow harmless phrases such as trading symbol, symbol normalization, and market symbol.
+      - Continue to reject real trading execution, wallet, private key, signing, deployment, and live exchange API behavior.
+      - Add a controlled smoke test that proves a broken normalize_symbol helper can be repaired locally.
+      - Keep cloud escalation manual-only.
+      - Keep Codex disabled as the default repair path.
+    not_in_scope:
+      - Automatic cloud model calls.
+      - Automatic Codex repair calls.
+      - Hosted coding-agent repair calls.
+      - Wallet, private key, signing, deployment, or live trading logic.
+    definition_of_done:
+      - ruff check . passes.
+      - pytest -q passes.
+      - The smoke test shows local repair evidence with cloud_attempt_count 0.
+      - The smoke test shows codex_used false.
