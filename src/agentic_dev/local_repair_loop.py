@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from enum import Enum
 from pathlib import Path
 from typing import Any, Sequence
@@ -35,19 +36,38 @@ REPAIR_POLICY_LINES = [
     "Do not add trading, wallet, private key, signing, or deployment logic.",
     "Keep the repair local-only.",
 ]
-BANNED_DOMAIN_TERMS = (
-    "wallet",
-    "private key",
-    "private-key",
-    "signing",
-    "deployment",
-    "deploy",
-    "live defi",
-    "live-defi",
-    "trading",
-    "exchange api",
-    "cloud model",
+BANNED_DOMAIN_PATTERNS = (
+    re.compile(r"\bwallet\b", re.IGNORECASE),
+    re.compile(r"\bprivate[- ]key\b", re.IGNORECASE),
+    re.compile(r"\bsigning\b", re.IGNORECASE),
+    re.compile(r"\bdeployment\b", re.IGNORECASE),
+    re.compile(r"\bdeploy(?:ment)?\b", re.IGNORECASE),
+    re.compile(r"\bplace(?:s|d)?\s+order(?:s)?\b", re.IGNORECASE),
+    re.compile(r"\bsubmit(?:s|ted|ting)?\s+order(?:s)?\b", re.IGNORECASE),
+    re.compile(r"\bexecute(?:s|d|ing)?\s+trade(?:s|d|ing)?\b", re.IGNORECASE),
+    re.compile(r"\btrade(?:s|d|ing)?\s+execution\b", re.IGNORECASE),
+    re.compile(r"\blive\s+exchange\s+api\b", re.IGNORECASE),
+    re.compile(r"\bexchange\s+api\b", re.IGNORECASE),
+    re.compile(r"\blive\s+defi\b", re.IGNORECASE),
+    re.compile(r"\bnetwork\s+call(?:s)?\s+for\s+trading\s+execution\b", re.IGNORECASE),
+    re.compile(r"\bcloud\s+model\b", re.IGNORECASE),
 )
+BANNED_DOMAIN_DESCRIPTIONS = {
+    r"\bwallet\b": "wallet handling",
+    r"\bprivate[- ]key\b": "private key handling",
+    r"\bsigning\b": "signing logic",
+    r"\bdeployment\b": "deployment logic",
+    r"\bdeploy(?:ment)?\b": "deployment logic",
+    r"\bplace(?:s|d)?\s+order(?:s)?\b": "order placement",
+    r"\bsubmit(?:s|ted|ting)?\s+order(?:s)?\b": "order submission",
+    r"\bexecute(?:s|d|ing)?\s+trade(?:s|d|ing)?\b": "trade execution",
+    r"\btrade(?:s|d|ing)?\s+execution\b": "trade execution",
+    r"\blive\s+exchange\s+api\b": "live exchange API",
+    r"\bexchange\s+api\b": "exchange API",
+    r"\blive\s+defi\b": "live DeFi",
+    r"\bnetwork\s+call(?:s)?\s+for\s+trading\s+execution\b": "network calls for trading execution",
+    r"\bcloud\s+model\b": "cloud model calls",
+}
 
 
 class RepairFailureKind(str, Enum):
@@ -196,11 +216,12 @@ def run_local_repair_loop(
         raise FileNotFoundError(f"Failure output file does not exist: {failure_output.resolve()}")
 
     strict_mode = is_python_file(resolved_target) if strict_python is None else strict_python
-    story_contract = load_story_contract(story_path)
+    story_contract = load_story_contract(resolved_project_path, story_path)
     failure_output_text = read_optional_text(failure_output)
     initial_classification = classify_available_failure(
         failure_output_text,
         target_path=resolved_target,
+        tests=resolved_tests,
         required_api_strings=tuple(required_api),
         strict_python=strict_mode,
         story_contract=story_contract,
@@ -525,6 +546,11 @@ def build_repair_prompt(inputs: RepairPromptInputs) -> str:
     current_file_display = inputs.current_file_content if inputs.current_file_content else "<empty file>"
     failure_display = inputs.failure_output if inputs.failure_output else "<no failure output supplied>"
     strict_python_note = "true" if inputs.strict_python else "false"
+    story_contract_display = (
+        inputs.story_contract
+        if inputs.story_contract.strip()
+        else "No story contract file or matching blueprint story was found. Use the failure output, current file, and required API strings as the repair source of truth."
+    )
 
     return "\n".join(
         [
@@ -546,7 +572,7 @@ def build_repair_prompt(inputs: RepairPromptInputs) -> str:
             "",
             "## Story Contract",
             "",
-            fenced_text(inputs.story_contract or "<no story contract available>", "yaml"),
+            fenced_text(story_contract_display, "yaml"),
             "",
             "## Current File Content",
             "",
@@ -675,48 +701,63 @@ def classify_available_failure(
     failure_output_text: str,
     *,
     target_path: Path,
+    tests: Sequence[Path] = (),
     required_api_strings: tuple[str, ...],
     strict_python: bool,
     story_contract: str,
 ) -> FailureClassification:
+    normalized_failure = failure_output_text.strip()
+    if not normalized_failure:
+        if story_contract.strip():
+            return FailureClassification(
+                kind=RepairFailureKind.EMPTY_LOCAL_OUTPUT,
+                owner=RepairOwner.DEVELOPER,
+                reason="Failure evidence was empty.",
+            )
+        return FailureClassification(
+            kind=RepairFailureKind.UNCLEAR_ACCEPTANCE_CRITERIA,
+            owner=RepairOwner.MANUAL_SUPPORT,
+            reason="Story contract is missing or empty and no failure evidence was provided.",
+            manual_support_required=True,
+        )
+
+    if looks_like_pytest_assertion_failure(normalized_failure, target_path=target_path, tests=tests):
+        return FailureClassification(
+            kind=RepairFailureKind.PYTEST_FAILURE,
+            owner=RepairOwner.DEVELOPER,
+            reason="Pytest assertion failure can be repaired locally.",
+        )
+
+    if looks_like_pytest_fixture_failure(normalized_failure):
+        return FailureClassification(
+            kind=RepairFailureKind.PYTEST_FAILURE,
+            owner=RepairOwner.TEST,
+            reason="Pytest evidence points to test fixture or import wiring.",
+        )
+
+    if looks_like_ruff_failure(normalized_failure):
+        return classify_ruff_failure(normalized_failure, target_path=target_path)
+
+    if detect_banned_domain_terms(normalized_failure) is not None:
+        return FailureClassification(
+            kind=RepairFailureKind.CONTRACT_VIOLATION,
+            owner=RepairOwner.DEVELOPER,
+            reason="Failure evidence indicates unsafe execution or live-system behavior.",
+            manual_support_required=True,
+        )
+
     if not story_contract.strip():
         return FailureClassification(
             kind=RepairFailureKind.UNCLEAR_ACCEPTANCE_CRITERIA,
             owner=RepairOwner.MANUAL_SUPPORT,
-            reason="Story contract is missing or empty.",
+            reason="Story contract is missing or empty and the failure evidence is ambiguous.",
             manual_support_required=True,
-        )
-
-    validation = validate_repair_output(
-        failure_output_text,
-        target_path=target_path,
-        required_api_strings=required_api_strings,
-        strict_python=strict_python,
-    )
-    if validation.passed:
-        return FailureClassification(
-            kind=RepairFailureKind.CONTRACT_VIOLATION,
-            owner=RepairOwner.DEVELOPER,
-            reason="Failure output does not indicate a local-model contract problem.",
-        )
-
-    if validation.failure_kind in {
-        RepairFailureKind.EMPTY_LOCAL_OUTPUT,
-        RepairFailureKind.MALFORMED_OUTPUT,
-        RepairFailureKind.MARKDOWN_FENCE_IN_STRICT_PYTHON,
-        RepairFailureKind.MISSING_REQUIRED_API,
-        RepairFailureKind.WRONG_DOMAIN,
-    }:
-        return FailureClassification(
-            kind=validation.failure_kind,
-            owner=validation.owner or RepairOwner.DEVELOPER,
-            reason=validation.reason,
         )
 
     return FailureClassification(
         kind=RepairFailureKind.CONTRACT_VIOLATION,
         owner=RepairOwner.DEVELOPER,
-        reason=validation.reason,
+        reason="Failure evidence did not match a known local repair path.",
     )
 
 
@@ -788,13 +829,6 @@ def classification_for_command_results(
             format_command_output(command_results["pytest"]),
             target_path=target_path,
         )
-    if not story_contract.strip():
-        return FailureClassification(
-            kind=RepairFailureKind.UNCLEAR_ACCEPTANCE_CRITERIA,
-            owner=RepairOwner.MANUAL_SUPPORT,
-            reason="Story contract is missing or empty.",
-            manual_support_required=True,
-        )
     return FailureClassification(
         kind=RepairFailureKind.REPAIR_ACCEPTED,
         owner=RepairOwner.DEVELOPER,
@@ -840,22 +874,88 @@ def ensure_repair_loop_directory(story_path: Path) -> Path:
     return repair_dir
 
 
-def load_story_contract(story_path: Path) -> str:
-    sections: list[str] = []
-    for relative_path in ("story.md", "status.yaml", "test_plan.yaml", "monitoring_plan.yaml"):
-        source_path = story_path / relative_path
-        if not source_path.exists():
+def load_story_contract(project_path: Path, story_path: Path) -> str:
+    story_file_path = story_path / "story.md"
+    if story_file_path.exists():
+        return story_file_path.read_text(encoding="utf-8")
+
+    blueprint_contract = load_story_contract_from_blueprint(project_path, story_path)
+    if blueprint_contract:
+        return blueprint_contract
+
+    return ""
+
+
+def load_story_contract_from_blueprint(project_path: Path, story_path: Path) -> str:
+    blueprints_path = project_path / "blueprints" / "stories"
+    if not blueprints_path.exists() or not blueprints_path.is_dir():
+        return ""
+
+    story_slug = story_path.name
+    status_path = story_path / "status.yaml"
+    story_refs = {story_slug}
+    if status_path.exists():
+        try:
+            loaded_status = yaml.safe_load(status_path.read_text(encoding="utf-8"))
+        except yaml.YAMLError:
+            loaded_status = None
+        if isinstance(loaded_status, dict):
+            for key in ("slug", "story_id", "id"):
+                value = loaded_status.get(key)
+                if isinstance(value, str) and value.strip():
+                    story_refs.add(value.strip())
+
+    for blueprint_path in sorted(blueprints_path.glob("*.yaml")) + sorted(blueprints_path.glob("*.yml")):
+        try:
+            loaded = yaml.safe_load(blueprint_path.read_text(encoding="utf-8"))
+        except yaml.YAMLError:
             continue
-        content = source_path.read_text(encoding="utf-8")
-        sections.extend(
-            [
-                f"## {relative_path}",
-                "",
-                fenced_text(content.rstrip(), "yaml" if source_path.suffix in {".yaml", ".yml"} else "text"),
-                "",
-            ],
-        )
-    return "\n".join(sections).strip()
+        if not isinstance(loaded, dict):
+            continue
+        stories = loaded.get("stories")
+        if not isinstance(stories, list):
+            continue
+        for story in stories:
+            if not isinstance(story, dict):
+                continue
+            candidate_refs = {
+                str(story.get(key, "")).strip()
+                for key in ("slug", "story_id", "id")
+                if isinstance(story.get(key), str) and str(story.get(key, "")).strip()
+            }
+            if not candidate_refs.intersection(story_refs):
+                continue
+            return yaml.safe_dump(story, sort_keys=False)
+
+    return ""
+
+
+def looks_like_pytest_assertion_failure(
+    failure_output: str,
+    *,
+    target_path: Path,
+    tests: Sequence[Path],
+) -> bool:
+    lowered = failure_output.lower()
+    if "assertionerror" in lowered or "e       assert" in lowered or "assert " in lowered:
+        return target_path.suffix == ".py" and bool(tests)
+    return False
+
+
+def looks_like_pytest_fixture_failure(failure_output: str) -> bool:
+    lowered = failure_output.lower()
+    return (
+        "fixture '" in lowered
+        or 'fixture "' in lowered
+        or "importerror while importing test module" in lowered
+        or "cannot import name" in lowered
+        or "module not found" in lowered
+    )
+
+
+def looks_like_ruff_failure(failure_output: str) -> bool:
+    lowered = failure_output.lower()
+    return "ruff" in lowered or "f401" in lowered or "e501" in lowered or "error:" in lowered
 
 
 def manual_support_clarification(reason: str, prompt_inputs: RepairPromptInputs) -> str:
@@ -1092,10 +1192,9 @@ def looks_like_markdown_fence(text: str) -> bool:
 
 
 def detect_banned_domain_terms(text: str) -> str | None:
-    lowered = text.lower()
-    for term in BANNED_DOMAIN_TERMS:
-        if term in lowered:
-            return term
+    for pattern in BANNED_DOMAIN_PATTERNS:
+        if pattern.search(text):
+            return BANNED_DOMAIN_DESCRIPTIONS.get(pattern.pattern, pattern.pattern)
     return None
 
 

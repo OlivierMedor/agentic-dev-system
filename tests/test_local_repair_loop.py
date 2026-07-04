@@ -11,6 +11,7 @@ from agentic_dev.local_repair_loop import (
     RepairOwner,
     build_repair_prompt,
     build_repair_prompt_inputs,
+    classify_available_failure,
     classify_pytest_failure,
     classify_ruff_failure,
     run_local_repair_loop,
@@ -115,6 +116,25 @@ def test_validate_repair_output_requires_public_api_strings(tmp_path: Path) -> N
     assert "ImportantType" in result.reason
 
 
+def test_validate_repair_output_allows_symbol_normalization_wording(tmp_path: Path) -> None:
+    target = write_python_target(tmp_path)
+
+    result = validate_repair_output(
+        (
+            "from __future__ import annotations\n\n\n"
+            "def normalize_symbol(symbol: str) -> str:\n"
+            '    """Normalize a trading symbol into uppercase dash-separated form."""\n'
+            '    return symbol.replace("/", "-").replace("_", "-").upper()\n'
+        ),
+        target_path=target,
+        required_api_strings=("normalize_symbol",),
+        strict_python=True,
+    )
+
+    assert result.passed is True
+    assert result.failure_kind is None
+
+
 def test_validate_target_path_rejects_escape_attempt(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="Target path must stay inside the project"):
         validate_target_path(tmp_path, Path("..") / "escape.py")
@@ -136,6 +156,28 @@ def test_classify_pytest_failure_routes_fixture_failure_to_test_owner(tmp_path: 
 
     assert classification.kind == RepairFailureKind.PYTEST_FAILURE
     assert classification.owner == RepairOwner.TEST
+
+
+def test_classify_available_failure_treats_assertion_failure_as_developer_work(
+    tmp_path: Path,
+) -> None:
+    target = write_python_target(tmp_path)
+    test_path = tmp_path / "tests" / "test_repair_loop_smoke.py"
+    test_path.parent.mkdir(parents=True, exist_ok=True)
+    test_path.write_text("from agentic_dev.repair_loop_smoke import normalize_symbol\n", encoding="utf-8")
+
+    classification = classify_available_failure(
+        "E   AssertionError: assert 'eth_usd' == 'ETH-USD'",
+        target_path=target,
+        tests=(test_path,),
+        required_api_strings=("normalize_symbol",),
+        strict_python=True,
+        story_contract="",
+    )
+
+    assert classification.kind == RepairFailureKind.PYTEST_FAILURE
+    assert classification.owner == RepairOwner.DEVELOPER
+    assert classification.manual_support_required is False
 
 
 def test_build_repair_prompt_includes_story_contract_failure_and_policy(tmp_path: Path) -> None:
