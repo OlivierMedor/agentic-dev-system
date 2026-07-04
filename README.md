@@ -49,7 +49,8 @@ human merge decision
 For diagrams of the full system, see `docs/system_map.md`. For the
 beginner-friendly operator flow, see `docs/golden_path.md`.
 For the manual-first cloud escalation queue, see
-`docs/cloud_queue_operator_guide.md`.
+`docs/cloud_queue_operator_guide.md`. For the local repair-loop orchestrator,
+see `docs/local_repair_loop.md`.
 
 ## Quick Demo
 
@@ -169,7 +170,8 @@ Codex or cloud code-generation. When a blueprint declares `subtasks`, the same
 command executes dependency-ready, context-safe sub-tasks only after the full
 required prompt fits the task's usable local-model input budget. Oversized
 sub-tasks are blocked for cloud redecomposition instead of being trimmed or
-split locally. Cloud review and local repair loops are deferred to Story 062.
+split locally. Cloud review remains manual, and local repair loops are handled
+by Story 069.
 
 `agentic cloud-queue` is the manual-first path for local blockers. It packages
 requests, exports batches, imports manual responses, classifies them
@@ -219,7 +221,9 @@ assignment process. Use `docs/local_agent_drafts.md` to save story context as
 reviewable local drafts, and `docs/local_agent_context_packets.md` for slim and
 micro local-model context packets. Use micro mode when Gemma returns hidden
 `reasoning_content` but empty visible content. See `docs/local_models.md` for
-setup.
+setup. See `docs/local_repair_loop.md` for the local-only retry loop that
+validates outputs, reruns checks, and writes manual support evidence when the
+retry budget is exhausted.
 
 Use `docs/micro_readiness.md` to interpret story sizing guidance. Warnings mean
 local models may need micro mode, slim mode, a stronger configured agent
@@ -333,6 +337,8 @@ That file is ignored and blocked by policy. The public-safe example is
 - `docs/local_agent_context_packets.md` explains slim local-agent context
   packets, micro final-answer-focused packets, and truncation warnings for local
   models.
+- `docs/local_repair_loop.md` explains the local-only repair loop orchestrator
+  and its manual support fallback.
 - `docs/micro_readiness.md` explains how to check whether assigned agent tasks
   are small enough for micro-mode local prompts.
 - `docs/role_context_builder.md` explains focused role context packets for

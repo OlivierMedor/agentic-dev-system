@@ -57,6 +57,7 @@ from agentic_dev.local_model_runtime import (
 from agentic_dev.local_execution import run_local_execution
 from agentic_dev.local_execution_recording import record_local_execution
 from agentic_dev.local_review import record_local_review
+from agentic_dev.local_repair_loop import run_local_repair_loop
 from agentic_dev.local_model_scorecard import (
     create_local_model_scorecard,
     create_local_model_scorecard_report,
@@ -1373,6 +1374,57 @@ def main() -> None:
         help="Overwrite an existing draft output and metadata file.",
     )
 
+    local_repair_loop_parser = subparsers.add_parser(
+        "local-repair-loop",
+        help="Validate and repair a local model output using a local-only retry loop.",
+    )
+    local_repair_loop_parser.add_argument(
+        "--project",
+        type=Path,
+        default=Path.cwd(),
+        help="Target project folder. Defaults to the current directory.",
+    )
+    local_repair_loop_parser.add_argument(
+        "--story",
+        required=True,
+        help="Story folder name under the project's stories folder.",
+    )
+    local_repair_loop_parser.add_argument(
+        "--target",
+        type=Path,
+        required=True,
+        help="Target file path to repair. Relative paths are resolved from the project root.",
+    )
+    local_repair_loop_parser.add_argument(
+        "--tests",
+        type=Path,
+        action="append",
+        default=[],
+        help="Optional pytest target path. May be repeated.",
+    )
+    local_repair_loop_parser.add_argument(
+        "--failure-output",
+        type=Path,
+        help="Optional failure output file to classify before building the repair prompt.",
+    )
+    local_repair_loop_parser.add_argument(
+        "--required-api",
+        action="append",
+        default=[],
+        help="Required public API string that must remain present in accepted output. May be repeated.",
+    )
+    local_repair_loop_parser.add_argument(
+        "--max-local-attempts",
+        type=int,
+        default=3,
+        help="Maximum number of local repair attempts before manual support is required.",
+    )
+    local_repair_loop_parser.add_argument(
+        "--execute",
+        action="store_true",
+        help="Run the local repair loop and apply accepted output. Without this flag the command only writes the prompt and plan.",
+    )
+
     support_ticket_parser = subparsers.add_parser(
         "support-ticket",
         help="Create and manage structured support tickets for blocked agents.",
@@ -2435,6 +2487,19 @@ def main() -> None:
                     "output was executed, and no cloud, GitHub, commit, merge, or deploy actions "
                     "were taken."
                 )
+
+        if args.command == "local-repair-loop":
+            result = run_local_repair_loop(
+                args.project,
+                args.story,
+                args.target,
+                tests=args.tests,
+                failure_output=args.failure_output,
+                required_api=tuple(args.required_api),
+                execute=args.execute,
+                max_local_attempts=args.max_local_attempts,
+            )
+            print(result.terminal_summary)
 
         if args.command == "support-ticket":
             if args.support_ticket_command == "create":

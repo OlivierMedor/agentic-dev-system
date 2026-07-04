@@ -193,6 +193,11 @@ See `docs/local_agent_drafts.md` for the save-only draft workflow,
 mapping, runtime artifact policy, and human/cloud review boundary for high-risk
 logic.
 
+See `docs/local_repair_loop.md` for the local-only repair orchestrator that
+validates model output, rebuilds targeted repair prompts, reruns Ruff and pytest
+when relevant, and writes manual support evidence when the retry budget is
+exhausted.
+
 Create repeatable local-agent scorecard prompts, run them against a configured
 local model, and create a manual report:
 
