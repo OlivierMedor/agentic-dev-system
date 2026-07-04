@@ -1,0 +1,70 @@
+id: STORY-069
+slug: story_069_local_repair_loop_orchestrator
+title: Local Repair Loop Orchestrator
+goal: Build a local-only repair loop that validates model outputs, classifies failures,
+  generates targeted repair prompts, reruns local checks, and records evidence without
+  automatic cloud or Codex escalation.
+why: Story 068 showed that local Qwen execution can complete the work, but the rejected
+  output handling, repair prompt creation, Ruff routing, pytest routing, validation, and
+  manual escalation steps still require too much steering. This story automates that
+  repair loop while preserving the local-first workflow and manual cloud policy.
+acceptance_criteria:
+  - Implement a local repair loop module for validation, classification, prompt building,
+    retry budgets, and evidence recording.
+  - Preserve the local Qwen repair path as the default.
+  - Reject empty output, malformed output, strict Python fences, missing required API
+    strings, and wrong-domain output.
+  - Route Ruff and pytest failures to the correct owner category.
+  - Apply only validated full-file output.
+  - Write manual support evidence when retry budgets are exceeded.
+  - Add a CLI command for dry-run and execute modes.
+  - Add tests that cover validation, classification, prompt construction, retry budgets,
+    dry-run, and execute flow.
+not_in_scope:
+  - No automatic cloud model calls.
+  - No Codex default repair path.
+  - No hosted coding-agent default repair path.
+  - No wallet, private-key, signing, trading, exchange API, or deployment logic.
+  - Do not overwrite blueprints/blueprint.yaml.
+definition_of_done:
+  - ruff check . passes.
+  - pytest -q passes.
+  - Story 069 evidence exists under stories/story_069_local_repair_loop_orchestrator/reports.
+  - The new command is documented.
+  - The feature remains local-first and manual-cloud-only.
+test_plan:
+  unit_tests:
+    required: true
+    focus:
+      - output validation helpers
+      - failure classification helpers
+      - repair prompt construction
+      - retry-budget handling
+      - dry-run and execute flows
+  integration_tests:
+    required: true
+    focus:
+      - CLI command wiring
+      - report file generation
+      - target path validation
+  mock_e2e_tests:
+    required: true
+    focus:
+      - accepted output applied
+      - rejected output not applied
+      - manual support report created at budget exhaustion
+  live_read_only_checks:
+    required: false
+    focus:
+      - not applicable
+  remote_dev_smoke_tests:
+    required: false
+    focus:
+      - not applicable
+monitoring_plan:
+  logs_required: true
+  watch_for:
+    - rejected_output
+    - retry_budget_exhausted
+    - manual_support_report_created
+    - unexpected_cloud_or_codex_usage
