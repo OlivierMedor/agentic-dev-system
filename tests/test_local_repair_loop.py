@@ -5,8 +5,10 @@ from pathlib import Path
 import pytest
 import yaml
 
+from agentic_dev import local_repair_loop as repair_loop_module
 from agentic_dev.cli import main
 from agentic_dev.local_repair_loop import (
+    DEFAULT_MAX_LOCAL_ATTEMPTS,
     RepairFailureKind,
     RepairOwner,
     build_repair_prompt,
@@ -229,6 +231,72 @@ def test_dry_run_writes_prompt_and_plan_but_does_not_modify_target(tmp_path: Pat
     assert plan["codex_policy"] == "disabled-by-default"
 
 
+def test_cli_local_repair_loop_defaults_max_local_attempts_to_five(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    create_story_workspace(tmp_path)
+    write_python_target(tmp_path)
+
+    def fake_run_local_repair_loop(*args, **kwargs):
+        assert kwargs["max_local_attempts"] == DEFAULT_MAX_LOCAL_ATTEMPTS
+        return type("Result", (), {"terminal_summary": "local repair loop summary"})()
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("agentic_dev.cli.run_local_repair_loop", fake_run_local_repair_loop)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "agentic",
+            "local-repair-loop",
+            "--story",
+            "story_069_local_repair_loop_orchestrator",
+            "--target",
+            "src/example.py",
+        ],
+    )
+
+    main()
+
+    captured = capsys.readouterr()
+    assert "local repair loop summary" in captured.out
+
+
+def test_cli_local_repair_loop_override_max_local_attempts_still_works(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    create_story_workspace(tmp_path)
+    write_python_target(tmp_path)
+
+    def fake_run_local_repair_loop(*args, **kwargs):
+        assert kwargs["max_local_attempts"] == 2
+        return type("Result", (), {"terminal_summary": "local repair loop summary"})()
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("agentic_dev.cli.run_local_repair_loop", fake_run_local_repair_loop)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "agentic",
+            "local-repair-loop",
+            "--story",
+            "story_069_local_repair_loop_orchestrator",
+            "--target",
+            "src/example.py",
+            "--max-local-attempts",
+            "2",
+        ],
+    )
+
+    main()
+
+    captured = capsys.readouterr()
+    assert "local repair loop summary" in captured.out
+
+
 def test_execute_mode_applies_accepted_output(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     create_story_workspace(tmp_path)
     target = write_python_target(tmp_path, "def keep_api():\n    return 1\n")
@@ -269,6 +337,150 @@ def test_execute_mode_applies_accepted_output(tmp_path: Path, monkeypatch: pytes
     assert result.attempts[0].retry_budget_status == "within_budget"
     assert result.attempts[0].codex_used is False
     assert result.attempts[0].cloud_attempt_count == 0
+
+
+@pytest.mark.parametrize(
+    ("raised_error", "expected_failure_kind"),
+    [
+        (TimeoutError("timed out"), RepairFailureKind.LOCAL_MODEL_TIMEOUT),
+        (ConnectionError("connection refused"), RepairFailureKind.LOCAL_MODEL_CONNECTION_ERROR),
+        (RuntimeError("local model runtime error"), RepairFailureKind.LOCAL_MODEL_RUNTIME_ERROR),
+    ],
+)
+def test_local_runtime_failures_are_caught_recorded_and_do_not_apply_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    raised_error: Exception,
+    expected_failure_kind: RepairFailureKind,
+) -> None:
+    create_story_workspace(tmp_path)
+    target = write_python_target(tmp_path, "def keep_api():\n    return 1\n")
+
+    def fake_invoke_local_repair_model(project_path: Path, prompt_text: str, http_client=None):
+        raise raised_error
+
+    monkeypatch.setattr(
+        "agentic_dev.local_repair_loop.invoke_local_repair_model",
+        fake_invoke_local_repair_model,
+    )
+
+    result = run_local_repair_loop(
+        tmp_path,
+        "story_069_local_repair_loop_orchestrator",
+        target,
+        required_api=("keep_api",),
+        execute=True,
+        max_local_attempts=1,
+    )
+
+    assert result.status == expected_failure_kind.value
+    assert result.applied is False
+    assert target.read_text(encoding="utf-8") == "def keep_api():\n    return 1\n"
+    assert result.attempts[0].failure_kind == expected_failure_kind
+    assert result.attempts[0].owner == RepairOwner.LOCAL_RUNTIME
+    assert result.attempts[0].applied is False
+    assert result.attempts[0].output_path is None
+    assert result.attempts[0].cloud_attempt_count == 0
+    assert result.attempts[0].codex_used is False
+    assert result.manual_support_report_path is not None
+    assert result.manual_support_report_path.exists()
+
+    attempt_report = yaml.safe_load(
+        (tmp_path / "stories" / "story_069_local_repair_loop_orchestrator" / "reports" / "local_repair_loop" / "repair_attempt_01.yaml").read_text(
+            encoding="utf-8",
+        ),
+    )
+    assert attempt_report["failure_kind"] == expected_failure_kind.value
+    assert attempt_report["owner"] == "local_runtime"
+    assert attempt_report["applied"] is False
+    assert attempt_report["output_path"] is None
+    assert attempt_report["cloud_attempt_count"] == 0
+    assert attempt_report["codex_used"] is False
+    assert attempt_report["retry_budget_status"] == "exhausted"
+
+    result_report = yaml.safe_load(result.result_path.read_text(encoding="utf-8"))
+    assert result_report["status"] == expected_failure_kind.value
+    assert result_report["attempt_number"] == 1
+    assert result_report["failure_kind"] == expected_failure_kind.value
+    assert result_report["owner"] == "local_runtime"
+    assert result_report["applied"] is False
+    assert result_report["output_path"] is None
+    assert result_report["cloud_attempt_count"] == 0
+    assert result_report["codex_used"] is False
+    assert result_report["retry_budget_status"] == "exhausted"
+
+    manual_support = yaml.safe_load(result.manual_support_report_path.read_text(encoding="utf-8"))
+    assert manual_support["attempt_number"] == 1
+    assert manual_support["failure_kind"] == "retry_budget_exceeded"
+    assert manual_support["owner"] == "manual_support"
+    assert manual_support["cloud_attempt_count"] == 0
+    assert manual_support["codex_used"] is False
+    assert manual_support["output_path"] is None
+    assert "LM Studio" in manual_support["requested_clarification"]
+
+
+def test_local_repair_loop_retries_after_runtime_timeout_when_budget_remains(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    create_story_workspace(tmp_path)
+    target = write_python_target(tmp_path, "def keep_api():\n    return 1\n")
+    call_count = {"value": 0}
+    captured_statuses: list[str] = []
+
+    def fake_invoke_local_repair_model(project_path: Path, prompt_text: str, http_client=None):
+        call_count["value"] += 1
+        if call_count["value"] == 1:
+            raise TimeoutError("timed out")
+        return "def keep_api():\n    return 2\n"
+
+    original_write_result_report = repair_loop_module.write_result_report
+
+    def capture_write_result_report(result):
+        captured_statuses.append(result.status)
+        original_write_result_report(result)
+
+    def fake_command_runner(command: list[str], cwd: Path):
+        return type(
+            "Result",
+            (object,),
+            {
+                "command": " ".join(command),
+                "returncode": 0,
+                "stdout": "ok\n",
+                "stderr": "",
+                "passed": True,
+            },
+        )()
+
+    monkeypatch.setattr(
+        "agentic_dev.local_repair_loop.invoke_local_repair_model",
+        fake_invoke_local_repair_model,
+    )
+    monkeypatch.setattr("agentic_dev.local_repair_loop.write_result_report", capture_write_result_report)
+
+    result = run_local_repair_loop(
+        tmp_path,
+        "story_069_local_repair_loop_orchestrator",
+        target,
+        required_api=("keep_api",),
+        execute=True,
+        max_local_attempts=2,
+        command_runner=fake_command_runner,
+    )
+
+    assert result.status == "completed"
+    assert result.applied is True
+    assert call_count["value"] == 2
+    assert captured_statuses[0] == "local_model_timeout"
+    assert captured_statuses[-1] == "completed"
+    assert result.attempts[0].failure_kind == RepairFailureKind.LOCAL_MODEL_TIMEOUT
+    assert result.attempts[0].owner == RepairOwner.LOCAL_RUNTIME
+    assert result.attempts[0].applied is False
+    assert result.attempts[1].applied is True
+    assert target.read_text(encoding="utf-8") == "def keep_api():\n    return 2"
+    assert result.cloud_attempt_count == 0
+    assert result.codex_used is False
 
 
 def test_rejected_output_is_not_applied_and_writes_manual_support_report(

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import socket
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -75,7 +76,18 @@ class UrllibLocalModelHttpClient:
             with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
                 response_body = response.read().decode("utf-8")
         except urllib.error.URLError as error:
-            raise ValueError(f"Local model request failed: {error}") from error
+            if isinstance(error, urllib.error.HTTPError):
+                raise RuntimeError(
+                    f"Local model request failed with HTTP {error.code}: {error.reason}"
+                ) from error
+
+            reason = error.reason
+            reason_text = str(reason).strip()
+            if isinstance(reason, (TimeoutError, socket.timeout)) or "timed out" in reason_text.lower():
+                raise TimeoutError(f"Local model request timed out: {reason_text or error}") from error
+            if isinstance(reason, OSError):
+                raise ConnectionError(f"Local model request failed: {reason_text or error}") from error
+            raise RuntimeError(f"Local model request failed: {reason_text or error}") from error
 
         try:
             loaded = json.loads(response_body)

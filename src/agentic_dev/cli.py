@@ -57,7 +57,7 @@ from agentic_dev.local_model_runtime import (
 from agentic_dev.local_execution import run_local_execution
 from agentic_dev.local_execution_recording import record_local_execution
 from agentic_dev.local_review import record_local_review
-from agentic_dev.local_repair_loop import run_local_repair_loop
+from agentic_dev.local_repair_loop import DEFAULT_MAX_LOCAL_ATTEMPTS, run_local_repair_loop
 from agentic_dev.local_model_scorecard import (
     create_local_model_scorecard,
     create_local_model_scorecard_report,
@@ -1416,7 +1416,7 @@ def main() -> None:
     local_repair_loop_parser.add_argument(
         "--max-local-attempts",
         type=int,
-        default=3,
+        default=DEFAULT_MAX_LOCAL_ATTEMPTS,
         help="Maximum number of local repair attempts before manual support is required.",
     )
     local_repair_loop_parser.add_argument(
