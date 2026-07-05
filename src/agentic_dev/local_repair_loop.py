@@ -18,7 +18,7 @@ from agentic_dev.review_bundle import CommandResult, format_command_output, run_
 
 
 LOCAL_REPAIR_LOOP_FOLDER = Path("reports") / "local_repair_loop"
-DEFAULT_MAX_LOCAL_ATTEMPTS = 3
+DEFAULT_MAX_LOCAL_ATTEMPTS = 5
 DEFAULT_MAX_CLOUD_ATTEMPTS = 0
 DEFAULT_MAX_CODEX_ATTEMPTS = 0
 REPAIR_PLAN_FILENAME = "repair_plan.yaml"
@@ -76,6 +76,9 @@ class RepairFailureKind(str, Enum):
     MALFORMED_OUTPUT = "malformed_output"
     MARKDOWN_FENCE_IN_STRICT_PYTHON = "markdown_fence_in_strict_python"
     MISSING_REQUIRED_API = "missing_required_api"
+    LOCAL_MODEL_TIMEOUT = "local_model_timeout"
+    LOCAL_MODEL_CONNECTION_ERROR = "local_model_connection_error"
+    LOCAL_MODEL_RUNTIME_ERROR = "local_model_runtime_error"
     WRONG_TARGET_PATH = "wrong_target_path"
     WRONG_DOMAIN = "wrong_domain"
     RUFF_FAILURE = "ruff_failure"
@@ -88,6 +91,7 @@ class RepairFailureKind(str, Enum):
 class RepairOwner(str, Enum):
     DEVELOPER = "developer"
     TEST = "test"
+    LOCAL_RUNTIME = "local_runtime"
     MANUAL_SUPPORT = "manual_support"
 
 
@@ -163,16 +167,56 @@ class RepairLoopResult:
     manual_support_report_path: Path | None
 
     @property
+    def latest_attempt(self) -> RepairAttempt | None:
+        if not self.attempts:
+            return None
+        return self.attempts[-1]
+
+    @property
+    def cloud_attempt_count(self) -> int:
+        return sum(attempt.cloud_attempt_count for attempt in self.attempts)
+
+    @property
+    def codex_used(self) -> bool:
+        return any(attempt.codex_used for attempt in self.attempts)
+
+    @property
+    def next_step(self) -> str:
+        if self.classification.kind in {
+            RepairFailureKind.LOCAL_MODEL_TIMEOUT,
+            RepairFailureKind.LOCAL_MODEL_CONNECTION_ERROR,
+            RepairFailureKind.LOCAL_MODEL_RUNTIME_ERROR,
+        }:
+            if self.manual_support_report_path is not None:
+                return (
+                    "Review the manual support report, confirm LM Studio/local model is "
+                    "loaded and responsive, then rerun the command."
+                )
+            return (
+                "Confirm LM Studio/local model is loaded and responsive, then rerun the command."
+            )
+        if self.status == "budget_exceeded":
+            if self.manual_support_report_path is not None:
+                return (
+                    "Review the manual support report, confirm the local model is ready, "
+                    "and rerun the command."
+                )
+            return "Review the manual support report and clarify the repair boundary."
+        if self.status == "completed":
+            return "Review the applied output and rerun checks if needed."
+        return "Inspect the generated prompt and plan before rerunning."
+
+    @property
     def terminal_summary(self) -> str:
         lines = [
             f"Local repair loop for {self.story}:",
             f"Status: {self.status}",
-            f"Target: {self.target_path}",
-            f"Prompt: {self.prompt_path}",
-            f"Plan: {self.plan_path}",
-            f"Result: {self.result_path}",
             f"Attempts: {len(self.attempts)}",
-            f"Classification: {self.classification.kind.value} ({self.classification.owner.value})",
+            f"Applied: {str(self.applied).lower()}",
+            f"Cloud attempts: {self.cloud_attempt_count}",
+            f"Codex used: {str(self.codex_used).lower()}",
+            f"Evidence: {self.result_path}",
+            f"Next step: {self.next_step}",
         ]
         if self.applied_path is not None:
             lines.append(f"Applied path: {self.applied_path}")
@@ -288,11 +332,87 @@ def run_local_repair_loop(
         current_prompt_path.write_text(current_prompt_text, encoding="utf-8")
         current_output_path = repair_dir / f"repair_output_{attempt_number:02d}.txt"
 
-        response_text = invoke_local_repair_model(
-            resolved_project_path,
-            current_prompt_text,
-            http_client=http_client,
-        )
+        try:
+            response_text = invoke_local_repair_model(
+                resolved_project_path,
+                current_prompt_text,
+                http_client=http_client,
+            )
+        except (TimeoutError, ConnectionError, RuntimeError, ValueError) as error:
+            classification = classify_local_model_failure(error)
+            validation_result = runtime_failure_validation_result(classification)
+            attempt = build_attempt(
+                attempt_number=attempt_number,
+                failure_kind=classification.kind,
+                owner=classification.owner,
+                prompt_path=current_prompt_path,
+                output_path=None,
+                validation_result=validation_result,
+                applied=False,
+                reason=classification.reason,
+                retry_budget_status=(
+                    "within_budget" if attempt_number < max_local_attempts else "exhausted"
+                ),
+            )
+            attempts.append(attempt)
+            write_attempt_report(repair_dir, attempt)
+
+            progress_result = RepairLoopResult(
+                story=story,
+                target_path=resolved_target,
+                story_path=story_path,
+                prompt_path=current_prompt_path,
+                plan_path=plan_path,
+                result_path=result_path,
+                attempts=attempts,
+                classification=classification,
+                status=classification.kind.value,
+                applied=False,
+                applied_path=None,
+                manual_support_report_path=None,
+            )
+            write_result_report(progress_result)
+
+            if attempt_number >= max_local_attempts:
+                manual_support_report_path = write_manual_support_report(
+                    repair_dir,
+                    story=story,
+                    target_path=resolved_target,
+                    classification=FailureClassification(
+                        kind=RepairFailureKind.RETRY_BUDGET_EXCEEDED,
+                        owner=RepairOwner.MANUAL_SUPPORT,
+                        reason=classification.reason,
+                        manual_support_required=True,
+                    ),
+                    attempts=attempts,
+                    attempt_number=attempt_number,
+                    prompt_path=current_prompt_path,
+                    output_path=None,
+                    retry_budget_status="exhausted",
+                    requested_clarification=local_model_runtime_clarification(
+                        classification.reason,
+                        current_prompt_inputs,
+                    ),
+                )
+                result = RepairLoopResult(
+                    story=story,
+                    target_path=resolved_target,
+                    story_path=story_path,
+                    prompt_path=current_prompt_path,
+                    plan_path=plan_path,
+                    result_path=result_path,
+                    attempts=attempts,
+                    classification=classification,
+                    status=classification.kind.value,
+                    applied=False,
+                    applied_path=None,
+                    manual_support_report_path=manual_support_report_path,
+                )
+                write_result_report(result)
+                return result
+
+            continue
+
         current_output_path.write_text(response_text, encoding="utf-8")
         validation_result = validate_repair_output(
             response_text,
@@ -335,6 +455,7 @@ def run_local_repair_loop(
                         manual_support_required=True,
                     ),
                     attempts=attempts,
+                    attempt_number=attempt_number,
                     prompt_path=current_prompt_path,
                     output_path=current_output_path,
                     retry_budget_status="exhausted",
@@ -448,6 +569,7 @@ def run_local_repair_loop(
                     manual_support_required=True,
                 ),
                 attempts=attempts,
+                attempt_number=attempt_number,
                 prompt_path=current_prompt_path,
                 output_path=current_output_path,
                 retry_budget_status="exhausted",
@@ -867,6 +989,61 @@ def invoke_local_repair_model(
     return response_text
 
 
+def classify_local_model_failure(error: Exception) -> FailureClassification:
+    reason = str(error).strip()
+    if isinstance(error, TimeoutError):
+        return FailureClassification(
+            kind=RepairFailureKind.LOCAL_MODEL_TIMEOUT,
+            owner=RepairOwner.LOCAL_RUNTIME,
+            reason=reason or "Local model request timed out.",
+        )
+    if isinstance(error, ConnectionError):
+        return FailureClassification(
+            kind=RepairFailureKind.LOCAL_MODEL_CONNECTION_ERROR,
+            owner=RepairOwner.LOCAL_RUNTIME,
+            reason=reason or "Local model connection failed.",
+        )
+    if isinstance(error, ValueError):
+        return FailureClassification(
+            kind=RepairFailureKind.LOCAL_MODEL_RUNTIME_ERROR,
+            owner=RepairOwner.LOCAL_RUNTIME,
+            reason=reason or "Local model runtime failed.",
+        )
+    if isinstance(error, RuntimeError):
+        return FailureClassification(
+            kind=RepairFailureKind.LOCAL_MODEL_RUNTIME_ERROR,
+            owner=RepairOwner.LOCAL_RUNTIME,
+            reason=reason or "Local model runtime failed.",
+        )
+    return FailureClassification(
+        kind=RepairFailureKind.LOCAL_MODEL_RUNTIME_ERROR,
+        owner=RepairOwner.LOCAL_RUNTIME,
+        reason=reason or f"Local model runtime failed: {error.__class__.__name__}.",
+    )
+
+
+def runtime_failure_validation_result(classification: FailureClassification) -> OutputValidationResult:
+    return OutputValidationResult(
+        passed=False,
+        failure_kind=classification.kind,
+        owner=classification.owner,
+        reason=classification.reason,
+        normalized_output="",
+    )
+
+
+def local_model_runtime_clarification(reason: str, prompt_inputs: RepairPromptInputs) -> str:
+    required_api = ", ".join(prompt_inputs.required_api_strings) or "none"
+    return (
+        "Confirm LM Studio or the configured local model endpoint is loaded and responding. "
+        "If needed, run `agentic local-model dry-run --prompt \"Return exactly: LOCAL_MODEL_OK\"` "
+        "before rerunning the repair loop. "
+        f"Reason: {reason}. "
+        f"Target: {prompt_inputs.current_file_path.as_posix()}. "
+        f"Required API strings: {required_api}."
+    )
+
+
 def ensure_repair_loop_directory(story_path: Path) -> Path:
     repair_dir = story_path / LOCAL_REPAIR_LOOP_FOLDER
     repair_dir.mkdir(parents=True, exist_ok=True)
@@ -1064,11 +1241,14 @@ def write_attempt_report(repair_dir: Path, attempt: RepairAttempt) -> Path:
 
 
 def write_result_report(result: RepairLoopResult) -> None:
+    latest_attempt = result.latest_attempt
     payload = {
         "story": result.story,
         "target_path": result.target_path.as_posix(),
         "story_path": result.story_path.as_posix(),
-        "prompt_path": result.prompt_path.as_posix(),
+        "prompt_path": (
+            latest_attempt.prompt_path.as_posix() if latest_attempt is not None else result.prompt_path.as_posix()
+        ),
         "plan_path": result.plan_path.as_posix(),
         "result_path": result.result_path.as_posix(),
         "status": result.status,
@@ -1081,6 +1261,20 @@ def write_result_report(result: RepairLoopResult) -> None:
         ),
         "classification": classification_payload(result.classification),
         "attempts": [attempt.attempt_number for attempt in result.attempts],
+        "attempt_number": latest_attempt.attempt_number if latest_attempt is not None else None,
+        "failure_kind": (
+            latest_attempt.failure_kind.value if latest_attempt is not None else result.classification.kind.value
+        ),
+        "owner": latest_attempt.owner.value if latest_attempt is not None else result.classification.owner.value,
+        "reason": latest_attempt.reason if latest_attempt is not None else result.classification.reason,
+        "output_path": (
+            latest_attempt.output_path.as_posix() if latest_attempt and latest_attempt.output_path else None
+        ),
+        "cloud_attempt_count": result.cloud_attempt_count,
+        "codex_used": result.codex_used,
+        "retry_budget_status": (
+            latest_attempt.retry_budget_status if latest_attempt is not None else "not_started"
+        ),
     }
     result.result_path.parent.mkdir(parents=True, exist_ok=True)
     result.result_path.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
@@ -1093,8 +1287,9 @@ def write_manual_support_report(
     target_path: Path,
     classification: FailureClassification,
     attempts: list[RepairAttempt],
+    attempt_number: int,
     prompt_path: Path,
-    output_path: Path,
+    output_path: Path | None,
     retry_budget_status: str,
     requested_clarification: str,
 ) -> Path:
@@ -1102,6 +1297,7 @@ def write_manual_support_report(
     payload = {
         "story": story,
         "target_path": target_path.as_posix(),
+        "attempt_number": attempt_number,
         "failure_kind": classification.kind.value,
         "owner": classification.owner.value,
         "reason": classification.reason,
@@ -1110,7 +1306,7 @@ def write_manual_support_report(
         "cloud_attempt_count": 0,
         "codex_used": False,
         "prompt_path": prompt_path.as_posix(),
-        "output_path": output_path.as_posix(),
+        "output_path": output_path.as_posix() if output_path else None,
         "requested_clarification": requested_clarification,
         "attempts": [
             {

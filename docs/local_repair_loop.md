@@ -29,6 +29,10 @@ The repair loop:
 1. Stops at the configured retry budget and writes a manual support report
    instead of automatically escalating to cloud or Codex.
 
+The recommended default local retry budget is 5 attempts. Use
+`--max-local-attempts` to override it when you need a smaller or larger bounded
+budget.
+
 ## Default Model
 
 Qwen remains the simple default local repair path. The project runtime config can
@@ -54,10 +58,41 @@ Cloud escalation stays manual-only. The repair loop never calls a cloud model
 automatically, never calls Codex automatically, and never writes wallet,
 trading, private-key, signing, deployment, or live DeFi logic.
 
+Cloud and Codex remain disabled by default for local repair loop runs. The
+runtime records `cloud_attempt_count: 0` and `codex_used: false` for the local
+attempts.
+
 If the retry budget is exhausted or the acceptance criteria are too unclear for
 local repair, the loop writes a manual support report under the story reports
 directory. A human can then decide whether to clarify the task or route the
 issue through the existing manual cloud process.
+
+## Local Runtime Failures
+
+If the local model times out, the loop records a `local_model_timeout` evidence
+entry instead of printing a traceback. Connection failures are recorded as
+`local_model_connection_error`, and other local model runtime failures are
+recorded as `local_model_runtime_error`.
+
+When one of those failures happens:
+
+1. The attempt is counted as a local attempt.
+1. The repair result report is updated under
+   `stories/STORY_SLUG/reports/local_repair_loop/repair_result.yaml`.
+1. No cloud or Codex attempt is triggered automatically.
+1. If attempts remain, the loop retries locally.
+1. If the retry budget is exhausted, the loop writes
+   `manual_support_report.yaml` and stops cleanly.
+
+For a quick local health check before `local-repair-loop execute`, run:
+
+```powershell
+agentic local-model dry-run --prompt "Return exactly: LOCAL_MODEL_OK"
+```
+
+If LM Studio or the local Qwen endpoint times out, confirm the model is loaded,
+check the runtime URL and port, and rerun the dry run before retrying the repair
+loop.
 
 ## Failure Classification
 
