@@ -77,12 +77,18 @@ def install_finalize_doubles(
 ) -> list[str]:
     calls: list[str] = []
 
-    def fake_create_review_bundle(project_path: Path, story: str) -> ReviewBundleResult:
-        calls.append(f"review_bundle:{story}")
+    def fake_create_review_bundle(
+        project_path: Path,
+        story: str,
+        base_ref: str | None = None,
+        command_runner=None,
+    ) -> ReviewBundleResult:
+        calls.append(f"review_bundle:{story}:{base_ref}")
         review_bundle_path = project_path.resolve() / "stories" / story / "review_bundle"
         review_bundle_path.mkdir(parents=True, exist_ok=True)
+        call_number = sum(1 for call in calls if call.startswith(f"review_bundle:{story}:"))
         (review_bundle_path / "handoff.md").write_text(
-            f"# Handoff\n\nCall {calls.count(f'review_bundle:{story}')}\n",
+            f"# Handoff\n\nCall {call_number}\n",
             encoding="utf-8",
         )
         return ReviewBundleResult(
@@ -144,9 +150,9 @@ def test_finalize_story_creates_reports_and_regenerates_review_bundle(
     result = finalize_story(tmp_path, STORY)
 
     assert calls == [
-        f"review_bundle:{STORY}",
+        f"review_bundle:{STORY}:origin/main",
         f"quality_gate:{STORY}",
-        f"review_bundle:{STORY}",
+        f"review_bundle:{STORY}:origin/main",
     ]
     assert result.review_bundle_path == story_path / "review_bundle"
     assert (story_path / "review_bundle" / "handoff.md").exists()
@@ -190,10 +196,10 @@ def test_finalize_story_runs_test_layers_before_quality_gate_when_applicable(
     result = finalize_story(tmp_path, STORY)
 
     assert calls == [
-        f"review_bundle:{STORY}",
+        f"review_bundle:{STORY}:origin/main",
         f"test_layers:{STORY}",
         f"quality_gate:{STORY}",
-        f"review_bundle:{STORY}",
+        f"review_bundle:{STORY}:origin/main",
     ]
     assert result.test_layer_result_path == story_path / "reports" / "test_layer_result.yaml"
     assert result.test_layer_result_path.exists()
@@ -286,3 +292,30 @@ def test_cli_finalize_story_defaults_project_to_current_directory(
     assert (story_path / "review_bundle" / "handoff.md").exists()
     assert (story_path / "reports" / "finalize_story_report.md").exists()
     assert (story_path / "reports" / "finalize_story_result.yaml").exists()
+
+
+def test_cli_finalize_story_passes_explicit_base_ref(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    create_story(tmp_path)
+    calls = install_finalize_doubles(monkeypatch, READY_FOR_REVIEW)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "agentic",
+            "finalize-story",
+            "--story",
+            STORY,
+            "--base-ref",
+            "origin/phase/01-funding-spike-detector",
+        ],
+    )
+
+    main()
+
+    assert any(
+        call == f"review_bundle:{STORY}:origin/phase/01-funding-spike-detector"
+        for call in calls
+    )

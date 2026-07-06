@@ -80,7 +80,7 @@ def _mock_all(monkeypatch, manifest_data, project_path):
 
     monkeypatch.setattr(fs, "run_quality_gate", lambda p, s: DummyQG())
     monkeypatch.setattr(fs, "status_from_quality_gate", lambda qg: (qg.overall_status, qg.overall_ready_for_review))
-    monkeypatch.setattr(fs, "create_review_bundle_with_runner", lambda p, s, cr: dummy_rb)
+    monkeypatch.setattr(fs, "create_review_bundle_with_runner", lambda p, s, base_ref, cr: dummy_rb)
 
 
 # --- Core regression tests ---

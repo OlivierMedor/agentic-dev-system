@@ -127,6 +127,12 @@ docker compose run --rm dev agentic project-status
 choose micro, slim, or stronger configured agent runtime usage before generated
 prompts are run.
 
+`finalize-story`, `review-bundle`, and `workflow-run --phase local-finalize`
+use the project `default_base_ref` from `.agentic/agent_runtime.yaml` when it is
+set, then fall back to `origin/main`. The selected base ref must resolve; the
+CLI does not silently substitute a different branch.
+Pass `--base-ref` to override the project default explicitly.
+
 Local validation and hygiene:
 
 ```powershell

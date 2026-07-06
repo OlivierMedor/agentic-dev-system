@@ -5,6 +5,7 @@ from pathlib import Path
 
 from agentic_dev.review_state.integrity import checksum_mapping, checksum_text, load_yaml_mapping
 from agentic_dev.review_state.service import validate_review_bundle
+from agentic_dev.runtime_config import resolve_project_base_ref
 
 
 @dataclass(frozen=True)
@@ -25,10 +26,11 @@ class LocalEvidenceValidationResult:
 def validate_local_evidence(
     project_path: Path,
     story: str,
-    base_ref: str = "origin/main",
+    base_ref: str | None = None,
 ) -> LocalEvidenceValidationResult:
     """Validate the canonical local execution record and review decision."""
     project_path = project_path.resolve()
+    resolved_base_ref = resolve_project_base_ref(project_path, base_ref)
     story_path = project_path / "stories" / story
     reports_path = story_path / "reports"
     review_bundle_path = story_path / "review_bundle"
@@ -75,7 +77,7 @@ def validate_local_evidence(
         failure_reasons.append("execution record checksum mismatch")
 
     # Validate review bundle
-    validation = validate_review_bundle(project_path, story, base_ref=base_ref)
+    validation = validate_review_bundle(project_path, story, base_ref=resolved_base_ref)
     if not validation.valid:
         failure_reasons.append("review bundle validation failed: " + "; ".join(validation.reasons))
         return _build_invalid_result(
