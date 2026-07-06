@@ -7,7 +7,7 @@ from agentic_dev import finalize_story as finalize_story_module
 from agentic_dev.cli import main
 from agentic_dev.finalize_story import finalize_story
 from agentic_dev.quality_gate import READY_FOR_REVIEW, REQUEST_CHANGES, QualityGateResult
-from agentic_dev.review_bundle import ReviewBundleResult
+from agentic_dev.review_bundle import CommandResult as ReviewCommandResult, ReviewBundleResult
 from agentic_dev.test_layers import TEST_LAYER_PASSED, TestLayerResult as LayerValidationResult
 
 
@@ -133,6 +133,59 @@ def install_finalize_doubles(
     return calls
 
 
+def make_finalize_story_runner(cwd: Path):
+    outputs = {
+        "git rev-parse --is-inside-work-tree": "true\n",
+        "git rev-parse --show-toplevel": f"{cwd.resolve()}\n",
+        "git rev-parse --git-dir": ".git\n",
+        "git branch --show-current": "main\n",
+        "git rev-parse --is-shallow-repository": "false\n",
+        "git rev-parse HEAD": "HEADSHA\n",
+        "git rev-parse --verify origin/main": "BASESHA\n",
+        "git merge-base HEAD origin/main": "BASESHA\n",
+        "git rev-parse --verify refs/remotes/origin/main": "BASESHA\n",
+        "git config --get remote.origin.url": "https://github.com/OlivierMedor/agentic-dev-system.git\n",
+        "git rev-list --max-parents=0 HEAD": "rootcommit\n",
+        "git rev-list --count BASESHA..HEADSHA": "1\n",
+        "git log --reverse --format=%H%x09%s BASESHA..HEADSHA": "c1\tmsg\n",
+        "git diff --name-only BASESHA..HEADSHA": "tools/agentic-dev-system\n",
+        "git diff --stat BASESHA..HEADSHA": " tools/agentic-dev-system | 2 ++\n",
+        "git diff --binary BASESHA..HEADSHA": "diff --git a/tools/agentic-dev-system b/tools/agentic-dev-system\n",
+        "git diff --summary BASESHA..HEADSHA": "",
+        "git diff --name-status BASESHA..HEADSHA": "M\ttools/agentic-dev-system\n",
+        "git status --short": " M tools/agentic-dev-system\n",
+        "git diff --cached --name-only": "tools/agentic-dev-system\n",
+        "git diff --name-only": "tools/agentic-dev-system\n",
+        "git diff --cached": "diff --git a/tools/agentic-dev-system b/tools/agentic-dev-system\n",
+        "git diff": "diff --git a/tools/agentic-dev-system b/tools/agentic-dev-system\n",
+        "git ls-files --others --exclude-standard": "",
+        "git ls-files --others --ignored --exclude-standard": "",
+        "git ls-files": "story.md\ntools/agentic-dev-system\n",
+        "git diff --summary -- tools/agentic-dev-system": "",
+        "git diff -U0 -- tools/agentic-dev-system": "",
+        "git check-attr -a -- tools/agentic-dev-system": "",
+        "git show HEAD:tools/agentic-dev-system": "",
+        "pytest": "12 passed in 0.34s\n",
+        "ruff check .": "All checks passed!\n",
+    }
+
+    def runner(command: list[str], cwd_path: Path):
+        cmd_text = " ".join(command)
+        if cmd_text == "git show HEAD:tools/agentic-dev-system":
+            raise AssertionError("non-regular paths must not be read as text")
+        if cmd_text.startswith("git check-attr -a -- "):
+            return ReviewCommandResult(cmd_text, 0, "", "")
+        if cmd_text.startswith("git diff --summary -- "):
+            return ReviewCommandResult(cmd_text, 0, "", "")
+        if cmd_text.startswith("git diff -U0 -- "):
+            return ReviewCommandResult(cmd_text, 0, "", "")
+        if cmd_text not in outputs:
+            raise KeyError(f"Unexpected strict command call: {cmd_text}")
+        return ReviewCommandResult(cmd_text, 0, outputs[cmd_text], "")
+
+    return runner
+
+
 def test_finalize_story_validates_story_folder_exists(tmp_path: Path) -> None:
     with pytest.raises(FileNotFoundError, match="Story folder does not exist") as error:
         finalize_story(tmp_path, STORY)
@@ -162,6 +215,48 @@ def test_finalize_story_creates_reports_and_regenerates_review_bundle(
     assert result.finalize_result_path.exists()
     assert result.quality_gate_result_path.exists()
     assert result.quality_gate_report_path.exists()
+
+
+def test_finalize_story_handles_directory_changed_path_without_crashing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    story_path = create_story(tmp_path)
+    (tmp_path / "tools" / "agentic-dev-system").mkdir(parents=True)
+
+    runner = make_finalize_story_runner(tmp_path)
+
+    def fake_run_quality_gate(project_path: Path, story: str) -> QualityGateResult:
+        reports_path = project_path.resolve() / "stories" / story / "reports"
+        reports_path.mkdir(parents=True, exist_ok=True)
+        result_path = reports_path / "quality_gate_result.yaml"
+        report_path = reports_path / "quality_gate_report.md"
+        result_path.write_text("status: ready_for_review\n", encoding="utf-8")
+        report_path.write_text("# Quality Gate\n\nready_for_review\n", encoding="utf-8")
+        return QualityGateResult(
+            story=story,
+            status=READY_FOR_REVIEW,
+            passed_checks=[],
+            failed_checks=[],
+            ready_for_review=True,
+            next_action="Send to review.",
+            result_path=result_path,
+            report_path=report_path,
+        )
+
+    monkeypatch.setattr(finalize_story_module, "run_quality_gate", fake_run_quality_gate)
+
+    result = finalize_story(tmp_path, STORY, command_runner=runner)
+
+    normalization = yaml.safe_load((story_path / "review_bundle" / "normalization" / "report.yaml").read_text(encoding="utf-8"))
+    findings = {entry["path"]: entry for entry in normalization["findings"]}
+
+    assert result.status == "ready_for_review"
+    assert result.ready_for_review is True
+    assert findings["tools/agentic-dev-system"]["kind"] == "submodule_or_directory"
+    assert findings["tools/agentic-dev-system"]["note"] == "content not read because path is not a regular file"
+    assert result.finalize_report_path.exists()
+    assert result.finalize_result_path.exists()
 
 
 def test_finalize_story_runs_test_layers_before_quality_gate_when_applicable(

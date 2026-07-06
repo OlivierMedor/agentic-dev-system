@@ -107,6 +107,9 @@ class NormalizationFinding:
     original_checksums: dict[str, str]
     normalized_checksums: dict[str, str]
     reason: str
+    kind: str | None = None
+    change_status: str | None = None
+    note: str | None = None
 
 
 @dataclass(frozen=True)
