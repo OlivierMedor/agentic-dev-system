@@ -146,3 +146,5 @@ cloud_batch:
   manual_cloud_only: true
   automatic_apply_enabled: false
   automatic_resume_enabled: false
+
+default_base_ref: origin/main

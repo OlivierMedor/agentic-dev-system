@@ -181,6 +181,7 @@ def test_default_runtime_config_uses_codex_first_tiered_defaults(tmp_path: Path)
         "automatic_apply_enabled": False,
         "automatic_resume_enabled": False,
     }
+    assert result.config["default_base_ref"] == "origin/main"
 
 
 def test_checked_in_runtime_config_keeps_codex_runtime_disabled_by_default() -> None:
@@ -200,6 +201,7 @@ def test_checked_in_runtime_config_keeps_codex_runtime_disabled_by_default() -> 
     assert config["cloud_batch"]["manual_cloud_only"] is True
     assert config["cloud_batch"]["automatic_apply_enabled"] is False
     assert config["cloud_batch"]["automatic_resume_enabled"] is False
+    assert config["default_base_ref"] == "origin/main"
 
 
 def test_validate_runtime_config_fails_for_missing_required_agent(tmp_path: Path) -> None:

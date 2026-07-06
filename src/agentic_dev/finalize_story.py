@@ -10,6 +10,7 @@ from agentic_dev.quality_gate import READY_FOR_REVIEW, REQUEST_CHANGES, QualityG
 from agentic_dev.quality_gate import run_quality_gate
 from agentic_dev.review_bundle import CommandRunner, ReviewBundleResult, create_review_bundle
 from agentic_dev.test_layers import TestLayerResult, run_test_layers, test_plan_uses_test_layer_schema
+from agentic_dev.runtime_config import resolve_project_base_ref
 
 
 STATUS_READY_FOR_REVIEW = "ready_for_review"
@@ -38,10 +39,12 @@ def finalize_story(
     story: str,
     force: bool = False,
     command_runner: CommandRunner | None = None,
+    base_ref: str | None = None,
 ) -> FinalizeStoryResult:
     """Finalize a story for review without committing, pushing, or running cloud models."""
     project_path = project_path.resolve()
     story_path = project_path / "stories" / story
+    resolved_base_ref = resolve_project_base_ref(project_path, base_ref)
 
     if not story_path.exists():
         raise FileNotFoundError(f"Story folder does not exist: {story_path}")
@@ -53,7 +56,7 @@ def finalize_story(
     reports_path.mkdir(parents=True, exist_ok=True)
 
     from agentic_dev.local_evidence_validation import validate_local_evidence
-    local_ev = validate_local_evidence(project_path, story)
+    local_ev = validate_local_evidence(project_path, story, base_ref=resolved_base_ref)
 
     execution_provenance = None
     execution_record_checksum = None
@@ -96,7 +99,12 @@ def finalize_story(
             "review_decision": None,
             "review_decision_checksum": None,
         }
-        review_bundle_result = create_review_bundle_with_runner(project_path, story, command_runner)
+        review_bundle_result = create_review_bundle_with_runner(
+            project_path,
+            story,
+            resolved_base_ref,
+            command_runner,
+        )
         test_layer_result = run_test_layers_if_applicable(project_path, story_path, story)
         quality_gate_result = run_quality_gate(project_path, story)
         status, ready_for_review = status_from_quality_gate(quality_gate_result)
@@ -124,7 +132,12 @@ def finalize_story(
     write_finalize_report(result, quality_gate_result, review_bundle_result, force, is_legacy)
 
     if is_legacy:
-        review_bundle_result = create_review_bundle_with_runner(project_path, story, command_runner)
+        review_bundle_result = create_review_bundle_with_runner(
+            project_path,
+            story,
+            resolved_base_ref,
+            command_runner,
+        )
         write_finalize_report(result, quality_gate_result, review_bundle_result, force, is_legacy)
 
     return result
@@ -133,12 +146,18 @@ def finalize_story(
 def create_review_bundle_with_runner(
     project_path: Path,
     story: str,
+    base_ref: str,
     command_runner: CommandRunner | None,
 ) -> ReviewBundleResult:
     if command_runner is None:
-        return create_review_bundle(project_path, story)
+        return create_review_bundle(project_path, story, base_ref=base_ref)
 
-    return create_review_bundle(project_path, story, command_runner=command_runner)
+    return create_review_bundle(
+        project_path,
+        story,
+        base_ref=base_ref,
+        command_runner=command_runner,
+    )
 
 
 def run_test_layers_if_applicable(

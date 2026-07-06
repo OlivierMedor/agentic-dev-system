@@ -79,7 +79,7 @@ def mock_validators(monkeypatch, manifest_data):
         ruff_passed=True,
         strict_clean_passed=True,
     )
-    monkeypatch.setattr(fs, "create_review_bundle_with_runner", lambda p, s, cr: dummy_rb)
+    monkeypatch.setattr(fs, "create_review_bundle_with_runner", lambda p, s, base_ref, cr: dummy_rb)
 
 
 def test_legacy_role_agent_story_no_local_evidence(tmp_path: Path, monkeypatch):
@@ -196,7 +196,7 @@ def test_finalize_story_legacy_regenerates_review_bundle_before_and_after_qualit
 
     from agentic_dev.review_bundle import ReviewBundleResult
 
-    def fake_regenerate(project_path: Path, story: str, command_runner):
+    def fake_regenerate(project_path: Path, story: str, base_ref: str, command_runner):
         calls.append((project_path, story, command_runner))
         return ReviewBundleResult(
             review_bundle_path=story_path / "review_bundle",

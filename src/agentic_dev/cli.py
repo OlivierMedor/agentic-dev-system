@@ -163,8 +163,12 @@ def main() -> None:
     )
     review_bundle_parser.add_argument(
         "--base-ref",
-        default="origin/main",
-        help="Base ref or base SHA used to capture the committed PR diff. Defaults to origin/main.",
+        default=None,
+        help=(
+            "Base ref or base SHA used to capture the committed PR diff. "
+            "Defaults to the project default_base_ref, then origin/main. "
+            "The selected ref must resolve; there is no silent fallback to another branch."
+        ),
     )
     review_bundle_parser.add_argument(
         "--strict-clean",
@@ -365,6 +369,14 @@ def main() -> None:
         action="store_true",
         help="Run the hardcoded safe local steps. Without this flag, only a plan is written.",
     )
+    workflow_run_parser.add_argument(
+        "--base-ref",
+        default=None,
+        help=(
+            "Base ref used by local-finalize review steps. Defaults to the project "
+            "default_base_ref, then origin/main. The selected ref must resolve."
+        ),
+    )
 
     run_story_parser = subparsers.add_parser(
         "run-story",
@@ -422,6 +434,14 @@ def main() -> None:
         "--force",
         action="store_true",
         help="Refresh generated finalize evidence.",
+    )
+    finalize_story_parser.add_argument(
+        "--base-ref",
+        default=None,
+        help=(
+            "Base ref used to validate review evidence. Defaults to the project "
+            "default_base_ref, then origin/main. The selected ref must resolve."
+        ),
     )
 
     cloud_review_packet_parser = subparsers.add_parser(
@@ -1808,6 +1828,7 @@ def main() -> None:
                 args.story,
                 phase=args.phase,
                 execute=args.execute,
+                base_ref=args.base_ref,
             )
             print(result.terminal_summary)
 
@@ -1824,7 +1845,12 @@ def main() -> None:
                 parser.exit(status=1)
 
         if args.command == "finalize-story":
-            result = finalize_story(args.project, args.story, args.force)
+            result = finalize_story(
+                args.project,
+                args.story,
+                args.force,
+                base_ref=args.base_ref,
+            )
 
             print(f"Story finalized: {result.story}")
             print(f"Status: {result.status}")

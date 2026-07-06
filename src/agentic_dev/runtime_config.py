@@ -197,6 +197,8 @@ cloud_batch:
   manual_cloud_only: true
   automatic_apply_enabled: false
   automatic_resume_enabled: false
+
+default_base_ref: origin/main
 """
 
 
@@ -225,6 +227,35 @@ class CodexRuntimeConfig:
 
 def runtime_config_path(project_path: Path) -> Path:
     return project_path.resolve() / ".agentic" / "agent_runtime.yaml"
+
+
+def resolve_project_base_ref(project_path: Path, explicit_base_ref: str | None = None) -> str:
+    if explicit_base_ref is not None:
+        if not explicit_base_ref.strip():
+            raise ValueError("base ref must be a non-empty string.")
+        return explicit_base_ref.strip()
+
+    default_base_ref = load_project_default_base_ref(project_path)
+    if default_base_ref is not None:
+        return default_base_ref
+
+    return "origin/main"
+
+
+def load_project_default_base_ref(project_path: Path) -> str | None:
+    try:
+        _, config = load_runtime_config(project_path)
+    except FileNotFoundError:
+        return None
+
+    default_base_ref = config.get("default_base_ref")
+    if default_base_ref is None:
+        return None
+
+    if not isinstance(default_base_ref, str) or not default_base_ref.strip():
+        raise ValueError("default_base_ref must be a non-empty string.")
+
+    return default_base_ref.strip()
 
 
 def default_runtime_config_text() -> str:
@@ -332,6 +363,10 @@ def validate_runtime_config(project_path: Path) -> RuntimeConfigValidationResult
     validate_local_execution_config(config.get("local_execution"), errors)
     validate_cloud_escalation_config(config.get("cloud_escalation"), errors)
     validate_cloud_batch_config(config.get("cloud_batch"), errors)
+
+    default_base_ref = config.get("default_base_ref")
+    if default_base_ref is not None and not nonempty_string(default_base_ref):
+        errors.append("default_base_ref must be a non-empty string.")
 
     if errors:
         raise ValueError("Runtime config validation failed:\n- " + "\n- ".join(errors))

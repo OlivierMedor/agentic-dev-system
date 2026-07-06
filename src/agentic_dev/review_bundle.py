@@ -8,6 +8,8 @@ from typing import Any
 
 import yaml
 
+from agentic_dev.runtime_config import resolve_project_base_ref
+
 
 MAX_UNTRACKED_SNAPSHOT_BYTES = 100 * 1024
 REVIEW_BUNDLE_SNAPSHOT_FILE = "review_bundle_snapshot.yaml"
@@ -523,7 +525,7 @@ class ReviewBundleDiagnosticsResult:
 def create_review_bundle(
     project_path: Path,
     story: str,
-    base_ref: str = "origin/main",
+    base_ref: str | None = None,
     command_runner: CommandRunner = run_command,
     strict_clean: bool = False,
     diagnose_git_state: bool = False,
@@ -535,10 +537,12 @@ def create_review_bundle(
         ReviewBundleDiagnosticsServiceResult,
     )
 
+    resolved_base_ref = resolve_project_base_ref(project_path, base_ref)
+
     result = create_review_state_bundle(
         project_path,
         story,
-        base_ref=base_ref,
+        base_ref=resolved_base_ref,
         command_runner=command_runner,
         strict_clean=strict_clean,
         diagnose_git_state=diagnose_git_state,

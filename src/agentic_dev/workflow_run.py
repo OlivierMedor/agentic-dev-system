@@ -54,6 +54,7 @@ from agentic_dev.micro_readiness import run_micro_readiness
 from agentic_dev.next_step import format_bullet_list, validate_story_folder
 from agentic_dev.prepare_story import prepare_story
 from agentic_dev.review_bundle import create_review_bundle
+from agentic_dev.runtime_config import resolve_project_base_ref
 from agentic_dev.test_layers import TEST_LAYER_PASSED, run_test_layers
 from agentic_dev.workflow_preview import run_workflow_preview
 
@@ -113,6 +114,8 @@ class WorkflowRunState(TypedDict, total=False):
     story: str
     phase: str
     execute: bool
+    requested_base_ref: str | None
+    base_ref: str
     story_path: Path
     reports_path: Path
     graph_nodes_visited: list[str]
@@ -154,6 +157,7 @@ def run_workflow_run(
     story: str,
     phase: str = LOCAL_FINALIZE_PHASE,
     execute: bool = False,
+    base_ref: str | None = None,
     step_runner: SafeStepRunner | None = None,
 ) -> WorkflowRunResult:
     """Plan or execute a safe local story workflow using LangGraph."""
@@ -163,6 +167,8 @@ def run_workflow_run(
     project_path = project_path.resolve()
     story_path = project_path / "stories" / story
     validate_story_folder(story_path)
+    requested_base_ref = base_ref
+    resolved_base_ref = resolve_project_base_ref(project_path, base_ref)
 
     reports_path = story_path / "reports"
     reports_path.mkdir(parents=True, exist_ok=True)
@@ -174,6 +180,8 @@ def run_workflow_run(
             "story": story,
             "phase": phase,
             "execute": execute,
+            "requested_base_ref": requested_base_ref,
+            "base_ref": resolved_base_ref,
             "story_path": story_path,
             "reports_path": reports_path,
             "graph_nodes_visited": [],
@@ -204,7 +212,13 @@ def collect_story_state(state: WorkflowRunState) -> WorkflowRunState:
 
 
 def plan_safe_steps(state: WorkflowRunState) -> WorkflowRunState:
-    safe_steps = build_safe_steps(state["project_path"], state["story"], state["phase"])
+    safe_steps = build_safe_steps(
+        state["project_path"],
+        state["story"],
+        state["phase"],
+        state.get("requested_base_ref"),
+        state.get("base_ref"),
+    )
     return {
         "safe_steps_planned": safe_steps,
         "graph_nodes_visited": append_node(state, "plan_safe_steps"),
@@ -316,8 +330,20 @@ def write_workflow_run_report(state: WorkflowRunState) -> WorkflowRunState:
     }
 
 
-def build_safe_steps(project_path: Path, story: str, phase: str) -> list[SafeStep]:
+def build_safe_steps(
+    project_path: Path,
+    story: str,
+    phase: str,
+    requested_base_ref: str | None = None,
+    resolved_base_ref: str | None = None,
+) -> list[SafeStep]:
     project_text = str(project_path)
+    base_ref_args: tuple[str, ...] = ()
+    if phase == LOCAL_FINALIZE_PHASE:
+        if requested_base_ref is not None:
+            base_ref_args = ("--base-ref", resolved_base_ref or "origin/main")
+        elif resolved_base_ref and resolved_base_ref != "origin/main":
+            base_ref_args = ("--base-ref", resolved_base_ref)
 
     if phase == PREPARE_PHASE:
         return [
@@ -347,12 +373,28 @@ def build_safe_steps(project_path: Path, story: str, phase: str) -> list[SafeSte
             ),
             SafeStep(
                 name="finalize-story",
-                command=("agentic", "finalize-story", "--project", project_text, "--story", story),
+                command=(
+                    "agentic",
+                    "finalize-story",
+                    "--project",
+                    project_text,
+                    "--story",
+                    story,
+                    *base_ref_args,
+                ),
                 description="Refresh final local evidence and update story status.",
             ),
             SafeStep(
                 name="review-bundle",
-                command=("agentic", "review-bundle", "--project", project_text, "--story", story),
+                command=(
+                    "agentic",
+                    "review-bundle",
+                    "--project",
+                    project_text,
+                    "--story",
+                    story,
+                    *base_ref_args,
+                ),
                 description="Refresh the local review bundle.",
             ),
             SafeStep(
@@ -432,7 +474,11 @@ def run_safe_step(project_path: Path, story: str, step: SafeStep) -> SafeStepRes
             )
 
         if step.name == "finalize-story":
-            result = finalize_story(project_path, story)
+            result = finalize_story(
+                project_path,
+                story,
+                base_ref=extract_step_option(step.command, "--base-ref"),
+            )
             return build_step_result(
                 step,
                 result.ready_for_review,
@@ -442,7 +488,11 @@ def run_safe_step(project_path: Path, story: str, step: SafeStep) -> SafeStepRes
             )
 
         if step.name == "review-bundle":
-            result = create_review_bundle(project_path, story)
+            result = create_review_bundle(
+                project_path,
+                story,
+                base_ref=extract_step_option(step.command, "--base-ref"),
+            )
             passed = result.pytest_passed and result.ruff_passed
             return build_step_result(
                 step,
@@ -722,3 +772,14 @@ def append_node(state: WorkflowRunState, node_name: str) -> list[str]:
 
 def format_command(command: tuple[str, ...]) -> str:
     return " ".join(command)
+
+
+def extract_step_option(command: tuple[str, ...], option_name: str) -> str | None:
+    if option_name not in command:
+        return None
+
+    option_index = command.index(option_name)
+    if option_index + 1 >= len(command):
+        return None
+
+    return command[option_index + 1]

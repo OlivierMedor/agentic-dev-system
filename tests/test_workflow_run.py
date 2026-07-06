@@ -16,6 +16,7 @@ from agentic_dev.workflow_run import (
     build_workflow_run_graph,
     run_workflow_run,
 )
+from agentic_dev.test_layers import TEST_LAYER_PASSED
 
 
 STORY = "story_028_langgraph_safe_workflow_runner"
@@ -67,6 +68,13 @@ def create_story(project_path: Path, story: str = STORY) -> Path:
             bp_file.write_text(bp + "  - slug: " + story + "\n    story_id: " + story + "\n    title: " + story + "\n", encoding="utf-8")
             
     return story_path
+
+
+def write_runtime_config(project_path: Path, default_base_ref: str) -> Path:
+    config_path = project_path / ".agentic" / "agent_runtime.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(f"default_base_ref: {default_base_ref}\n", encoding="utf-8")
+    return config_path
 
 
 def read_yaml(path: Path) -> dict[str, Any]:
@@ -230,6 +238,194 @@ def test_workflow_run_execute_runs_safe_local_finalize_steps_with_fake_runner(
     assert "finalize-story: PASSED" in report
     assert "review-bundle: PASSED" in report
     assert "workflow-preview: PASSED" in report
+
+
+def test_workflow_run_local_finalize_uses_project_default_base_ref(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    create_story(tmp_path)
+    default_base_ref = "origin/phase/01-funding-spike-detector"
+    write_runtime_config(tmp_path, default_base_ref)
+    finalize_calls: list[str | None] = []
+    review_calls: list[str | None] = []
+
+    class FakeFinalizeResult:
+        ready_for_review = True
+        status = "ready_for_review"
+        finalize_result_path = tmp_path / "stories" / STORY / "reports" / "finalize_story_result.yaml"
+        finalize_report_path = tmp_path / "stories" / STORY / "reports" / "finalize_story_report.md"
+
+    class FakeReviewBundleResult:
+        pytest_passed = True
+        ruff_passed = True
+        review_bundle_path = tmp_path / "stories" / STORY / "review_bundle"
+
+    class FakeWorkflowPreviewResult:
+        result_path = tmp_path / "stories" / STORY / "reports" / "workflow_preview_result.yaml"
+        report_path = tmp_path / "stories" / STORY / "reports" / "workflow_preview_report.md"
+        recommended_next_action = "Continue."
+
+    class FakeTestLayerResult:
+        status = TEST_LAYER_PASSED
+        result_path = tmp_path / "stories" / STORY / "reports" / "test_layer_result.yaml"
+        report_path = tmp_path / "stories" / STORY / "reports" / "test_layer_report.md"
+
+    def fake_finalize_story(
+        project_path: Path,
+        story: str,
+        force: bool = False,
+        command_runner=None,
+        base_ref: str | None = None,
+    ) -> FakeFinalizeResult:
+        finalize_calls.append(base_ref)
+        assert project_path == tmp_path
+        assert story == STORY
+        assert base_ref == default_base_ref
+        FakeFinalizeResult.finalize_result_path.parent.mkdir(parents=True, exist_ok=True)
+        FakeFinalizeResult.finalize_result_path.write_text("ready_for_review: true\n", encoding="utf-8")
+        FakeFinalizeResult.finalize_report_path.write_text("# finalize\n", encoding="utf-8")
+        return FakeFinalizeResult()
+
+    def fake_create_review_bundle(
+        project_path: Path,
+        story: str,
+        base_ref: str | None = None,
+        command_runner=None,
+        strict_clean: bool = False,
+        diagnose_git_state: bool = False,
+        allow_generated_artifacts: bool = False,
+        host_identity_file: Path | None = None,
+    ) -> FakeReviewBundleResult:
+        review_calls.append(base_ref)
+        assert project_path == tmp_path
+        assert story == STORY
+        assert base_ref == default_base_ref
+        FakeReviewBundleResult.review_bundle_path.mkdir(parents=True, exist_ok=True)
+        (FakeReviewBundleResult.review_bundle_path / "handoff.md").write_text(
+            "# handoff\n",
+            encoding="utf-8",
+        )
+        return FakeReviewBundleResult()
+
+    def fake_run_test_layers(project_path: Path, story: str) -> FakeTestLayerResult:
+        assert project_path == tmp_path
+        assert story == STORY
+        FakeTestLayerResult.result_path.parent.mkdir(parents=True, exist_ok=True)
+        FakeTestLayerResult.result_path.write_text("status: PASSED\n", encoding="utf-8")
+        FakeTestLayerResult.report_path.write_text("# test layers\n", encoding="utf-8")
+        return FakeTestLayerResult()
+
+    def fake_run_workflow_preview(project_path: Path, story: str) -> FakeWorkflowPreviewResult:
+        assert project_path == tmp_path
+        assert story == STORY
+        FakeWorkflowPreviewResult.result_path.parent.mkdir(parents=True, exist_ok=True)
+        FakeWorkflowPreviewResult.result_path.write_text("status: completed\n", encoding="utf-8")
+        FakeWorkflowPreviewResult.report_path.write_text("# workflow preview\n", encoding="utf-8")
+        return FakeWorkflowPreviewResult()
+
+    monkeypatch.setattr("agentic_dev.workflow_run.finalize_story", fake_finalize_story)
+    monkeypatch.setattr("agentic_dev.workflow_run.create_review_bundle", fake_create_review_bundle)
+    monkeypatch.setattr("agentic_dev.workflow_run.run_test_layers", fake_run_test_layers)
+    monkeypatch.setattr("agentic_dev.workflow_run.run_workflow_preview", fake_run_workflow_preview)
+
+    result = run_workflow_run(tmp_path, STORY, execute=True)
+    result_data = read_yaml(result.result_path)
+
+    assert finalize_calls == [default_base_ref]
+    assert review_calls == [default_base_ref]
+    assert result.status == "completed"
+    assert result.safe_steps_planned == [
+        "test-layers",
+        "finalize-story",
+        "review-bundle",
+        "workflow-preview",
+    ]
+    assert any(default_base_ref in step_result.command for step_result in result.step_results)
+    assert "finalize-story --project" in result.report_path.read_text(encoding="utf-8")
+    assert result_data["status"] == "completed"
+
+
+def test_workflow_run_explicit_origin_main_base_ref_overrides_project_default(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    create_story(tmp_path)
+    write_runtime_config(tmp_path, "origin/phase/01-funding-spike-detector")
+    seen_base_refs: list[str | None] = []
+
+    class FakeFinalizeResult:
+        ready_for_review = True
+        status = "ready_for_review"
+        finalize_result_path = tmp_path / "stories" / STORY / "reports" / "finalize_story_result.yaml"
+        finalize_report_path = tmp_path / "stories" / STORY / "reports" / "finalize_story_report.md"
+
+    class FakeReviewBundleResult:
+        pytest_passed = True
+        ruff_passed = True
+        review_bundle_path = tmp_path / "stories" / STORY / "review_bundle"
+
+    class FakeWorkflowPreviewResult:
+        result_path = tmp_path / "stories" / STORY / "reports" / "workflow_preview_result.yaml"
+        report_path = tmp_path / "stories" / STORY / "reports" / "workflow_preview_report.md"
+        recommended_next_action = "Continue."
+
+    class FakeTestLayerResult:
+        status = TEST_LAYER_PASSED
+        result_path = tmp_path / "stories" / STORY / "reports" / "test_layer_result.yaml"
+        report_path = tmp_path / "stories" / STORY / "reports" / "test_layer_report.md"
+
+    def fake_finalize_story(
+        project_path: Path,
+        story: str,
+        force: bool = False,
+        command_runner=None,
+        base_ref: str | None = None,
+    ) -> FakeFinalizeResult:
+        seen_base_refs.append(base_ref)
+        assert base_ref == "origin/main"
+        FakeFinalizeResult.finalize_result_path.parent.mkdir(parents=True, exist_ok=True)
+        FakeFinalizeResult.finalize_result_path.write_text("ready_for_review: true\n", encoding="utf-8")
+        FakeFinalizeResult.finalize_report_path.write_text("# finalize\n", encoding="utf-8")
+        return FakeFinalizeResult()
+
+    def fake_create_review_bundle(
+        project_path: Path,
+        story: str,
+        base_ref: str | None = None,
+        command_runner=None,
+        strict_clean: bool = False,
+        diagnose_git_state: bool = False,
+        allow_generated_artifacts: bool = False,
+        host_identity_file: Path | None = None,
+    ) -> FakeReviewBundleResult:
+        seen_base_refs.append(base_ref)
+        assert base_ref == "origin/main"
+        FakeReviewBundleResult.review_bundle_path.mkdir(parents=True, exist_ok=True)
+        (FakeReviewBundleResult.review_bundle_path / "handoff.md").write_text("# handoff\n", encoding="utf-8")
+        return FakeReviewBundleResult()
+
+    def fake_run_test_layers(project_path: Path, story: str) -> FakeTestLayerResult:
+        FakeTestLayerResult.result_path.parent.mkdir(parents=True, exist_ok=True)
+        FakeTestLayerResult.result_path.write_text("status: PASSED\n", encoding="utf-8")
+        FakeTestLayerResult.report_path.write_text("# test layers\n", encoding="utf-8")
+        return FakeTestLayerResult()
+
+    def fake_run_workflow_preview(project_path: Path, story: str) -> FakeWorkflowPreviewResult:
+        FakeWorkflowPreviewResult.result_path.parent.mkdir(parents=True, exist_ok=True)
+        FakeWorkflowPreviewResult.result_path.write_text("status: completed\n", encoding="utf-8")
+        FakeWorkflowPreviewResult.report_path.write_text("# workflow preview\n", encoding="utf-8")
+        return FakeWorkflowPreviewResult()
+
+    monkeypatch.setattr("agentic_dev.workflow_run.finalize_story", fake_finalize_story)
+    monkeypatch.setattr("agentic_dev.workflow_run.create_review_bundle", fake_create_review_bundle)
+    monkeypatch.setattr("agentic_dev.workflow_run.run_test_layers", fake_run_test_layers)
+    monkeypatch.setattr("agentic_dev.workflow_run.run_workflow_preview", fake_run_workflow_preview)
+
+    result = run_workflow_run(tmp_path, STORY, execute=True, base_ref="origin/main")
+
+    assert seen_base_refs == ["origin/main", "origin/main"]
+    assert result.status == "completed"
 
 
 def test_workflow_run_prepare_dry_run_writes_plan_without_running_safe_steps(

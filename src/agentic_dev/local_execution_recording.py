@@ -11,6 +11,7 @@ import yaml
 from agentic_dev.quality_gate import pytest_passed, ruff_passed
 from agentic_dev.review_state.integrity import checksum_mapping, checksum_text, load_yaml_mapping, write_text_file
 from agentic_dev.review_state.service import validate_review_bundle
+from agentic_dev.runtime_config import resolve_project_base_ref
 
 
 SCHEMA_VERSION = 1
@@ -689,7 +690,7 @@ def record_local_execution(
     attestation_file: Path | None = None,
     dry_run: bool = False,
     force: bool = False,
-    base_ref: str = "origin/main",
+    base_ref: str | None = None,
 ) -> LocalExecutionResult:
     """Record evidence-derived local execution for a story.
 
@@ -698,6 +699,7 @@ def record_local_execution(
     structured review decision via `agentic record-local-review`.
     """
     project_path = project_path.resolve()
+    resolved_base_ref = resolve_project_base_ref(project_path, base_ref)
 
     # Validate execution type
     if execution_type not in ACCEPTED_EXECUTION_TYPES:
@@ -730,7 +732,7 @@ def record_local_execution(
     _safe_relative_path(manifest_path.resolve(), project_path)
 
     # 1. Validate the review bundle (strict)
-    validation = validate_review_bundle(project_path, story, base_ref=base_ref)
+    validation = validate_review_bundle(project_path, story, base_ref=resolved_base_ref)
     if not validation.valid:
         raise ValueError(
             "Review bundle validation failed before recording: "

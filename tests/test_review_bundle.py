@@ -9,6 +9,13 @@ BASE_SHA = "5f0d9fda8b6b0a89ed6c6ef819a6937630d79d3e"
 HEAD_SHA = "c2ec13bfefe6e8cf35d2f6ac4dc2f3a20193b47a"
 
 
+def write_runtime_config(project_path: Path, default_base_ref: str) -> Path:
+    config_path = project_path / ".agentic" / "agent_runtime.yaml"
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(f"default_base_ref: {default_base_ref}\n", encoding="utf-8")
+    return config_path
+
+
 def mock_git_runner(cwd: Path, custom_outputs: dict[str, str | tuple[int, str, str]], head_sha=HEAD_SHA, base_sha=BASE_SHA):
     outputs = {
         "git rev-parse --is-inside-work-tree": "true\n",
@@ -129,6 +136,63 @@ def test_create_review_bundle_accepts_explicit_base_sha_for_clean_branch(tmp_pat
     metadata = (result.review_bundle_path / "committed_diff_metadata.txt").read_text(encoding="utf-8")
     assert f"Requested base ref: `{BASE_SHA}`" in metadata
     assert f"Base SHA: `{BASE_SHA}`" in metadata
+
+
+def test_create_review_bundle_uses_project_default_base_ref_when_base_ref_is_omitted(
+    tmp_path: Path,
+) -> None:
+    story = "story_002_review_bundle_command"
+    (tmp_path / "stories" / story).mkdir(parents=True)
+    (tmp_path / "stories" / story / "story.md").write_text("# story\n", encoding="utf-8")
+    default_base_ref = "origin/phase/01-funding-spike-detector"
+    write_runtime_config(tmp_path, default_base_ref)
+
+    runner = mock_git_runner(
+        tmp_path,
+        {
+            f"git rev-parse --verify {default_base_ref}": f"{BASE_SHA}\n",
+            f"git merge-base HEAD {default_base_ref}": f"{BASE_SHA}\n",
+            f"git rev-parse --verify refs/remotes/{default_base_ref}": (
+                1,
+                "",
+                "fatal: Needed a single revision\n",
+            ),
+        },
+    )
+
+    result = create_review_bundle(tmp_path, story, command_runner=runner)
+
+    metadata = (result.review_bundle_path / "committed_diff_metadata.txt").read_text(encoding="utf-8")
+    assert f"Requested base ref: `{default_base_ref}`" in metadata
+    assert f"Resolved base ref: `{default_base_ref}`" in metadata
+    assert f"Base SHA: `{BASE_SHA}`" in metadata
+
+
+def test_create_review_bundle_fails_when_selected_base_ref_is_missing(tmp_path: Path) -> None:
+    story = "story_002_review_bundle_command"
+    (tmp_path / "stories" / story).mkdir(parents=True)
+    (tmp_path / "stories" / story / "story.md").write_text("# story\n", encoding="utf-8")
+    missing_base_ref = "origin/phase/does-not-exist"
+    write_runtime_config(tmp_path, missing_base_ref)
+
+    runner = mock_git_runner(
+        tmp_path,
+        {
+            f"git rev-parse --verify {missing_base_ref}": (
+                1,
+                "",
+                f"fatal: Needed a single revision {missing_base_ref}\n",
+            ),
+            f"git merge-base HEAD {missing_base_ref}": (
+                1,
+                "",
+                f"fatal: Not a valid object name {missing_base_ref}\n",
+            ),
+        },
+    )
+
+    with pytest.raises(ValueError, match="Requested base ref 'origin/phase/does-not-exist' could not be resolved"):
+        create_review_bundle(tmp_path, story, command_runner=runner)
 
 
 def test_file_tree_excludes_noisy_folders(tmp_path: Path) -> None:

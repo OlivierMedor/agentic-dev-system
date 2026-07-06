@@ -4,6 +4,14 @@
 which provider and model each agent role should use, and which commands are safe
 to run without repeated approval.
 
+It can also set `default_base_ref` for review-boundary commands that need to
+resolve the project's non-default review base branch. `--base-ref` overrides
+the project default when it is passed explicitly. When no explicit `--base-ref`
+is provided, `finalize-story`, `review-bundle`, and
+`workflow-run --phase local-finalize` use `default_base_ref` before falling
+back to `origin/main`. If the selected ref cannot be resolved, the command
+fails. There is no silent substitution to another branch.
+
 Blueprint files describe what to build and why. They are not the source of
 truth for provider wiring, Codex tiers, or local endpoint settings. Story 060
 adds one narrow exception: a blueprint role may optionally override the local
@@ -54,6 +62,11 @@ cloud model and records the result manually.
 `cloud_batch` follows the same manual-first rule for Story 065 orchestration.
 It coordinates multiple requests and their downstream applications, but
 automatic batch apply and automatic batch resume remain disabled.
+
+`default_base_ref` is optional and should match the branch or ref that review
+bundle commands use as their committed-diff base. The default template keeps it
+set to `origin/main`, but downstream projects can change it when their review
+flow branches from another ref.
 
 `local_model_helper` keeps Gemma support available as an optional micro-mode
 draft helper. It is not the default docs runtime, not a final reviewer, and not
