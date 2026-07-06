@@ -99,6 +99,9 @@ The story folder answers these questions:
 
 A review bundle is generated evidence for a story. It collects local context such
 as Git status, diffs, test output, lint output, file tree, and a handoff summary.
+Changed paths that are directories, submodules, missing, binary, or unreadable
+are still recorded in the bundle with explicit metadata, but their contents are
+not read as normal text files.
 
 Review bundles live under:
 

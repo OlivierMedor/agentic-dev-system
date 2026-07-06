@@ -168,28 +168,71 @@ def classify_normalization(project_path: Path, paths: list[str], command_runner:
     findings: list[NormalizationFinding] = []
     for relative_path in sorted(set(paths)):
         file_path = project_path / relative_path
-        
-        is_deleted = not file_path.exists()
-        repo_res = command_runner(["git", "show", f"HEAD:{relative_path}"], project_path)
-        is_added = repo_res.returncode != 0
 
-        if is_deleted:
+        git_attributes = _split_lines(_run_text(command_runner, ["git", "check-attr", "-a", "--", relative_path], project_path))
+
+        if not file_path.exists():
             findings.append(
                 NormalizationFinding(
                     path=relative_path,
                     classification="deleted",
                     repository_representation="text",
-                    working_tree_representation="none",
-                    git_attributes=_split_lines(_run_text(command_runner, ["git", "check-attr", "-a", "--", relative_path], project_path)),
+                    working_tree_representation="missing",
+                    git_attributes=git_attributes,
                     original_checksums={"repository": "", "working_tree": ""},
                     normalized_checksums={"repository": "", "working_tree": ""},
                     reason="deleted file",
+                    kind="missing",
+                    change_status="deleted",
+                    note="content not read because path is missing from the working tree",
+                )
+            )
+            continue
+
+        if not file_path.is_file():
+            note = "content not read because path is not a regular file"
+            kind = "submodule_or_directory" if file_path.is_dir() else "non_regular_path"
+            findings.append(
+                NormalizationFinding(
+                    path=relative_path,
+                    classification=kind,
+                    repository_representation="not-a-regular-file",
+                    working_tree_representation="not-a-regular-file",
+                    git_attributes=git_attributes,
+                    original_checksums={"repository": "", "working_tree": ""},
+                    normalized_checksums={"repository": "", "working_tree": ""},
+                    reason="working tree path is not a regular file",
+                    kind=kind,
+                    change_status="modified",
+                    note=note,
+                )
+            )
+            continue
+
+        repo_res = command_runner(["git", "show", f"HEAD:{relative_path}"], project_path)
+        is_added = repo_res.returncode != 0
+
+        try:
+            working_bytes = file_path.read_bytes()
+        except OSError:
+            findings.append(
+                NormalizationFinding(
+                    path=relative_path,
+                    classification="unreadable",
+                    repository_representation="text" if not is_added else "none",
+                    working_tree_representation="unreadable",
+                    git_attributes=git_attributes,
+                    original_checksums={"repository": "", "working_tree": ""},
+                    normalized_checksums={"repository": "", "working_tree": ""},
+                    reason="working tree file could not be read",
+                    kind="unreadable",
+                    change_status="added" if is_added else "modified",
+                    note="content not read because the working tree file could not be read",
                 )
             )
             continue
 
         if is_added:
-            working_bytes = file_path.read_bytes()
             is_binary = b"\x00" in working_bytes[:8000]
             findings.append(
                 NormalizationFinding(
@@ -197,16 +240,18 @@ def classify_normalization(project_path: Path, paths: list[str], command_runner:
                     classification="binary" if is_binary else "added",
                     repository_representation="none",
                     working_tree_representation="binary" if is_binary else "text",
-                    git_attributes=_split_lines(_run_text(command_runner, ["git", "check-attr", "-a", "--", relative_path], project_path)),
+                    git_attributes=git_attributes,
                     original_checksums={"repository": "", "working_tree": checksum_bytes(working_bytes)},
                     normalized_checksums={"repository": "", "working_tree": checksum_bytes(working_bytes)},
                     reason="binary file" if is_binary else "added file",
+                    kind="binary" if is_binary else "text",
+                    change_status="added",
+                    note="content read as bytes only because the file was newly added" if is_binary else None,
                 )
             )
             continue
 
         # Exists in both HEAD and working tree
-        working_bytes = file_path.read_bytes()
         is_binary_work = b"\x00" in working_bytes[:8000]
         
         repo_bytes = repo_res.stdout.encode("utf-8", errors="surrogateescape")
@@ -219,10 +264,13 @@ def classify_normalization(project_path: Path, paths: list[str], command_runner:
                     classification="binary",
                     repository_representation="binary",
                     working_tree_representation="binary",
-                    git_attributes=_split_lines(_run_text(command_runner, ["git", "check-attr", "-a", "--", relative_path], project_path)),
+                    git_attributes=git_attributes,
                     original_checksums={"repository": checksum_bytes(repo_bytes), "working_tree": checksum_bytes(working_bytes)},
                     normalized_checksums={"repository": checksum_bytes(repo_bytes), "working_tree": checksum_bytes(working_bytes)},
                     reason="binary file",
+                    kind="binary",
+                    change_status="modified",
+                    note="content read as bytes only because binary data was detected",
                 )
             )
             continue
@@ -273,10 +321,13 @@ def classify_normalization(project_path: Path, paths: list[str], command_runner:
                 classification=classification,
                 repository_representation=_describe_text(repo_text),
                 working_tree_representation=_describe_text(work_text),
-                git_attributes=_split_lines(_run_text(command_runner, ["git", "check-attr", "-a", "--", relative_path], project_path)),
+                git_attributes=git_attributes,
                 original_checksums={"repository": checksum_text(repo_text), "working_tree": checksum_text(work_text)},
                 normalized_checksums={"repository": checksum_text(repo_final), "working_tree": checksum_text(work_final)},
                 reason=reason,
+                kind="text",
+                change_status="modified",
+                note="content read and normalized as text",
             ),
         )
     return findings

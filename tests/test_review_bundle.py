@@ -1,5 +1,7 @@
+from collections.abc import Callable
 from pathlib import Path
 import pytest
+import yaml
 
 from agentic_dev.cli import main
 from agentic_dev.review_bundle import CommandResult, ReviewBundleResult, create_review_bundle
@@ -70,6 +72,76 @@ def mock_git_runner(cwd: Path, custom_outputs: dict[str, str | tuple[int, str, s
             return CommandResult(cmd_text, val[0], val[1], val[2])
         return CommandResult(cmd_text, 0, val, "")
     return runner
+
+
+def make_non_regular_path_runner(
+    cwd: Path,
+    unreadable_path: Path | None = None,
+    custom_outputs: dict[str, str | tuple[int, str, str]] | None = None,
+) -> tuple[Callable[[list[str], Path], CommandResult], dict[str, str | tuple[int, str, str]]]:
+    outputs = {
+        "git rev-parse --is-inside-work-tree": "true\n",
+        "git rev-parse --show-toplevel": f"{cwd.resolve()}\n",
+        "git rev-parse --git-dir": ".git\n",
+        "git branch --show-current": "main\n",
+        "git rev-parse --is-shallow-repository": "false\n",
+        "git rev-parse --verify origin/main": f"{BASE_SHA}\n",
+        "git rev-parse --verify refs/remotes/origin/main": f"{BASE_SHA}\n",
+        f"git rev-parse --verify refs/remotes/{BASE_SHA}": (1, "", "fatal: Needed a single revision\n"),
+        f"git rev-parse --verify {BASE_SHA}": f"{BASE_SHA}\n",
+        "git rev-parse HEAD": f"{HEAD_SHA}\n",
+        "git merge-base HEAD origin/main": f"{BASE_SHA}\n",
+        f"git merge-base HEAD {BASE_SHA}": f"{BASE_SHA}\n",
+        "git diff --stat": "",
+        "git diff --cached": "",
+        "git diff": "",
+        f"git diff --stat {BASE_SHA}..HEAD": "",
+        f"git diff --name-only {BASE_SHA}..HEAD": "",
+        f"git diff {BASE_SHA}..HEAD": "",
+        f"git diff --stat {BASE_SHA}..{HEAD_SHA}": "",
+        f"git diff --name-only {BASE_SHA}..{HEAD_SHA}": "",
+        f"git diff {BASE_SHA}..{HEAD_SHA}": "",
+        f"git rev-list --count {BASE_SHA}..{HEAD_SHA}": "1\n",
+        "git ls-files --others --exclude-standard": "",
+        "git ls-files --others --ignored --exclude-standard": "",
+        "git status --short": "",
+        "git log --oneline -5": "c2ec13b fix: msg\n",
+        f"git log --reverse --format=%H%x09%s {BASE_SHA}..{HEAD_SHA}": "c2ec13b\tfix: msg\n",
+        f"git diff --binary {BASE_SHA}..{HEAD_SHA}": "",
+        f"git diff --summary {BASE_SHA}..{HEAD_SHA}": "",
+        f"git diff --name-status {BASE_SHA}..{HEAD_SHA}": "",
+        "git ls-files": "",
+        "git diff --cached --name-only": "",
+        "git diff --name-only": "",
+        "git config --get remote.origin.url": "https://github.com/OlivierMedor/agentic-dev-system.git\n",
+        "git rev-list --max-parents=0 HEAD": "rootcommit\n",
+        "pytest": "12 passed in 0.34s\n",
+        "ruff check .": "All checks passed!\n",
+    }
+    if custom_outputs:
+        outputs.update(custom_outputs)
+
+    def runner(command: list[str], cwd_path: Path) -> CommandResult:
+        cmd_text = " ".join(command)
+        if cmd_text == "git show HEAD:tools/agentic-dev-system":
+            raise AssertionError("non-regular paths must not be read as text")
+        if cmd_text.startswith("git check-attr -a -- "):
+            return CommandResult(cmd_text, 0, "", "")
+        if cmd_text.startswith("git diff --summary -- "):
+            return CommandResult(cmd_text, 0, "", "")
+        if cmd_text.startswith("git diff -U0 -- "):
+            return CommandResult(cmd_text, 0, "", "")
+        if unreadable_path is not None and cmd_text == f"git show HEAD:{unreadable_path.relative_to(cwd_path).as_posix()}":
+            return CommandResult(cmd_text, 0, "unreadable repo text\n", "")
+        if cmd_text not in outputs:
+            raise KeyError(f"Unexpected strict command call: {cmd_text}")
+
+        val = outputs[cmd_text]
+        if isinstance(val, tuple):
+            return CommandResult(cmd_text, val[0], val[1], val[2])
+        return CommandResult(cmd_text, 0, val, "")
+
+    return runner, outputs
 
 
 def test_create_review_bundle_writes_expected_files(tmp_path: Path) -> None:
@@ -262,6 +334,94 @@ def test_untracked_file_outputs_record_skipped_files(tmp_path: Path) -> None:
     assert "SECRET=value" not in contents
     assert ".env: potential secret file" in skipped
     assert "large.txt: file too large" in skipped
+
+
+def test_changed_non_regular_and_unreadable_paths_are_recorded_without_crashing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    story = "story_002_review_bundle_command"
+    story_path = tmp_path / "stories" / story
+    story_path.mkdir(parents=True)
+    (story_path / "story.md").write_text("# story\n", encoding="utf-8")
+
+    normal_path = tmp_path / "notes" / "normal.txt"
+    normal_path.parent.mkdir(parents=True, exist_ok=True)
+    normal_path.write_text("updated content\n", encoding="utf-8")
+
+    binary_path = tmp_path / "binary.bin"
+    binary_path.write_bytes(b"alpha\x00beta")
+
+    unreadable_path = tmp_path / "unreadable.txt"
+    unreadable_path.write_text("secret\n", encoding="utf-8")
+
+    directory_path = tmp_path / "tools" / "agentic-dev-system"
+    directory_path.mkdir(parents=True)
+
+    runner, _ = make_non_regular_path_runner(
+        tmp_path,
+        unreadable_path=unreadable_path,
+        custom_outputs={
+            "git diff --cached --name-only": "\n".join(
+                [
+                    "notes/normal.txt",
+                    "tools/agentic-dev-system",
+                    "binary.bin",
+                    "unreadable.txt",
+                    "missing.txt",
+                ],
+            )
+            + "\n",
+            "git diff --name-only": "\n".join(
+                [
+                    "notes/normal.txt",
+                    "tools/agentic-dev-system",
+                    "binary.bin",
+                    "unreadable.txt",
+                    "missing.txt",
+                ],
+            )
+            + "\n",
+            "git ls-files": "\n".join(
+                [
+                    "story.md",
+                    "notes/normal.txt",
+                    "tools/agentic-dev-system",
+                    "binary.bin",
+                    "unreadable.txt",
+                ],
+            )
+            + "\n",
+            "git show HEAD:notes/normal.txt": "original content\n",
+            "git show HEAD:binary.bin": "binary repository content\n",
+            "git show HEAD:unreadable.txt": "unreadable repository content\n",
+        },
+    )
+
+    original_read_bytes = Path.read_bytes
+
+    def fake_read_bytes(self: Path) -> bytes:
+        if self == unreadable_path:
+            raise OSError("permission denied")
+        return original_read_bytes(self)
+
+    monkeypatch.setattr(Path, "read_bytes", fake_read_bytes, raising=True)
+
+    result = create_review_bundle(tmp_path, story, command_runner=runner)
+
+    normalization = yaml.safe_load((result.review_bundle_path / "normalization" / "report.yaml").read_text(encoding="utf-8"))
+    findings = {entry["path"]: entry for entry in normalization["findings"]}
+
+    assert findings["notes/normal.txt"]["kind"] == "text"
+    assert findings["notes/normal.txt"]["note"] == "content read and normalized as text"
+    assert findings["tools/agentic-dev-system"]["kind"] == "submodule_or_directory"
+    assert findings["tools/agentic-dev-system"]["note"] == "content not read because path is not a regular file"
+    assert findings["binary.bin"]["kind"] == "binary"
+    assert findings["binary.bin"]["note"] == "content read as bytes only because binary data was detected"
+    assert findings["unreadable.txt"]["kind"] == "unreadable"
+    assert findings["unreadable.txt"]["note"] == "content not read because the working tree file could not be read"
+    assert findings["missing.txt"]["kind"] == "missing"
+    assert findings["missing.txt"]["note"] == "content not read because path is missing from the working tree"
 
 
 def test_uncommitted_edits_never_enter_committed_patch(tmp_path: Path) -> None:
